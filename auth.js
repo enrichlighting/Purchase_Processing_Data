@@ -1,0 +1,79 @@
+// ============================================================
+// auth.js — จัดการ Login เข้าองค์กรผ่าน MSAL.js (Microsoft Authentication Library)
+// ใช้คู่กับ Entra ID App Registration: Richest_Purchase_Processing
+// ============================================================
+
+const msalConfig = {
+  auth: {
+    clientId: '5bf2fbde-fbfa-4469-b7d6-7a035a01ef1b', // Application (client) ID
+    authority: 'https://login.microsoftonline.com/77ec4080-3602-4d2e-b2fb-eee9ed878b1c', // Tenant ID
+    redirectUri: 'https://enrichlighting.github.io/Purchase_Processing_Data/', // ต้องตรงกับ Redirect URI ที่ลงทะเบียนไว้ใน Entra ID เป๊ะๆ
+  },
+  cache: {
+    cacheLocation: 'sessionStorage',
+    storeAuthStateInCookie: false,
+  },
+};
+
+const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+const loginRequest = {
+  scopes: ['https://graph.microsoft.com/Sites.ReadWrite.All'],
+};
+
+let msalInitialized = false;
+async function ensureMsalInitialized() {
+  if (!msalInitialized) {
+    await msalInstance.initialize();
+    msalInitialized = true;
+  }
+}
+
+/**
+ * เรียกฟังก์ชันนี้ตอนเปิดหน้าเว็บ (หรือกดปุ่ม Login) เพื่อให้ผู้ใช้ล็อกอินด้วยบัญชีองค์กร
+ * ถ้าล็อกอินค้างอยู่แล้วในเบราว์เซอร์ จะข้ามการเปิด popup ไปเลย
+ */
+async function signIn() {
+  await ensureMsalInitialized();
+
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length > 0) {
+    msalInstance.setActiveAccount(accounts[0]);
+    return accounts[0];
+  }
+
+  const loginResponse = await msalInstance.loginPopup(loginRequest);
+  msalInstance.setActiveAccount(loginResponse.account);
+  return loginResponse.account;
+}
+
+/**
+ * เรียกฟังก์ชันนี้ทุกครั้งก่อนยิง Graph API เพื่อขอ Access Token ล่าสุด
+ * (จะพยายามขอแบบเงียบๆ ก่อน ถ้าไม่ได้ค่อยเปิด popup ให้ล็อกอินใหม่)
+ */
+async function getGraphToken() {
+  await ensureMsalInitialized();
+
+  let account = msalInstance.getActiveAccount();
+  if (!account) {
+    account = await signIn();
+  }
+
+  try {
+    const response = await msalInstance.acquireTokenSilent({
+      ...loginRequest,
+      account,
+    });
+    return response.accessToken;
+  } catch (error) {
+    const response = await msalInstance.acquireTokenPopup(loginRequest);
+    return response.accessToken;
+  }
+}
+
+// เปิดให้ไฟล์อื่น (เช่น graphStorage.js หรือ bc-*.js) เรียกใช้งานผ่าน window.GraphAuth
+window.GraphAuth = {
+  signIn,
+  getGraphToken,
+  msalInstance,
+};
