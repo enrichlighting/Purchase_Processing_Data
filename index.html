@@ -7979,6 +7979,7 @@ function poSaveFollow(){ try{ localStorage.setItem(PO_FOLLOWKEY, JSON.stringify(
 function poFI(po,item){ let f=window.poFollow[po]; if(!f||!f.items){ f=window.poFollow[po]={items:{}}; } if(!f.items[item]) f.items[item]={leadDays:'',f1:{},f2:{}}; const o=f.items[item]; if(!o.f1)o.f1={}; if(!o.f2)o.f2={}; return o; }
 window.poSelected = window.poSelected || '';
 function poSelectPO(po){ window.poSelected=po; renderPoFollow(); }
+function poToggleVendorIdx(i){ const v=(window._poVendList||[])[i]; if(v==null) return; window.poVendorExpanded=(window.poVendorExpanded===v)?null:v; renderPoFollow(); }
 // เลือก PO จากช่องค้นหา (datalist) — ดึงเลข PO จากส่วนหน้าของ label
 function poPickFromSearch(v){
   v=String(v||'').trim();
@@ -8159,18 +8160,27 @@ function renderPoFollow(){
   const list=poReleasedList(), packed=poPackedMap(), today=poToday();
   if(!list.length){ el.innerHTML='<p class="muted">ไม่มี PO ที่ Released &amp; ค้างรับ</p>'; return; }
   const C1='#d97706', C2='#7c3aed', PD=window.BC_PODATE||{};
-  // ===== ตาราง Top 10 PO ค้างรับนานสุด (Document Date เก่าสุด) =====
-  const withDoc=list.map(po=>({po, doc:PD[po.po]||null})).filter(x=>x.doc);
-  withDoc.sort((a,b)=> a.doc<b.doc?-1:(a.doc>b.doc?1:0));
-  const top10=withDoc.slice(0,10);
-  const rowsT=top10.map((x,i)=>{ const days=Math.round((new Date(today)-new Date(x.doc))/86400000);
-    return `<tr style="cursor:pointer;${window.poSelected===x.po.po?'background:var(--brand-soft);':''}" onclick="poSelectPO('${x.po.po}')" title="คลิกเพื่อเลือก PO นี้"><td>${i+1}</td><td><b style="font-size:11px;">${x.po.po}</b><br><span class="muted" style="font-size:10px;">${(x.po.vendor||'').slice(0,18)}</span></td><td class="num" style="font-size:11px;">${poThaiShort(x.doc)}<br><b style="color:var(--bad)">ค้าง ${fmtNum(days)} วัน</b></td></tr>`; }).join('');
+  // ===== 5 ผู้ขาย (Vendor) ค้างรับนานสุด — คลิกดู PO ข้างใน =====
+  const byVendor={};
+  list.forEach(po=>{ const doc=PD[po.po]; if(!doc) return; const v=po.vendor||'(ไม่ระบุผู้ขาย)';
+    if(!byVendor[v]) byVendor[v]={vendor:v,pos:[],oldest:doc};
+    const totOut=po.items.reduce((s,x)=>s+(+x.out||0),0);
+    byVendor[v].pos.push({po:po.po,doc,out:totOut}); if(doc<byVendor[v].oldest) byVendor[v].oldest=doc; });
+  const vendors=Object.values(byVendor).sort((a,b)=> a.oldest<b.oldest?-1:(a.oldest>b.oldest?1:0)).slice(0,5);
+  window._poVendList=vendors.map(v=>v.vendor);
+  const rowsT=vendors.map((v,i)=>{ const days=Math.round((new Date(today)-new Date(v.oldest))/86400000); const open=window.poVendorExpanded===v.vendor;
+    let h=`<tr style="cursor:pointer;${open?'background:var(--brand-soft);':''}" onclick="poToggleVendorIdx(${i})" title="คลิกดู PO ของผู้ขายนี้"><td style="text-align:center;">${open?'▼':'▶'}</td><td><b style="font-size:11px;">${(v.vendor||'').slice(0,24)}</b><br><span class="muted" style="font-size:10px;">${v.pos.length} PO</span></td><td class="num" style="font-size:11px;"><b style="color:var(--bad)">ค้าง ${fmtNum(days)} วัน</b></td></tr>`;
+    if(open){ v.pos.slice().sort((a,b)=> a.doc<b.doc?-1:1).forEach(p=>{ const pd=Math.round((new Date(today)-new Date(p.doc))/86400000);
+      h+=`<tr style="cursor:pointer;${window.poSelected===p.po?'outline:2px solid var(--brand);':''}" onclick="poSelectPO('${p.po}')" title="เลือก PO นี้"><td></td><td style="padding-left:12px;"><b style="font-size:11px;">${p.po}</b><br><span class="muted" style="font-size:10px;">ค้าง ${fmtNum(p.out)}</span></td><td class="num" style="font-size:11px;">${poThaiShort(p.doc)}<br>${fmtNum(pd)} วัน</td></tr>`; }); }
+    return h;
+  }).join('');
   const tbl=`<div style="flex:1 1 260px;min-width:250px;max-width:360px;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:6px;">⏳ 10 PO ค้างรับนานสุด <span class="muted" style="font-weight:400;font-size:11px;">(Document Date เก่าสุด · คลิกเพื่อเลือก)</span></div>
-    <div style="overflow-x:auto;"><table style="width:100%;font-size:12px;table-layout:fixed;"><tr><th style="width:24px;">#</th><th>PO / Vendor</th><th class="num" style="width:96px;">Doc / ค้าง</th></tr>${rowsT}</table></div></div>`;
+    <div style="font-weight:700;font-size:13px;margin-bottom:6px;">⏳ 5 ผู้ขายค้างรับนานสุด <span class="muted" style="font-weight:400;font-size:11px;">(คลิกเพื่อดู PO ข้างใน)</span></div>
+    <div style="overflow-x:auto;"><table style="width:100%;font-size:12px;table-layout:fixed;"><tr><th style="width:20px;"></th><th>ผู้ขาย / PO</th><th class="num" style="width:96px;">ค้าง (วัน)</th></tr>${rowsT}</table></div></div>`;
   // ===== dropdown เลือก PO =====
   const sorted=list.slice().sort((a,b)=>a.po<b.po?-1:1);
-  const poLabel=po=>{ const doc=PD[po.po]; const lots=[...new Set(po.items.map(x=>(poRelLot(po.po,x.item)||{}).lot).filter(Boolean))]; const lotTxt=lots.length?(' · Lot: '+lots.join(', ')):''; return `${po.po}${doc?(' · '+doc):''} · ${po.items.length} สินค้า${lotTxt}`; };
+  const poShort=iso=>{ if(!iso) return ''; const p=String(iso).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0].slice(2)}`:''; };   // dd/mm/yy
+  const poLabel=po=>{ const doc=PD[po.po]; const lots=[...new Set(po.items.map(x=>(poRelLot(po.po,x.item)||{}).lot).filter(Boolean))]; const lotTxt=lots.length?(' · Lot: '+lots.join(', ')):''; const totOut=po.items.reduce((s,x)=>s+(+x.out||0),0); const dt=doc?(' · '+poShort(doc)):''; return `${po.po}${lotTxt}${dt} · ค้าง ${fmtNum(totOut)}`; };
   const dlOpts=sorted.map(po=>`<option value="${poLabel(po).replace(/"/g,'&quot;')}"></option>`).join('');
   const selPoNow=window.poSelected?list.find(x=>x.po===window.poSelected):null;
   const selLabel=selPoNow?poLabel(selPoNow).replace(/"/g,'&quot;'):'';
