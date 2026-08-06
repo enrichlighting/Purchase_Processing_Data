@@ -7596,14 +7596,7 @@ function pkLoadDraft(){
   return false;
 }
 
-/* ---- บันทึก Lead Time & สถานะ PO (ชัดเจน + ประทับเวลา) ---- */
-function bcSaveLeadtime(){
-  poSaveFollow();                          // เก็บ poFollow ลง localStorage
-  bcSetTs('bcLeadtimeSavedAt');
-  bcCloudPush('leadtime', window.poFollow);
-  pkToast('บันทึก Lead Time & สถานะ PO แล้ว ✓ (เก็บในเครื่อง · พร้อมเชื่อม SharePoint)','good');
-  renderPoFollow();
-}
+/* (ปุ่มบันทึก Lead Time แยกถูกยกเลิก — ใช้ปุ่มซิงค์ส่วนกลาง ⬆️/⬇️ แทน · poFollow ยัง auto-save ลง localStorage ทุกครั้งที่แก้ไข) */
 
 /* ===== สำรอง/กู้คืนข้อมูล (ย้ายข้ามเครื่อง) — รวม Packing รอบ + สถานะติดตาม PO ===== */
 function pkExportBackup(){
@@ -8277,13 +8270,7 @@ function renderPoFollow(){
       <button onclick="poGoPackSelected()" class="go" style="background:var(--bad);">➡️ นำรายการที่เลือกไปหน้า Packing List</button>
     </div>`;
   }
-  const _ltTs=bcGetTs('bcLeadtimeSavedAt');
-  const saveBar=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--brand-soft);">
-    <button onclick="bcSaveLeadtime()" class="go" style="background:var(--brand);">💾 บันทึก Lead Time &amp; สถานะ PO</button>
-    <span class="muted" style="font-size:12px;">${_ltTs?('✓ บันทึกล่าสุด: '+_ltTs):'ข้อมูลถูกเก็บอัตโนมัติในเครื่องอยู่แล้ว — กดเพื่อยืนยัน/ประทับเวลา'}</span>
-    <span class="muted" style="font-size:11px;margin-left:auto;">☁️ เตรียมเชื่อม SharePoint</span>
-  </div>`;
-  el.innerHTML=saveBar+readyHtml+`<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;">${leftCol}${tbl}</div>${trkTbl}`;
+  el.innerHTML=readyHtml+`<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;">${leftCol}${tbl}</div>${trkTbl}`;
 }
 function poPhaseBlock(po, item, r, fx, dueDate, today, color){
   const title = r===1 ? 'ตามโรงงานรอบที่ 1 (เริ่มผลิตหรือยัง)' : 'ตามโรงงานรอบที่ 2 (ความคืบหน้า)';
