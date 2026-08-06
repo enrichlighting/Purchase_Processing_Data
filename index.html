@@ -6524,6 +6524,16 @@ function renderSearch(){
 /* =====================================================================
    PAGE 2 — LEAD TIME & REORDER
    ===================================================================== */
+// คำนวณ "รวมสั่ง (ควรสั่ง + เพิ่มเติม) → อยู่ได้กี่เดือน" แบบไม่ re-render (คงโฟกัสช่องกรอก)
+function lMoqCalc(suggestQty, paidDaily){
+  const el=document.getElementById('l-moq-result'); if(!el) return;
+  const extra=Math.max(0, +((document.getElementById('l-moq-extra')||{}).value)||0);
+  const total=(+suggestQty||0)+extra;
+  const uom=el.getAttribute('data-uom')||'';
+  if(paidDaily>0){ const days=Math.round(total/paidDaily);
+    el.innerHTML = `รวมสั่ง <b>${fmtNum(total)}</b> ${uom} → อยู่ได้ <b>${fmtNum(days)}</b> วัน (<b>${fmt1(days/30)}</b> เดือน)`+(extra>0?` <span class="muted" style="font-weight:400;">· เพิ่มจากควรสั่ง +${fmtNum(extra)}</span>`:'');
+  } else { el.innerHTML = `รวมสั่ง <b>${fmtNum(total)}</b> ${uom} <span class="muted">(ไม่มียอดขาย — ประเมินเดือนไม่ได้)</span>`; }
+}
 function renderLeadtime(){
   const itemNo = comboValue('l-item');
   const reserve = Math.max(0, +document.getElementById('l-reserve').value||0);
@@ -6635,6 +6645,17 @@ function renderLeadtime(){
   html += `<div style="margin-top:16px;border:2.5px solid var(--brand);background:var(--brand-soft);border-radius:14px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
     <span style="font-weight:800;font-size:16px;">📦 จำนวนที่ควรสั่งเพิ่ม</span>
     <span style="text-align:right;"><b style="color:var(--brand);font-size:30px;letter-spacing:-.5px;">${fmtNum(suggestQty)}</b> <span style="font-size:15px;font-weight:600;color:var(--muted);">${it.uom}</span>${coverText}</span>
+  </div>`;
+  // ช่องเผื่อ MOQ / สั่งเพิ่มเติม — ประเมินว่า (ควรสั่ง + เพิ่มเติม) อยู่ได้กี่เดือน
+  const _initDays = paidDaily>0 ? Math.round(suggestQty/paidDaily) : 0;
+  const _initRes = paidDaily>0 ? `รวมสั่ง <b>${fmtNum(suggestQty)}</b> ${it.uom} → อยู่ได้ <b>${fmtNum(_initDays)}</b> วัน (<b>${fmt1(_initDays/30)}</b> เดือน)` : `รวมสั่ง <b>${fmtNum(suggestQty)}</b> ${it.uom} <span class="muted">(ไม่มียอดขาย — ประเมินเดือนไม่ได้)</span>`;
+  html += `<div style="margin-top:10px;border:1px dashed var(--brand);border-radius:12px;padding:12px 16px;background:var(--card);">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px;">➕ เผื่อ MOQ / สั่งเพิ่มเติม <span class="muted" style="font-weight:400;font-size:11px;">(กรณีโรงงานมีขั้นต่ำต่อรอบ)</span></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;">
+      <span>ควรสั่ง <b>${fmtNum(suggestQty)}</b> + เพิ่มอีก</span>
+      <input type="number" id="l-moq-extra" min="0" step="1" value="0" oninput="lMoqCalc(${suggestQty},${paidDaily})" style="width:120px;text-align:right;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> <span>${it.uom}</span>
+    </div>
+    <div id="l-moq-result" data-uom="${it.uom}" style="margin-top:8px;font-size:14px;font-weight:700;color:var(--brand);">${_initRes}</div>
   </div>`;
   if(!it.ileReal) html += '<p class="hint" style="margin-top:8px;color:var(--warn)">* สินค้านี้ไม่มีข้อมูลยอดขายจริง (ILE) — ใช้อัตราประมาณแทน</p>';
   html += '</div>';
