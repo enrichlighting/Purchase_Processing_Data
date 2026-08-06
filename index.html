@@ -146,6 +146,9 @@
   .fbtn.active[data-f="red"] { background:var(--bad); border-color:var(--bad); }
   .fbtn.active[data-f="warn"] { background:var(--warn); border-color:var(--warn); }
   #urgent-result table tr:first-child th { position:sticky; top:0; background:var(--card); z-index:1; box-shadow:0 1px 0 var(--line); }
+  /* ตารางบอกสถานะ: ให้คอลัมน์มีที่หายใจ + เลื่อนแนวนอนได้ + ตัวเลข(เดือน)ไม่ตกบรรทัด */
+  #urgent-result table { min-width:1000px; }
+  #urgent-result td.num, #urgent-result th.num { white-space:nowrap; }
   /* หน้า Packing List: กว้างเต็มจอ เห็นทุกคอลัมน์ไม่ต้องเลื่อน */
   #page-packing { width:100vw; margin-left:calc(50% - 50vw); padding:0 24px; box-sizing:border-box; }
   #page-packing #pk-result table th, #page-packing #pk-result table td { padding:8px 9px; font-size:12.5px; }
@@ -219,8 +222,10 @@
         <label style="font-size:13px;font-weight:600;">ความจุตู้: <input type="number" id="pk-cap" value="68" min="1" step="0.5" style="width:80px;text-align:right;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> CBM/ตู้</label>
         <label style="font-size:13px;font-weight:600;">Exchange Rate: <input type="number" id="pk-fx" value="5" min="0" step="0.01" style="width:80px;text-align:right;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/หยวน</label>
         <span style="flex:1"></span>
+        <button class="go" id="pk-savedraft" style="background:var(--warn);" title="เก็บสิ่งที่กำลังจัดค้างไว้ กันหายเมื่อปิด/เปิดใหม่ (ยังไม่ลงประวัติ)">💾 บันทึกแบบร่าง (กันหาย)</button>
         <button class="go" id="pk-save" style="background:var(--brand);">💾 บันทึกข้อมูลการจัดตู้</button>
       </div>
+      <div id="pk-draft-ts" class="muted" style="font-size:11px;margin-bottom:8px;"></div>
       <div id="pk-ship" style="margin-bottom:14px;"></div>
       <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
         <div class="chartbox" id="pk-result" style="flex:1;min-width:340px;"></div>
@@ -319,7 +324,7 @@
             <option value="1s">กลุ่ม 1 · Mr.DIY (ยอดขายหน้าร้าน)</option>
             <option value="1avg">กลุ่ม 1 · Mr.DIY (เฉลี่ย ซื้อ+ขายหน้าร้าน)</option>
             <option value="2">กลุ่ม 2 · Big C</option>
-            <option value="3">กลุ่ม 3 · ลูกค้าอื่น ๆ</option>
+            <option value="3">กลุ่ม 3 · ลูกค้าอื่น ๆ (ไม่รวม DIY และ Big C)</option>
           </select>
         </div>
       </div>
@@ -382,7 +387,7 @@
             <option value="1s">กลุ่ม 1 · Mr.DIY (ยอดขายหน้าร้าน)</option>
             <option value="1avg">กลุ่ม 1 · Mr.DIY (เฉลี่ย ซื้อ+ขายหน้าร้าน)</option>
             <option value="2">กลุ่ม 2 · Big C</option>
-            <option value="3">กลุ่ม 3 · ลูกค้าอื่น ๆ</option>
+            <option value="3">กลุ่ม 3 · ลูกค้าอื่น ๆ (ไม่รวม DIY และ Big C)</option>
           </select>
         </div>
         <div class="field" style="flex:0 0 auto; min-width:auto;">
@@ -6539,7 +6544,7 @@ function renderLeadtime(){
   const basisMonths = basis/30;
   const custGroup = window.RGROUP || 'all';
   { const e=document.getElementById('l-basis'); if(e)e.value=String(basis); const g=document.getElementById('l-custgroup'); if(g)g.value=custGroup; }
-  const grpLabel = { all:'ทุกกลุ่มรวมกัน', '1':'กลุ่ม 1 · Mr.DIY (ยอดซื้อจากเรา)', '1s':'กลุ่ม 1 · Mr.DIY (ยอดขายหน้าร้าน)', '1avg':'กลุ่ม 1 · Mr.DIY (เฉลี่ย ซื้อ+ขายหน้าร้าน)', '2':'กลุ่ม 2 · Big C', '3':'กลุ่ม 3 · ลูกค้าอื่น ๆ' }[custGroup];
+  const grpLabel = { all:'ทุกกลุ่มรวมกัน', '1':'กลุ่ม 1 · Mr.DIY (ยอดซื้อจากเรา)', '1s':'กลุ่ม 1 · Mr.DIY (ยอดขายหน้าร้าน)', '1avg':'กลุ่ม 1 · Mr.DIY (เฉลี่ย ซื้อ+ขายหน้าร้าน)', '2':'กลุ่ม 2 · Big C', '3':'กลุ่ม 3 · ลูกค้าอื่น ๆ (ไม่รวม DIY และ Big C)' }[custGroup];
   const usesSell = (custGroup==='1s' || custGroup==='1avg');   // โหมดที่ใช้ยอดขายหน้าร้าน
   const paidWindow = paidWindowFor(it, basis, custGroup);
   const paidDaily = (usesSell || it.ileReal) ? paidWindow/basis : usage;   // /วัน · อัตราหลักของทั้งหน้า
@@ -6606,7 +6611,7 @@ function renderLeadtime(){
   const poDiyDone = poDiyFulfilled(itemNo);
   if(poDiy>0 || poDiyDone>0) html += kpi('จอง PO DIY (เหลือ)', fmtNum(poDiy)+` <small>${it.uom}</small>`+(poDiyDone>0?`<br><small class="muted" style="font-weight:400;">ขายให้ DIY แล้ว ${fmtNum(poDiyDone)}</small>`:''), poDiy>0?'warn':'good');
   html += kpi('พร้อมขายจริง', fmtNum(available)+` <small>${it.uom}</small>`, available<=it.safety?'bad':'good');
-  html += kpi('ขายเฉลี่ย/วัน', fmt1(paidDaily)+` <small>${it.uom}</small>`+`<br><small class="muted" style="font-weight:400;line-height:1.25;display:block;margin-top:2px;">ตัด free item · ฐาน ${basisMonths} เดือน · ${grpLabel}</small>`, '');
+  html += kpi('ขายเฉลี่ย/วัน', fmt1(paidDaily)+` <small>${it.uom} (${fmtNum(Math.round(paidMonthly))}/เดือน)</small>`+`<br><small class="muted" style="font-weight:400;line-height:1.25;display:block;margin-top:2px;">ตัด free item · ฐาน ${basisMonths} เดือน · ${grpLabel}</small>`, '');
   html += '</div><div class="kpis">';
   const poExtra = [];
   if(overdueQty>0) poExtra.push(`<span style="color:var(--bad)">⚠ เลยกำหนด ${fmtNum(overdueQty)}</span>`);
@@ -6934,6 +6939,28 @@ function fillSelects(){
     '<option value="">ทุก Factory</option>' + allFactories().map(v=>`<option value="${v}">${v}</option>`).join('');
   populateSearchItems();
   populateLeadtimeItems();
+  fillUrgentFilters();   // ให้ตัวเลือกของตาราง "ต้องรีบสั่ง" อิงเฉพาะสินค้าที่มี ILE ตั้งแต่แรก
+}
+
+// ===== Cascade dropdown ของตาราง "ต้องรีบสั่งซื้อ" — เลือกอันบนแล้วอันล่างแสดงเฉพาะที่เกี่ยวข้อง =====
+function _uSetOpts(el, allLabel, values){
+  if(!el) return;
+  const cur=el.value, vals=[...new Set(values.filter(x=>x&&x!=='-'))].sort();
+  el.innerHTML=`<option value="">${allLabel}</option>`+vals.map(v=>`<option value="${v}">${v}</option>`).join('');
+  el.value = vals.includes(cur)? cur : '';
+}
+function fillUrgentFilters(){
+  const pool=ITEMS.filter(i=>i.ileReal);
+  const tEl=document.getElementById('u-type'), sEl=document.getElementById('u-subtype'),
+        vEl=document.getElementById('u-vendor'), fEl=document.getElementById('u-factory');
+  if(!tEl) return;
+  _uSetOpts(tEl, 'ทุก Type', pool.map(i=>i.itemType));           // Type: เต็ม (บนสุดของลำดับ)
+  const t=tEl.value, poolT=pool.filter(i=>!t||i.itemType===t);
+  _uSetOpts(sEl, 'ทุก SubType', poolT.map(i=>i.subType));         // SubType: ตาม Type
+  const s=sEl.value, poolTS=poolT.filter(i=>!s||i.subType===s);
+  _uSetOpts(vEl, 'ทุก Vendor', poolTS.flatMap(i=>(i.sources||[]).map(x=>x.vendor)));   // Vendor: ตาม Type+SubType
+  const v=vEl.value, poolTSV=poolTS.filter(i=>itemHasVendor(i,v));
+  _uSetOpts(fEl, 'ทุก Factory', poolTSV.flatMap(i=>(i.sources||[]).map(x=>x.factory))); // Factory: ตาม Type+SubType+Vendor
 }
 
 // เติมรายการสินค้าในหน้า Lead Time ตาม Vendor/Factory ที่เลือก
@@ -7076,11 +7103,12 @@ function renderUrgent(){
   const uBasis = +window.RBASIS || 180;   // ค่ากลางร่วม
   const uGroup = window.RGROUP || 'all';
   { const e=document.getElementById('u-basis'); if(e)e.value=String(uBasis); const g=document.getElementById('u-custgroup'); if(g)g.value=uGroup; }
-  // คำนวณ + จัดสถานะสินค้าทุกตัวที่มียอดขายจริง
+  // คำนวณ + จัดสถานะ: แสดงถ้ามียอดขายจริง หรือ มีจอง PO DIY หรือ มี PO กำลังเข้า
+  // (สินค้าตามฤดูกาลที่ไม่มียอดขายใน 6 เดือน แต่มีภาระจอง/PO ค้างรับ ก็ต้องเห็นในตาราง)
   const all = ITEMS.filter(i=>i.ileReal && (!uType||i.itemType===uType) && (!uSub||i.subType===uSub) && itemHasVendor(i,uVen) && itemHasFactory(i,uFac))
     .map(i=>({ it:i, r:reorderCalc(i,uBasis,uGroup) }))
-    .filter(x=> x.r.paidDaily>0)
-    .sort((a,b)=> a.r.dosPaid - b.r.dosPaid || b.r.paidDaily - a.r.paidDaily);
+    .filter(x=> x.r.paidDaily>0 || x.r.poDiy>0 || x.r.incoming>0)
+    .sort((a,b)=> (a.r.dosPaid - b.r.dosPaid) || (b.r.paidDaily - a.r.paidDaily));
   all.forEach(x=>{
     x.status = x.r.coverPaid<=x.it.leadTime ? 'red' : x.r.coverPaid<=x.it.leadTime*1.5 ? 'warn' : 'watch';
   });
@@ -7092,16 +7120,34 @@ function renderUrgent(){
     {k:'follow1',label:'📞 ตามรอบที่ 1'},{k:'follow2',label:'📞 ตามรอบที่ 2'},{k:'processing',label:'⚙️ กำลังผลิต'},
     {k:'due',label:'📦 ครบกำหนด'},{k:'partial',label:'📦 จัดบางส่วน'},{k:'packed',label:'✅ จัดตู้เสร็จแล้ว'}
   ];
-  const labels={all:'ทั้งหมด'}; STATUS_DEFS.forEach(d=>labels[d.k]=d.label);
-  const cnt={}; all.forEach(x=>{ cnt[x.mkey]=(cnt[x.mkey]||0)+1; });
-  const f = window.urgentFilter || 'all';
-  // สร้างปุ่มกรอง (เฉพาะสถานะที่มีรายการ)
-  const fbHtml = [`<button class="fbtn ${f==='all'?'active':''}" onclick="setUrgentFilter('all')">ทั้งหมด (${all.length})</button>`]
-    .concat(STATUS_DEFS.filter(d=>cnt[d.k]).map(d=>`<button class="fbtn ${f===d.k?'active':''}" onclick="setUrgentFilter('${d.k}')">${d.label} (${cnt[d.k]})</button>`)).join('');
-  document.getElementById('urgent-filters').innerHTML = fbHtml;
-  let rows = (f==='all' ? all : all.filter(x=>x.mkey===f));   // แสดงทั้งหมด (เลื่อนดูได้)
+  const SHIP_LABELS={ship_wait:'⏳ รอโหลด', ship_load:'📦 กำลังโหลด', ship_cls:'🔒 ปิดตู้แล้ว', ship_sail:'🚢 เรือเดินทาง', ship_th:'🇹🇭 ถึงไทย', ship_wh:'🏭 ถึงคลังแล้ว'};
+  const labels={all:'ทั้งหมด'}; STATUS_DEFS.forEach(d=>labels[d.k]=d.label); Object.assign(labels, SHIP_LABELS);
+  // ค้นหาสินค้า (รหัส/ชื่อ) — ให้มีผลกับตัวนับทุกปุ่มสถานะด้วย ไม่ใช่แค่แถวที่แสดง
   const iq = (window.urgentItemQuery||'').trim().toLowerCase();
-  if(iq) rows = rows.filter(x=> (x.it.no+' '+(x.it.desc||'')).toLowerCase().includes(iq));   // กรองด้วยรหัส/ชื่อสินค้า
+  const base = iq ? all.filter(x=> (x.it.no+' '+(x.it.desc||'')).toLowerCase().includes(iq)) : all;
+  base.forEach(x=>{ x.shipKey = itemShipKey(x.it.no); });   // สถานะขนส่ง (ถ้าจัดตู้แล้ว)
+  const cnt={}; base.forEach(x=>{ cnt[x.mkey]=(cnt[x.mkey]||0)+1; if(x.shipKey) cnt[x.shipKey]=(cnt[x.shipKey]||0)+1; });
+  const f = window.urgentFilter || 'all';
+  // ===== ปุ่มกรอง แบ่ง 3 หมวด (พับได้) =====
+  const CATS=[
+    {id:'order', label:'📍 จุดสั่งซื้อ', keys:['red','warn','watch']},
+    {id:'po',    label:'🏭 ติดตาม PO',  keys:['none','start','follow1','follow2','processing','due','partial','packed']},
+    {id:'ship',  label:'🚚 ขนส่ง',      keys:['ship_wait','ship_load','ship_cls','ship_sail','ship_th','ship_wh']}
+  ];
+  window.urgentCatOpen = window.urgentCatOpen || {};
+  let fbHtml = `<button class="fbtn ${f==='all'?'active':''}" onclick="setUrgentFilter('all')">ทั้งหมด (${base.length})</button>`;
+  CATS.forEach(cat=>{
+    const ks=cat.keys.filter(k=>cnt[k]); if(!ks.length) return;   // หมวดจะขึ้นก็ต่อเมื่อมีสถานะ
+    const open = window.urgentCatOpen[cat.id]!==false;            // ค่าเริ่มต้น = เปิด
+    const total = ks.reduce((s,k)=>s+cnt[k],0);
+    fbHtml += `<div style="width:100%;margin-top:8px;">
+      <div onclick="toggleUrgentCat('${cat.id}')" style="cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:6px;user-select:none;">
+        <span style="font-size:10px;">${open?'▼':'▶'}</span> ${cat.label} <span style="font-weight:400;">(${total})</span></div>
+      ${open?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">${ks.map(k=>`<button class="fbtn ${f===k?'active':''}" onclick="setUrgentFilter('${k}')">${labels[k]} (${cnt[k]})</button>`).join('')}</div>`:''}
+    </div>`;
+  });
+  document.getElementById('urgent-filters').innerHTML = fbHtml;
+  let rows = (f==='all') ? base : (String(f).indexOf('ship_')===0 ? base.filter(x=>x.shipKey===f) : base.filter(x=>x.mkey===f));
   const tagOf = s => s==='red'?'<span class="tag bad">🔴 ต้องรีบสั่งซื้อ</span>':s==='warn'?'<span class="tag warn">⏰ ใกล้ถึงจุดสั่ง</span>':'<span class="tag info">เฝ้าระวัง</span>';
 
   // การเรียงลำดับ (คลิกหัวคอลัมน์ตัวเลข) — ค่าเริ่มต้น: อยู่ได้น้อย→มาก
@@ -7114,8 +7160,8 @@ function renderUrgent(){
   });
   const cols = [
     {label:'อันดับ'}, {label:'สถานะ'}, {label:'รหัส · ชื่อสินค้า'},
-    {key:'onHand',label:'คงเหลือ'}, {key:'paidDaily',label:'ขายจริง/วัน'}, {key:'dosPaid',label:'อยู่ได้ (วัน)'},
-    {key:'incoming',label:'PO เข้า'}, {key:'leadTime',label:'Lead Time'}, {key:'suggestQty',label:'ควรสั่ง'}
+    {key:'onHand',label:'คงเหลือ'}, {key:'paidDaily',label:'ขายจริง (วัน · เดือน)'}, {key:'dosPaid',label:'อยู่ได้ (วัน · เดือน)'},
+    {key:'incoming',label:'PO เข้า'}, {key:'suggestQty',label:'ควรสั่ง'}, {label:'ควรสั่ง → อยู่ได้ (วัน · เดือน)'}
   ];
   const thead = '<tr>' + cols.map(c=>{
     if(!c.key) return `<th>${c.label}</th>`;
@@ -7129,10 +7175,19 @@ function renderUrgent(){
   else {
     html = '<div class="chartbox" style="max-height:460px;overflow:auto;"><table>' + thead;
     rows.forEach((row,idx)=>{
-      const it=row.it, r=row.r, dos=Math.round(r.dosPaid);
+      const it=row.it, r=row.r, dos=Math.round(r.dosPaid), dosTxt=isFinite(dos)?dos:'∞';
+      const dosMo=isFinite(r.dosPaid)?`<br><span class="muted" style="font-size:10px;">(${fmt1(r.dosPaid/30)} เดือน)</span>`:'';
+      const paidMo=`<br><span class="muted" style="font-size:10px;">(${fmtNum(Math.round(r.paidDaily*30))}/เดือน)</span>`;
+      // อยู่ได้รวมทั้งไปป์ไลน์ = สต๊อก + PO ค้างรับ (รวมของที่จัดตู้/กำลังขนส่ง) + จำนวนที่ควรสั่ง
+      // กลุ่มที่ไม่ใช่ DIY (Big C / ลูกค้าอื่น) → หัก PO DIY เต็มจำนวนจากทั้งไปป์ไลน์ (ของนั้นถูกกันไว้ให้ DIY)
+      const _nonDiy = (uGroup==='2' || uGroup==='3');
+      const _stockPart = _nonDiy ? r.availRaw : r.avail;   // availRaw = สต๊อก − PO DIY (ติดลบได้)
+      const totCov = Math.max(0, _stockPart + r.incoming + r.suggestQty);
+      const sd = (r.paidDaily>0) ? Math.round(totCov/r.paidDaily) : null;
+      const sdTxt = sd==null ? '∞' : `${fmtNum(sd)} <span class="muted" style="font-size:10px;">(${fmt1(sd/30)} เดือน)</span>`;
       html += `<tr style="cursor:pointer" onclick="openLeadtime('${it.no}')">
         <td><b>${idx+1}</b></td>
-        <td>${itemMergedStatusTag(it.no, tagOf(row.status))}</td>
+        <td style="min-width:150px;">${itemMergedStatusTag(it.no, tagOf(row.status))}${(function(){ const si=itemShipStatus(it.no); return si?`<div style="margin-top:6px;border-top:1px dashed var(--line);padding-top:5px;"><span style="font-size:10px;font-weight:700;color:var(--muted);">🚚 ${si.contName} · การขนส่ง</span>${pkShipStatusHtml(si.dates)}</div>`:''; })()}</td>
         <td style="white-space:normal;min-width:180px;"><b>${it.no}</b> <span class="muted">${it.desc||''}</span></td>
         <td class="num">${r.poDiy>0
           ? `<div style="line-height:1.35;">
@@ -7141,11 +7196,11 @@ function renderUrgent(){
                <div style="border-top:1px solid var(--line);margin-top:1px;padding-top:1px;font-weight:700;color:${r.availRaw<0?'var(--bad)':'var(--ink)'}" title="คงเหลือใช้ได้จริง (หัก PO DIY · ติดลบ = ขาด)">= ${fmtNum(r.availRaw)}</div>
              </div>`
           : fmtNum(r.onHand)}</td>
-        <td class="num">${fmt1(r.paidDaily)}</td>
-        <td class="num"><b style="color:${dos<=it.leadTime?'var(--bad)':dos<=it.leadTime*1.5?'var(--warn)':'var(--ink)'}">${dos}</b></td>
+        <td class="num">${fmt1(r.paidDaily)}${paidMo}</td>
+        <td class="num"><b style="color:${dos<=it.leadTime?'var(--bad)':dos<=it.leadTime*1.5?'var(--warn)':'var(--ink)'}">${dosTxt}</b>${dosMo}</td>
         <td class="num">${r.incoming?fmtNum(r.incoming):'-'}</td>
-        <td class="num">${it.leadTime}</td>
         <td class="num"><b style="color:var(--brand)">${fmtNum(r.suggestQty)}</b></td>
+        <td class="num">${sdTxt}</td>
       </tr>`;
     });
     html += '</table></div>';
@@ -7330,9 +7385,9 @@ function renderContainers(){
 const PK_DATEF = [
   {k:'load',  label:'LOAD',        desc:'วันที่โหลดสินค้า'},
   {k:'cls',   label:'CLS',         desc:'วันปิดตู้'},
-  {k:'eta',   label:'ETA',         desc:'วันที่เรือออกจากต้นทาง'},
-  {k:'arrTH', label:'ETD ถึงไทย',  desc:'วันที่เรือถึงไทย (ปลายทาง)'},
-  {k:'arrWh', label:'ETD ถึงคลัง', desc:'วันที่ถึงคลังสินค้าบริษัท'}
+  {k:'eta',   label:'ETD',         desc:'วันที่เรือออกจากต้นทาง'},
+  {k:'arrTH', label:'ETA ถึงไทย',  desc:'วันที่เรือถึงไทย (ปลายทาง)'},
+  {k:'arrWh', label:'ETA ถึงคลัง', desc:'วันที่ถึงคลังสินค้าบริษัท'}
 ];
 function pkThaiDate(iso){
   if(!iso) return '';
@@ -7503,6 +7558,8 @@ function renderPacking(){
   document.getElementById('pk-result').innerHTML = html;
   renderContainers();
   renderShipPanel();
+  if(typeof pkSaveDraft==='function' && !window.pkEditIdx) pkSaveDraft(true);   // auto เก็บแบบร่างกันหาย (เงียบ)
+  const _dts=(typeof bcGetTs==='function')?bcGetTs('pkDraftSavedAt'):''; const _de=document.getElementById('pk-draft-ts'); if(_de&&_dts) _de.textContent='บันทึกแบบร่างล่าสุด: '+_dts;
 }
 
 /* ============ บันทึกประวัติ Packing List (stamp เวลา + Excel + ภาพตู้) ============ */
@@ -7513,6 +7570,40 @@ function pkLoadLog(){ try{ const s=localStorage.getItem(PK_LOGKEY); window.pkLog
 function pkSaveLogStore(){ try{ localStorage.setItem(PK_LOGKEY, JSON.stringify(window.pkLog)); }catch(e){} }
 function pkNowStr(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }
 function pkTsFile(ts){ return ts.replace(/:/g,'').replace(/ /g,'_'); }
+
+/* ===== ชั้นบันทึกข้อมูล (เก็บในเครื่องตอนนี้ · เตรียม hook เชื่อม SharePoint) ===== */
+function bcSetTs(key){ try{ localStorage.setItem(key, pkNowStr()); }catch(e){} }
+function bcGetTs(key){ try{ return localStorage.getItem(key)||''; }catch(e){ return ''; } }
+/* TODO(SharePoint): เมื่อวางระบบเสร็จ ให้ push payload ขึ้น SharePoint (Microsoft Graph) ในฟังก์ชันนี้
+   ปัจจุบันบันทึกในเครื่อง (localStorage) เท่านั้น — คืน Promise เพื่อให้ต่อ async ได้ในอนาคต */
+function bcCloudPush(kind, payload){ return Promise.resolve({ ok:true, mode:'local' }); }
+
+/* ---- แบบร่างการจัดตู้ (กันหายระหว่างกรอกค้างไว้) ---- */
+const PK_DRAFTKEY='pkDraftV1';
+function pkSaveDraft(silent){
+  try{ localStorage.setItem(PK_DRAFTKEY, JSON.stringify({
+    containers: window.pkContainers, rows: window.packingRows,
+    mode: window.pkMode, cap: pkCap(), fx: pkFxVal(), ts: pkNowStr()
+  })); }catch(e){}
+  bcSetTs('pkDraftSavedAt'); bcCloudPush('packing-draft', null);
+  if(!silent){ pkToast('บันทึกแบบร่างการจัดตู้แล้ว ✓ (กันหายเมื่อเปิดใหม่)','good'); const el=document.getElementById('pk-draft-ts'); if(el) el.textContent='บันทึกแบบร่างล่าสุด: '+bcGetTs('pkDraftSavedAt'); }
+}
+function pkLoadDraft(){
+  try{ const s=localStorage.getItem(PK_DRAFTKEY); if(!s) return false; const d=JSON.parse(s);
+    if(d.rows&&d.rows.length){ window.packingRows=d.rows; window.pkContainers=(d.containers&&d.containers.length)?d.containers:window.pkContainers; if(d.mode) window.pkMode=d.mode;
+      const cp=document.getElementById('pk-cap'); if(cp&&d.cap) cp.value=d.cap; const fx=document.getElementById('pk-fx'); if(fx&&d.fx) fx.value=d.fx;
+      return true; } }catch(e){}
+  return false;
+}
+
+/* ---- บันทึก Lead Time & สถานะ PO (ชัดเจน + ประทับเวลา) ---- */
+function bcSaveLeadtime(){
+  poSaveFollow();                          // เก็บ poFollow ลง localStorage
+  bcSetTs('bcLeadtimeSavedAt');
+  bcCloudPush('leadtime', window.poFollow);
+  pkToast('บันทึก Lead Time & สถานะ PO แล้ว ✓ (เก็บในเครื่อง · พร้อมเชื่อม SharePoint)','good');
+  renderPoFollow();
+}
 
 /* ===== สำรอง/กู้คืนข้อมูล (ย้ายข้ามเครื่อง) — รวม Packing รอบ + สถานะติดตาม PO ===== */
 function pkExportBackup(){
@@ -7587,7 +7678,7 @@ function pkSaveRound(){
   if(snap.mode==='released'){
     let incomplete=false;
     window.pkContainers.forEach((ct,c)=>{ if(pkContSum(c).pcs>0){ if(PK_DATEF.some(f=>!(ct.dates&&ct.dates[f.k]))) incomplete=true; } });
-    if(incomplete){ pkToast('โปรดระบุวันที่ตู้ให้ครบ (LOAD · CLS · ETA · ETD ถึงไทย · ETD ถึงคลัง) ทุกตู้ที่มีสินค้า','bad'); if(document.getElementById('pk-ship')) document.getElementById('pk-ship').scrollIntoView({behavior:'smooth',block:'center'}); return; }
+    if(incomplete){ pkToast('โปรดระบุวันที่ตู้ให้ครบ (LOAD · CLS · ETD · ETA ถึงไทย · ETA ถึงคลัง) ทุกตู้ที่มีสินค้า','bad'); if(document.getElementById('pk-ship')) document.getElementById('pk-ship').scrollIntoView({behavior:'smooth',block:'center'}); return; }
   }
   // ป้องกันจัดตู้เกินจำนวนสั่งผลิต / ค้างรับใน PO (นับรวมทุกรอบที่บันทึกไว้)
   if(snap.mode==='released'){
@@ -7813,6 +7904,60 @@ function pkPreviewImage(idx){
   document.body.appendChild(ov);
 }
 
+/* สถานะขนส่งปัจจุบันของตู้ (เทียบวันนี้กับวันที่ตู้ที่บันทึกไว้) */
+const PK_SHIP_STAGES=[
+  {k:'load', label:'กำลังโหลดสินค้า', emoji:'📦', color:'#0891b2'},
+  {k:'cls',  label:'ปิดตู้แล้ว',       emoji:'🔒', color:'#6366f1'},
+  {k:'eta',  label:'เรือกำลังเดินทาง', emoji:'🚢', color:'#2563eb'},
+  {k:'arrTH',label:'เรือถึงไทย',       emoji:'🇹🇭', color:'#d97706'},
+  {k:'arrWh',label:'ของถึงคลังแล้ว',   emoji:'🏭', color:'#16a34a'}
+];
+function pkShipStage(d){ d=d||{}; const today=poToday(); let cur=-1; for(let i=0;i<PK_SHIP_STAGES.length;i++){ const v=d[PK_SHIP_STAGES[i].k]; if(v && today>=v) cur=i; } return cur; }
+function pkShipStatusHtml(d){
+  d=d||{}; const cur=pkShipStage(d);
+  const dots=PK_SHIP_STAGES.map((s,i)=>{
+    const done=i<cur, isCur=i===cur; const bg=isCur?s.color:(done?'#16a34a':'var(--line)'); const sz=isCur?12:9;
+    return `<span title="${s.label}${d[s.k]?(' · '+pkThaiDate(d[s.k])):''}" style="display:inline-block;width:${sz}px;height:${sz}px;border-radius:50%;background:${bg};vertical-align:middle;"></span>`;
+  }).join('<span style="display:inline-block;width:8px;height:2px;background:var(--line);vertical-align:middle;"></span>');
+  let label, color, nextTxt='';
+  if(cur<0){ label='⏳ รอถึงกำหนดโหลด'; color='var(--muted)'; if(d.load) nextTxt='โหลด '+pkThaiDate(d.load); }
+  else { const s=PK_SHIP_STAGES[cur]; label=s.emoji+' '+s.label; color=s.color;
+    if(cur<PK_SHIP_STAGES.length-1){ const nk=PK_SHIP_STAGES[cur+1]; if(d[nk.k]) nextTxt='ถัดไป: '+nk.label+' · '+pkThaiDate(d[nk.k]); }
+    else nextTxt='ครบขั้นตอนแล้ว'; }
+  return `<div style="font-weight:700;color:${color};font-size:12px;">${label}</div>
+    <div style="margin:3px 0;line-height:1;">${dots}</div>
+    ${nextTxt?`<div class="muted" style="font-size:10px;">${nextTxt}</div>`:''}`;
+}
+// หาสถานะขนส่งของสินค้า: หา round ล่าสุดที่จัดสินค้านี้ + ตู้ที่ใส่มากสุด → คืนวันที่ตู้นั้น
+function itemShipStatus(itemNo){
+  const L=window.pkLog||[];
+  for(let i=0;i<L.length;i++){ const s=L[i]; let bestC=-1,bestQ=0;
+    (s.rows||[]).forEach(r=>{ if(r.item!==itemNo) return; (r.per||[]).forEach((p,c)=>{ if(p&&(p.pcs||0)>bestQ){ bestQ=p.pcs; bestC=c; } }); });
+    if(bestC>=0){ const ct=(s.containers||[])[bestC]||{}; return {contName:ct.name||'', dates:ct.dates||{}, ts:s.ts}; }
+  }
+  return null;
+}
+// คีย์สถานะขนส่งของสินค้า (สำหรับปุ่มกรองหมวดขนส่ง) — null ถ้ายังไม่จัดตู้
+function itemShipKey(itemNo){ const si=itemShipStatus(itemNo); if(!si) return null; const st=pkShipStage(si.dates); return st<0?'ship_wait':(['ship_load','ship_cls','ship_sail','ship_th','ship_wh'][st]||null); }
+// แถบความคืบหน้าสถานะ PO (ผลิต → จัดตู้) + ต่อด้วยสถานะขนส่งถ้าจัดตู้แล้ว
+const PO_STAGES=[
+  {label:'Lead Time', color:'#64748b'},
+  {label:'ตามรอบ 1',  color:'#d97706'},
+  {label:'ตามรอบ 2',  color:'#7c3aed'},
+  {label:'ครบกำหนด',  color:'#dc2626'},
+  {label:'จัดตู้',     color:'#16a34a'}
+];
+function poStageIndex(key){ const m={none:-1,start:0,follow1:1,processing:1,follow2:2,due:3,partial:4,packed:4}; return (key in m)?m[key]:-1; }
+function poProgressHtml(po,item,packedQ){
+  const st=poStatus(po,item,packedQ||0), cur=poStageIndex(st.key);
+  const dots=PO_STAGES.map((s,i)=>{ const done=i<cur,isCur=i===cur; const bg=isCur?s.color:(done?'#16a34a':'var(--line)'); const sz=isCur?12:9;
+    return `<span title="${s.label}" style="display:inline-block;width:${sz}px;height:${sz}px;border-radius:50%;background:${bg};vertical-align:middle;"></span>`;
+  }).join('<span style="display:inline-block;width:8px;height:2px;background:var(--line);vertical-align:middle;"></span>');
+  let html=`<div style="font-weight:700;color:${st.color};font-size:12px;">${st.emoji||''} ${st.label}</div><div style="margin:3px 0;line-height:1;">${dots}</div>`;
+  if(st.key==='packed'||st.key==='partial'){ const si=itemShipStatus(item); if(si){ html+=`<div style="margin-top:5px;border-top:1px dashed var(--line);padding-top:5px;"><span style="font-size:10px;font-weight:700;color:var(--muted);">🚚 ${si.contName} · การขนส่ง</span>${pkShipStatusHtml(si.dates)}</div>`; } }
+  return html;
+}
+function poShipCardBlock(item){ const si=itemShipStatus(item); return si?`<div style="margin-top:8px;border-top:1px dashed var(--line);padding-top:7px;"><span style="font-size:11px;font-weight:700;color:var(--muted);">🚚 ${si.contName} · สถานะขนส่ง</span>${pkShipStatusHtml(si.dates)}</div>`:''; }
 function renderPkLog(){
   const el=document.getElementById('pk-log'); if(!el) return;
   if(!window.pkLog.length){ el.innerHTML='<p class="muted" style="margin:6px 0;">ยังไม่มีการบันทึก — กด "💾 บันทึกรอบนี้" ด้านบน</p>'; return; }
@@ -7831,10 +7976,11 @@ function renderPkLog(){
       <td class="num"><b>${s.grand.cbm.toFixed(2)}</b></td>
       <td class="num">¥${pkMoney(s.grand.valRmb)}<br>฿${pkMoney(s.grand.valThb)}</td>
       <td style="font-size:11px;">${cont}</td>
+      <td style="min-width:180px;">${s.containers.map((c,i)=>`<div style="margin-bottom:7px;"><span style="font-size:11px;font-weight:700;">${c.name}</span>${pkShipStatusHtml(c.dates)}</div>`).join('')}</td>
       <td style="white-space:nowrap"><button style="${mini}" onclick="pkEditRound(${idx})">✏️ แก้ไข</button> <button style="${mini}" onclick="pkPrintRound(${idx})">🖨️ พิมพ์</button> <button style="${mini}" onclick="pkExportExcel(${idx})">📄 Excel</button> <button style="${mini}" onclick="pkPreviewImage(${idx})">🖼️ ภาพตู้</button> <a href="#" style="color:var(--bad);font-size:12px;font-weight:${window.pkDelConfirm===idx?'700':'400'};${window.pkDelConfirm===idx?'background:#fdecec;padding:2px 6px;border-radius:5px;':''}" onclick="pkDelRound(${idx});return false;">${window.pkDelConfirm===idx?'⚠️ คลิกอีกครั้งเพื่อยืนยันลบ':'🗑️ ลบ'}</a></td>
     </tr>`;
   });
-  el.innerHTML=`<table><tr><th>#</th><th>วัน–เวลา / รูปแบบ</th><th class="num">แถว</th><th class="num">ตู้</th><th class="num">รวมชิ้น</th><th class="num">รวม CBM</th><th class="num">มูลค่า (¥/฿)</th><th>สรุปต่อตู้</th><th>จัดการ</th></tr>${rows}</table>`;
+  el.innerHTML=`<table><tr><th>#</th><th>วัน–เวลา / รูปแบบ</th><th class="num">แถว</th><th class="num">ตู้</th><th class="num">รวมชิ้น</th><th class="num">รวม CBM</th><th class="num">มูลค่า (¥/฿)</th><th>สรุปต่อตู้</th><th>สถานะขนส่ง (วันนี้)</th><th>จัดการ</th></tr>${rows}</table>`;
 }
 
 /* ============ ติดตามสถานะ PO & จัดตู้ (เชื่อม Packing Log ↔ Lead Time) ============ */
@@ -7842,94 +7988,6 @@ const PO_FOLLOWKEY='poFollowV1';
 window.poFollow = window.poFollow || {};
 function poLoadFollow(){ try{ const s=localStorage.getItem(PO_FOLLOWKEY); window.poFollow=s?JSON.parse(s):{}; }catch(e){ window.poFollow={}; } }
 function poSaveFollow(){ try{ localStorage.setItem(PO_FOLLOWKEY, JSON.stringify(window.poFollow)); }catch(e){} }
-  /* ============== ซิงค์ข้อมูลกับ SharePoint (เพิ่มใหม่ — ไม่แตะโค้ดเดิม) ============== */
-
-async function pkSyncFromCloud(){
-  if (!window.GraphStorage) return;
-  const remote = await window.GraphStorage.loadData(PK_LOGKEY);
-  if (remote){
-    window.pkLog = typeof remote === 'string' ? JSON.parse(remote) : remote;
-    try{ localStorage.setItem(PK_LOGKEY, JSON.stringify(window.pkLog)); }catch(e){}
-  }
-}
-async function pkPushToCloud(){
-  if (!window.GraphStorage) return;
-  pkLoadLog(); // อ่านค่าล่าสุดจาก localStorage ก่อนอัปโหลด กันพลาดกรณี window.pkLog ไม่ตรงกับที่บันทึกไว้
-  await window.GraphStorage.saveData(PK_LOGKEY, window.pkLog);
-}
-
-async function poSyncFromCloud(){
-  if (!window.GraphStorage) return;
-  const remote = await window.GraphStorage.loadData(PO_FOLLOWKEY);
-  if (remote){
-    window.poFollow = typeof remote === 'string' ? JSON.parse(remote) : remote;
-    try{ localStorage.setItem(PO_FOLLOWKEY, JSON.stringify(window.poFollow)); }catch(e){}
-  }
-}
-async function poPushToCloud(){
-  if (!window.GraphStorage) return;
-  poLoadFollow();
-  await window.GraphStorage.saveData(PO_FOLLOWKEY, window.poFollow);
-}
-
-// เรียก render ใหม่ทุกฟังก์ชันที่มีอยู่แล้วในระบบ (เช็คก่อนว่ามีจริงค่อยเรียก กันชื่อไม่ตรง)
-function cloudRerenderAll(){
-  ['renderPoFollow','renderContainers','renderShipPanel','renderTab'].forEach(fn=>{
-    try{ if (typeof window[fn] === 'function') window[fn](); }catch(e){}
-  });
-}
-
-async function cloudPullNow(){
-  try{
-    if (typeof pkToast === 'function') pkToast('กำลังดึงข้อมูลล่าสุด...', 'info');
-    await window.GraphAuth.signIn();
-    await pkSyncFromCloud();
-    await poSyncFromCloud();
-    cloudRerenderAll();
-    if (typeof pkToast === 'function') pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅', 'good');
-    else alert('ดึงข้อมูลล่าสุดสำเร็จ');
-  }catch(e){
-    console.error(e);
-    if (typeof pkToast === 'function') pkToast('ดึงข้อมูลไม่สำเร็จ: '+e.message, 'bad');
-    else alert('ดึงข้อมูลไม่สำเร็จ: '+e.message);
-  }
-}
-
-async function cloudPushNow(){
-  try{
-    if (typeof pkToast === 'function') pkToast('กำลังอัปโหลดขึ้นส่วนกลาง...', 'info');
-    await window.GraphAuth.signIn();
-    await pkPushToCloud();
-    await poPushToCloud();
-    if (typeof pkToast === 'function') pkToast('อัปโหลดขึ้นส่วนกลางสำเร็จ ✅', 'good');
-    else alert('อัปโหลดขึ้นส่วนกลางสำเร็จ');
-  }catch(e){
-    console.error(e);
-    if (typeof pkToast === 'function') pkToast('อัปโหลดไม่สำเร็จ: '+e.message, 'bad');
-    else alert('อัปโหลดไม่สำเร็จ: '+e.message);
-  }
-}
-
-// สร้างปุ่มลอยมุมจอ ไม่ต้องแก้ HTML เดิมเลย
-(function addCloudSyncButtons(){
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
-
-  const btnPull = document.createElement('button');
-  btnPull.textContent = '⬇️ ดึงข้อมูลล่าสุด';
-  btnPull.style.cssText = 'padding:10px 16px;border-radius:8px;background:#3ecf7a;color:#fff;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:14px;font-family:inherit;';
-  btnPull.onclick = cloudPullNow;
-
-  const btnPush = document.createElement('button');
-  btnPush.textContent = '⬆️ อัปโหลดขึ้นส่วนกลาง';
-  btnPush.style.cssText = 'padding:10px 16px;border-radius:8px;background:#5b8bff;color:#fff;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:14px;font-family:inherit;';
-  btnPush.onclick = cloudPushNow;
-
-  wrap.appendChild(btnPull);
-  wrap.appendChild(btnPush);
-  document.body.appendChild(wrap);
-})();
-
 // ต่อ (PO, สินค้า) — แยก Lead Time / Follow เป็นรายสินค้า
 function poFI(po,item){ let f=window.poFollow[po]; if(!f||!f.items){ f=window.poFollow[po]={items:{}}; } if(!f.items[item]) f.items[item]={leadDays:'',f1:{},f2:{}}; const o=f.items[item]; if(!o.f1)o.f1={}; if(!o.f2)o.f2={}; return o; }
 window.poSelected = window.poSelected || '';
@@ -8004,7 +8062,8 @@ function poMonthsIncl(item, packedQty){
 // สถานะปัจจุบันของ (PO, สินค้า)
 function poStatus(po, item, packedQ){
   const o0=poFI(po,item);
-  const target=(o0.orderQty===''||o0.orderQty==null)?null:(+o0.orderQty);
+  const _rl0=poRelLot(po,item), _poOut=_rl0?(+_rl0.out||0):0;                       // ค้างรับใน PO
+  const target=(o0.orderQty===''||o0.orderQty==null)?(_poOut>0?_poOut:null):(+o0.orderQty);   // default = ค้างรับ
   if(packedQ>0){
     // จัดตู้ครบตามจำนวนสั่งผลิต (หรือไม่ได้ระบุจำนวน) → เสร็จ
     if(target==null || packedQ>=target) return {key:'packed', label:'จัดตู้เสร็จแล้ว', emoji:'✅', color:'var(--good)'};
@@ -8058,11 +8117,12 @@ function poFollowGoto(po, item){
 function itemMergedStatusKey(item, reorderStatus){ const m=itemMergedPO(item); return m? m.st.key : reorderStatus; }
 function setUrgentFilter(k){ window.urgentFilter=k; renderUrgent(); }
 function urgentItemPick(v){ window.urgentItemQuery = String(v||''); renderUrgent(); }
+function toggleUrgentCat(id){ window.urgentCatOpen=window.urgentCatOpen||{}; window.urgentCatOpen[id]=(window.urgentCatOpen[id]===false); renderUrgent(); }
 function poRefresh(){ if(typeof renderPoFollow==='function') renderPoFollow(); if(typeof renderUrgent==='function' && window.tabRendered && window.tabRendered.leadtime) renderUrgent(); }
 // รายการ (PO, สินค้า) ที่กรอก Lead Time แล้ว → [{po,item,leadDays,status}]
 function poTrackedList(){
   const packed=poPackedMap(), rows=[];
-  for(const po in window.poFollow){ const items=(window.poFollow[po]||{}).items||{}; for(const item in items){ const o=items[item]; const hasLead=!(o.leadDays===''||o.leadDays==null), hasQty=!(o.orderQty===''||o.orderQty==null); if(!hasLead && !hasQty) continue; const pq=packed[po]?(packed[po].items[item]||0):0; const rl=poRelLot(po,item); rows.push({po,item,leadDays:o.leadDays, orderQty:(hasQty?o.orderQty:null), lot:rl?rl.lot:'', status:poStatus(po,item,pq)}); } }
+  for(const po in window.poFollow){ const items=(window.poFollow[po]||{}).items||{}; for(const item in items){ const o=items[item]; const hasLead=!(o.leadDays===''||o.leadDays==null), hasQty=!(o.orderQty===''||o.orderQty==null); if(!hasLead && !hasQty) continue; const pq=packed[po]?(packed[po].items[item]||0):0; const rl=poRelLot(po,item); rows.push({po,item,leadDays:o.leadDays, orderQty:(hasQty?o.orderQty:(rl?rl.out:null)), lot:rl?rl.lot:'', status:poStatus(po,item,pq)}); } }
   return rows.sort((a,b)=> a.po<b.po?-1:(a.po>b.po?1:0));
 }
 // Lot ที่ Released ของ (PO, สินค้า) จาก BC_POREL
@@ -8081,6 +8141,7 @@ function poReadyList(){
   return out.sort((a,b)=> a.po<b.po?-1:1);
 }
 function poTogglePack(key, checked){ if(!window.poPackSel) window.poPackSel=new Set(); if(checked) window.poPackSel.add(key); else window.poPackSel.delete(key); }
+function poSelectAllReady(checked){ window.poPackSel=window.poPackSel||new Set(); if(checked){ poReadyList().forEach(r=>window.poPackSel.add(r.po+'|'+r.item)); } else { window.poPackSel.clear(); } renderPoFollow(); }
 // ส่งรายการที่ติ๊กไปหน้า Packing List (Released) พร้อม Item / PO(Lot) / จำนวนที่ยังเหลือต้องจัด
 function poGoPackSelected(){
   const sel=[...(window.poPackSel||[])]; if(!sel.length){ pkToast('กรุณาเลือกอย่างน้อย 1 รายการที่จะจัดตู้','bad'); return; }
@@ -8137,25 +8198,27 @@ function renderPoFollow(){
       const packedQ=pk?(pk.items[x.item]||0):0;
       const xlot=(poRelLot(selPo.po,x.item)||{}).lot||'';
       const lotTag = xlot?` <span class="muted" style="font-size:11px;">(Lot: ${xlot})</span>`:'';
+      const xname=(getItem(x.item)||{}).desc||'';
+      const itemHead=`<b>${x.item}</b> <span class="muted" style="font-size:12px;">${xname}</span> <span class="muted">(ค้าง ${fmtNum(x.out)})</span>${lotTag}`;
       if(packedQ>0){
         const stp=poStatus(selPo.po,x.item,packedQ);
         const m=poMonthsIncl(x.item,packedQ), mo=m?(m.months===Infinity?'∞':m.months.toFixed(1)):'-';
         if(stp.key==='partial'){
           return `<div style="border:1px solid #ea580c;background:#fff4ec;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
-            <b>${x.item}</b> <span class="muted">(ค้าง ${fmtNum(x.out)})</span>${lotTag}
+            ${itemHead}
             <div style="font-size:12px;margin-top:3px;color:var(--good);font-weight:700;">✅ จัดตู้แล้ว ${fmtNum(packedQ)} ชิ้น</div>
             <div style="font-size:12px;color:#ea580c;font-weight:700;">🔔 เหลือต้องจัดอีก ${fmtNum(stp.remaining)} ชิ้น <span class="muted" style="font-weight:400;">— เลือกในกล่อง "📦 พร้อมจัดตู้" ด้านบนเพื่อจัดต่อ</span></div>
-            <div style="font-size:12px;">คงเหลือสต๊อก ${m?fmtNum(m.onHand):'-'} → รวมของจัดตู้แล้วอยู่ได้อีก <b style="color:var(--good)">~${mo} เดือน</b></div></div>`;
+            <div style="font-size:12px;">คงเหลือสต๊อก ${m?fmtNum(m.onHand):'-'} → รวมของจัดตู้แล้วอยู่ได้อีก <b style="color:var(--good)">~${mo} เดือน</b></div>${poShipCardBlock(x.item)}</div>`;
         }
         return `<div style="border:1px solid var(--good);background:var(--good-soft);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
-          <b>${x.item}</b> <span class="muted">(ค้าง ${fmtNum(x.out)})</span>${lotTag}
+          ${itemHead}
           <div style="font-size:12px;margin-top:3px;color:var(--good);font-weight:700;">✅ จัดตู้เสร็จแล้ว ${fmtNum(packedQ)} ชิ้น</div>
-          <div style="font-size:12px;">คงเหลือ ${m?fmtNum(m.onHand):'-'} → รวมของจัดตู้แล้วอยู่ได้อีก <b style="color:var(--good)">~${mo} เดือน</b></div></div>`;
+          <div style="font-size:12px;">คงเหลือ ${m?fmtNum(m.onHand):'-'} → รวมของจัดตู้แล้วอยู่ได้อีก <b style="color:var(--good)">~${mo} เดือน</b></div>${poShipCardBlock(x.item)}</div>`;
       }
       const o=poFI(selPo.po,x.item), sc=poSchedule(selPo.po,x.item), st=poStatus(selPo.po,x.item,0);
       let phase='';
       if(sc.valid){
-        phase=`<div style="margin:6px 0;">${poStatusPill(st)}</div>`
+        phase=`<div style="margin:6px 0;">${poProgressHtml(selPo.po,x.item,0)}</div>`
           + `<div style="font-size:12px;margin:6px 0;display:flex;gap:14px;flex-wrap:wrap;">
           <span>📅 <b>รอบ 1</b> (30%): ${pkThaiDate(sc.f1date)}</span>
           <span>📅 <b>รอบ 2</b> (60%): ${pkThaiDate(sc.f2date)}</span>
@@ -8170,9 +8233,9 @@ function renderPoFollow(){
       }
       return `<div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;">
-          <div><b>${x.item}</b> <span class="muted">(ค้าง ${fmtNum(x.out)})</span>${lotTag}</div>
+          <div>${itemHead}</div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
-            <label style="font-size:12px;font-weight:600;">จำนวนสั่งผลิต: <input type="number" min="0" max="${x.out}" step="1" value="${o.orderQty===''||o.orderQty==null?'':o.orderQty}" onchange="poSetQty('${selPo.po}','${x.item}',this.value,${x.out})" style="width:78px;text-align:right;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> <span class="muted">/ ${fmtNum(x.out)} ชิ้น</span></label>
+            <label style="font-size:12px;font-weight:600;">จำนวนสั่งผลิต: <input type="number" min="0" max="${x.out}" step="1" value="${o.orderQty===''||o.orderQty==null?x.out:o.orderQty}" onchange="poSetQty('${selPo.po}','${x.item}',this.value,${x.out})" style="width:78px;text-align:right;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> <span class="muted">/ ${fmtNum(x.out)} ชิ้น</span></label>
             <label style="font-size:12px;font-weight:600;">Lead Time: <input type="number" min="0" step="1" value="${o.leadDays===''||o.leadDays==null?'':o.leadDays}" onchange="poSetLead('${selPo.po}','${x.item}',this.value)" style="width:66px;text-align:right;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> วัน</label>
           </div>
         </div>${phase}</div>`;
@@ -8192,7 +8255,7 @@ function renderPoFollow(){
     const cnt=k=> k==='all'?tracked.length:tracked.filter(t=>t.status.key===k).length;
     const fbtns=FILTERS.map(([k,lb])=>{ const active=(window.poFilter===k); const c=cnt(k); return `<button onclick="poSetFilter('${k}')" style="padding:4px 11px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid ${active?'transparent':'var(--line)'};${active?'background:var(--brand);color:#fff;font-weight:700;':'background:var(--bg);color:var(--ink);'}">${lb}${c?' ('+c+')':''}</button>`; }).join(' ');
     const shown=tracked.filter(t=> window.poFilter==='all' || t.status.key===window.poFilter);
-    const trows=shown.length? shown.map(t=>`<tr style="cursor:pointer;${window.poSelected===t.po?'background:var(--brand-soft);':''}" onclick="poSelectPO('${t.po}')" title="คลิกเพื่อดู PO นี้"><td><b>${t.po}</b>${t.lot?'<br><span class="muted" style="font-size:10px;">(Lot: '+t.lot+')</span>':''}</td><td>${t.item}</td><td class="num">${t.orderQty==null?'<span class=muted>-</span>':fmtNum(t.orderQty)}</td><td class="num">${t.leadDays===''||t.leadDays==null?'<span class=muted>-</span>':(fmtNum(t.leadDays)+' วัน')}</td><td>${poStatusPill(t.status)}</td></tr>`).join('')
+    const trows=shown.length? shown.map(t=>`<tr style="cursor:pointer;${window.poSelected===t.po?'background:var(--brand-soft);':''}" onclick="poSelectPO('${t.po}')" title="คลิกเพื่อดู PO นี้"><td><b>${t.po}</b>${t.lot?'<br><span class="muted" style="font-size:10px;">(Lot: '+t.lot+')</span>':''}</td><td style="min-width:180px;"><b>${t.item}</b><br><span class="muted" style="font-size:10px;">${(getItem(t.item)||{}).desc||''}</span></td><td class="num">${t.orderQty==null?'<span class=muted>-</span>':fmtNum(t.orderQty)}</td><td class="num">${t.leadDays===''||t.leadDays==null?'<span class=muted>-</span>':(fmtNum(t.leadDays)+' วัน')}</td><td style="min-width:160px;">${poProgressHtml(t.po,t.item,(packed[t.po]?(packed[t.po].items[t.item]||0):0))}</td></tr>`).join('')
       : '<tr><td colspan="5" class="muted" style="text-align:center;padding:12px;">ไม่มีรายการในสถานะนี้</td></tr>';
     trkTbl=`<div style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px;">
       <div style="font-weight:700;font-size:13px;margin-bottom:8px;">📋 รายการ Lead Time ที่บันทึกไว้ <span class="muted" style="font-weight:400;font-size:11px;">(คลิกแถวเพื่อดู PO)</span></div>
@@ -8204,14 +8267,23 @@ function renderPoFollow(){
   let readyHtml='';
   if(ready.length){
     window.poPackSel = window.poPackSel || new Set();
-    const rrows=ready.map(r=>{ const key=r.po+'|'+r.item; const ck=window.poPackSel.has(key)?'checked':''; const partTag = r.packed>0?` <span class="muted">(จัดแล้ว ${fmtNum(r.packed)} · เหลือ)</span>`:''; return `<label style="display:flex;gap:8px;align-items:center;font-size:12px;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--card);cursor:pointer;"><input type="checkbox" ${ck} onchange="poTogglePack('${key}',this.checked)"><span><b>${r.po}</b> · ${r.item} · Lot <b>${r.lot||'-'}</b> · <b style="color:var(--bad)">${r.remaining!=null?fmtNum(r.remaining):'(ยังไม่กรอกจำนวน)'}</b> ชิ้น${partTag}</span></label>`; }).join('');
+    const allChecked = ready.length>0 && ready.every(r=>window.poPackSel.has(r.po+'|'+r.item));
+    const selCount = ready.filter(r=>window.poPackSel.has(r.po+'|'+r.item)).length;
+    const selAllRow = `<label style="display:flex;gap:8px;align-items:center;font-size:12px;font-weight:700;padding:7px 9px;border:1px dashed var(--bad);border-radius:7px;background:#fff;cursor:pointer;margin-bottom:2px;"><input type="checkbox" ${allChecked?'checked':''} onchange="poSelectAllReady(this.checked)"><span>เลือกทั้งหมด (${ready.length} รายการ)${selCount?` <span class="muted" style="font-weight:400;">· เลือกอยู่ ${selCount}</span>`:''}</span></label>`;
+    const rrows=ready.map(r=>{ const key=r.po+'|'+r.item; const ck=window.poPackSel.has(key)?'checked':''; const partTag = r.packed>0?` <span class="muted">(จัดแล้ว ${fmtNum(r.packed)} · เหลือ)</span>`:''; const rname=(getItem(r.item)||{}).desc||''; return `<label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--card);cursor:pointer;"><input type="checkbox" ${ck} onchange="poTogglePack('${key}',this.checked)" style="margin-top:2px;"><span><b>${r.po}</b> · <b>${r.item}</b> · Lot <b>${r.lot||'-'}</b> · <b style="color:var(--bad)">${r.remaining!=null?fmtNum(r.remaining):'(ยังไม่กรอกจำนวน)'}</b> ชิ้น${partTag}<br><span class="muted" style="font-size:11px;">${rname}</span></span></label>`; }).join('');
     readyHtml=`<div style="padding:12px 14px;border:2px solid var(--bad);border-radius:10px;background:#fdecec;margin-bottom:14px;">
       <div style="font-weight:700;color:var(--bad);margin-bottom:8px;">📦 พร้อมจัดตู้ (${ready.length} รายการ) <span class="muted" style="font-weight:400;font-size:11px;">— ติ๊กเลือกรายการที่จะจัดลงตู้เดียวกัน (มากกว่า 1 PO / สินค้าได้)</span></div>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">${rrows}</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">${selAllRow}${rrows}</div>
       <button onclick="poGoPackSelected()" class="go" style="background:var(--bad);">➡️ นำรายการที่เลือกไปหน้า Packing List</button>
     </div>`;
   }
-  el.innerHTML=readyHtml+`<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;">${leftCol}${tbl}</div>${trkTbl}`;
+  const _ltTs=bcGetTs('bcLeadtimeSavedAt');
+  const saveBar=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--brand-soft);">
+    <button onclick="bcSaveLeadtime()" class="go" style="background:var(--brand);">💾 บันทึก Lead Time &amp; สถานะ PO</button>
+    <span class="muted" style="font-size:12px;">${_ltTs?('✓ บันทึกล่าสุด: '+_ltTs):'ข้อมูลถูกเก็บอัตโนมัติในเครื่องอยู่แล้ว — กดเพื่อยืนยัน/ประทับเวลา'}</span>
+    <span class="muted" style="font-size:11px;margin-left:auto;">☁️ เตรียมเชื่อม SharePoint</span>
+  </div>`;
+  el.innerHTML=saveBar+readyHtml+`<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;">${leftCol}${tbl}</div>${trkTbl}`;
 }
 function poPhaseBlock(po, item, r, fx, dueDate, today, color){
   const title = r===1 ? 'ตามโรงงานรอบที่ 1 (เริ่มผลิตหรือยัง)' : 'ตามโรงงานรอบที่ 2 (ความคืบหน้า)';
@@ -8269,11 +8341,12 @@ document.getElementById('pk-cap').oninput = ()=>{ renderPacking(); };
 document.getElementById('pk-fx').oninput = pkSetFx;
 document.querySelectorAll('input[name="pk-mode"]').forEach(rb=>{ rb.onchange = function(){ if(this.checked) pkSetMode(this.value); }; });
 document.getElementById('pk-save').onclick = pkSaveRound;
+document.getElementById('pk-savedraft').onclick = ()=>pkSaveDraft(false);
 document.getElementById('pk-setdir').onclick = pkSetDir;
 document.getElementById('pk-export').onclick = pkExportBackup;
 document.getElementById('pk-import').onclick = ()=>document.getElementById('pk-importfile').click();
 document.getElementById('pk-importfile').onchange = function(){ pkImportBackup(this.files[0]); this.value=''; };
-pkLoadLog(); pkRestoreDir();
+pkLoadLog(); pkLoadDraft(); pkRestoreDir();   // กู้แบบร่างการจัดตู้ที่ค้างไว้ (ถ้ามี)
 document.getElementById('s-type').onchange = ()=>{ populateSearchItems(); renderSearch(); };
 document.getElementById('s-subtype').onchange = ()=>{ populateSearchItems(); renderSearch(); };
 document.getElementById('s-vendor').onchange = ()=>{ populateSearchItems(); renderSearch(); };
@@ -8288,10 +8361,11 @@ document.getElementById('l-custgroup').onchange = function(){ window.RGROUP = th
 document.getElementById('l-includepo').onchange = renderLeadtime;
 document.getElementById('l-reserve').oninput = renderLeadtime;
 document.getElementById('l-btn').onclick = renderLeadtime;
-document.getElementById('u-type').onchange = renderUrgent;
-document.getElementById('u-subtype').onchange = renderUrgent;
-document.getElementById('u-vendor').onchange = ()=>{ fillFactoryDropdown('u-factory', document.getElementById('u-vendor').value); renderUrgent(); };
+document.getElementById('u-type').onchange = ()=>{ fillUrgentFilters(); renderUrgent(); };
+document.getElementById('u-subtype').onchange = ()=>{ fillUrgentFilters(); renderUrgent(); };
+document.getElementById('u-vendor').onchange = ()=>{ fillUrgentFilters(); renderUrgent(); };
 document.getElementById('u-factory').onchange = renderUrgent;
+fillUrgentFilters();
 document.getElementById('u-basis').onchange = function(){ window.RBASIS = +this.value; applyReorderChange(); };
 document.getElementById('u-custgroup').onchange = function(){ window.RGROUP = this.value; applyReorderChange(); };
 document.querySelectorAll('#urgent-filters .fbtn').forEach(b=>{
@@ -8334,9 +8408,41 @@ function init(){
   renderTab(active);
 }
 init();
+
+/* ============== ซิงค์ข้อมูลกับ SharePoint ส่วนกลาง (ใช้ auth.js + graphStorage.js บน GitHub Pages) ==============
+   โค้ดชุดนี้อิงของเดิมที่ทดสอบกับ SharePoint จริงแล้ว · บน Artifact/เปิดไฟล์ตรงจะไม่มี GraphStorage → ปุ่มไม่ขึ้น ทำงานแบบเก็บในเครื่อง */
+async function pkSyncFromCloud(){ if(!window.GraphStorage) return; const r=await window.GraphStorage.loadData(PK_LOGKEY); if(r){ window.pkLog= typeof r==='string'?JSON.parse(r):r; try{ localStorage.setItem(PK_LOGKEY, JSON.stringify(window.pkLog)); }catch(e){} } }
+async function pkPushToCloud(){ if(!window.GraphStorage) return; pkLoadLog(); await window.GraphStorage.saveData(PK_LOGKEY, window.pkLog); }
+async function poSyncFromCloud(){ if(!window.GraphStorage) return; const r=await window.GraphStorage.loadData(PO_FOLLOWKEY); if(r){ window.poFollow= typeof r==='string'?JSON.parse(r):r; try{ localStorage.setItem(PO_FOLLOWKEY, JSON.stringify(window.poFollow)); }catch(e){} } }
+async function poPushToCloud(){ if(!window.GraphStorage) return; poLoadFollow(); await window.GraphStorage.saveData(PO_FOLLOWKEY, window.poFollow); }
+function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
+async function cloudPullNow(){ const b=document.getElementById('bc-pull'); if(b) b.disabled=true;
+  try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); cloudRerenderAll(); bcSetTs('bcCloudSyncAt'); pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
+  catch(e){ console.error(e); pkToast('ดึงข้อมูลไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
+  if(b) b.disabled=false;
+}
+async function cloudPushNow(){ const b=document.getElementById('bc-push'); if(b) b.disabled=true;
+  try{ pkToast('กำลังอัปโหลดขึ้นส่วนกลาง...','info'); await window.GraphAuth.signIn(); await pkPushToCloud(); await poPushToCloud(); bcSetTs('bcCloudSyncAt'); pkToast('อัปโหลดขึ้นส่วนกลางสำเร็จ ✅','good'); }
+  catch(e){ console.error(e); pkToast('อัปโหลดไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
+  if(b) b.disabled=false;
+}
+function bcInjectSyncButtons(){
+  if(document.getElementById('bc-sync-wrap') || !(window.GraphStorage && window.GraphAuth)) return;   // ขึ้นเฉพาะเมื่อมี SharePoint (GitHub Pages)
+  const wrap=document.createElement('div'); wrap.id='bc-sync-wrap';
+  wrap.style.cssText='position:fixed;bottom:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
+  const bp=document.createElement('button'); bp.id='bc-pull'; bp.textContent='⬇️ ดึงข้อมูลล่าสุด';
+  bp.style.cssText='padding:10px 16px;border-radius:8px;background:#3ecf7a;color:#fff;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:14px;font-family:inherit;';
+  bp.onclick=cloudPullNow;
+  const bu=document.createElement('button'); bu.id='bc-push'; bu.textContent='⬆️ อัปโหลดขึ้นส่วนกลาง';
+  bu.style.cssText='padding:10px 16px;border-radius:8px;background:#5b8bff;color:#fff;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:14px;font-family:inherit;';
+  bu.onclick=cloudPushNow;
+  wrap.appendChild(bp); wrap.appendChild(bu); document.body.appendChild(wrap);
+}
+window.addEventListener('load', function(){ let n=0; const t=setInterval(function(){ if(window.GraphStorage && window.GraphAuth){ clearInterval(t); bcInjectSyncButtons(); } else if(++n>24){ clearInterval(t); } }, 250); });
 </script>
-  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.0/lib/msal-browser.min.js"></script>
-<script src="auth.js"></script>
-<script src="graphStorage.js"></script>
+<!-- ===== SharePoint sync (โหลดเฉพาะบน GitHub Pages ที่มีไฟล์เหล่านี้ · ลิงก์ Artifact จะบล็อก/404 แล้วข้ามไป) ===== -->
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.0/lib/msal-browser.min.js" onerror="void 0"></script>
+<script src="auth.js" onerror="void 0"></script>
+<script src="graphStorage.js" onerror="void 0"></script>
 </body>
 </html>
