@@ -6802,7 +6802,8 @@ function renderLeadtime(){
   const productionL = (typeof itemProductionQty==='function') ? itemProductionQty(itemNo) : 0; // จำนวนสั่งผลิตที่กรอก (ทุก PO)
   const cat1 = availRawL - reserve;                                 // หมวด 1: คลัง − จองนอกระบบ (ไม่รวม PO)
   const cat2 = availRawL + packedL;                                 // หมวด 2: คลัง + จัดตู้แล้ว (ไม่รวม PO)
-  const cat3 = availRawL + incoming + packedL + productionL;        // หมวด 3: คลัง + PO + จัดตู้ + สั่งผลิต
+  const poRemainL = Math.max(0, incoming - packedL - productionL);  // PO ที่ยังไม่จัดตู้/สั่งผลิต (กันนับซ้ำ)
+  const cat3 = availRawL + poRemainL + packedL + productionL;       // หมวด 3: คลัง + PO (จัดตู้/ผลิต = ส่วนหนึ่งของ PO)
   const targetDays = (window.RTARGET==='legacy') ? (it.leadTime + basis) : 120;             // legacy vs 4 เดือน
   const targetQty = (window.RTARGET==='legacy') ? (paidDaily*targetDays + (it.safety||0)) : (paidDaily*targetDays);
   const targetLabel = (window.RTARGET==='legacy') ? `Lead Time ${it.leadTime} วัน + ${basisMonths} เดือน = ${targetDays} วัน${it.safety?' + Safety':''}` : 'ให้อยู่ได้ 4 เดือน (120 วัน)';
@@ -6868,7 +6869,7 @@ function renderLeadtime(){
   html += `<div style="display:flex;gap:12px;flex-wrap:wrap;">`;
   html += mkCat('①','คลัง − จองนอกระบบ', `คลัง(หัก DIY) ${fmtNum(availRawL)}${reserve?` − จอง ${fmtNum(reserve)}`:''}`, cat1, dCat1, sug1, false);
   html += mkCat('②','คลัง + จัดตู้แล้ว', `คลัง ${fmtNum(availRawL)} + จัดตู้ ${fmtNum(packedL)}`, cat2, dCat2, sug2, false);
-  html += mkCat('③','คลัง + PO + จัดตู้ + สั่งผลิต', `คลัง ${fmtNum(availRawL)} + PO ${fmtNum(incoming)} + จัดตู้ ${fmtNum(packedL)} + ผลิต ${fmtNum(productionL)}`, cat3, dCat3, sug3, true);
+  html += mkCat('③','คลัง + PO + จัดตู้ + สั่งผลิต', `คลัง ${fmtNum(availRawL)} + PO เหลือ ${fmtNum(poRemainL)} <span class="muted" style="font-size:10px;">(PO ${fmtNum(incoming)} − จัดตู้/ผลิต)</span> + จัดตู้ ${fmtNum(packedL)} + ผลิต ${fmtNum(productionL)}`, cat3, dCat3, sug3, true);
   html += `</div>`;
   // กรอบเน้น "จำนวนที่ควรสั่งเพิ่ม" (ยึดหมวด 3)
   const coverText = paidDaily>0 && suggestQty>0 ? `<div style="font-size:12px;font-weight:600;color:var(--muted);margin-top:2px;">≈ สั่งแล้วอยู่ได้รวม ${fmt1((cat3+suggestQty)/paidDaily/30)} เดือน</div>` : '';
@@ -7370,7 +7371,8 @@ function reorderCalc(it, basisDays, custGroup){
   // ===== 3 หมวดการคำนวณ (ฐานสต๊อก = availRaw หัก DIY แล้ว) =====
   const c1 = availRaw - reserve;                                       // คลัง − จองนอกระบบ (ไม่รวม PO)
   const c2 = availRaw + packed;                                        // คลัง + จัดตู้แล้ว (ไม่รวม PO)
-  const c3 = availRaw + incoming + packed + production;                // คลัง + PO + จัดตู้ + สั่งผลิต
+  const poRemain = Math.max(0, incoming - packed - production);        // PO ที่ยังไม่จัดตู้/สั่งผลิต (กันนับซ้ำ)
+  const c3 = availRaw + poRemain + packed + production;                // คลัง + PO (จัดตู้/ผลิต = ส่วนหนึ่งของ PO)
   // ===== ควรสั่งเพิ่มแต่ละหมวด (ตามสูตรเป้าหมายที่เลือก) =====
   const targetQty = reorderTargetQty(it, basisDays, paidDaily);
   const sug = c => Math.max(0, Math.round(targetQty - c));
