@@ -248,6 +248,7 @@
       </div>
       <div style="margin-bottom:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
         <button class="go" id="pk-add">+ เพิ่มแถวสินค้า</button>
+        <button class="go" id="pk-addcustom" style="background:#0891b2;" title="เพิ่มสินค้าที่ไม่มีในระบบ/ไม่มี PO — กรอกชื่อ ขนาดกล่อง จำนวนชิ้น/กล่อง และ RMB เอง">✎ เพิ่มสินค้ากรอกเอง</button>
         <button class="go" id="pk-addcont" style="background:var(--good);">+ เพิ่มตู้</button>
         <button class="go" id="pk-delsel" style="background:var(--bad);" title="ติ๊กช่องหน้าแถว แล้วกดเพื่อลบหลายแถวพร้อมกัน">🗑️ ลบที่เลือก (0)</button>
         <button class="go" id="pk-clearrows" style="background:#64748b;" title="ล้างรายการสินค้าทั้งหมดในลิสท์">ล้างลิสท์ทั้งหมด</button>
@@ -256,6 +257,7 @@
         <span style="flex:1"></span>
         <button class="go" id="pk-savedraft" style="background:var(--warn);" title="เก็บสิ่งที่กำลังจัดค้างไว้ กันหายเมื่อปิด/เปิดใหม่ (ยังไม่ลงประวัติ)">💾 บันทึกแบบร่าง (กันหาย)</button>
         <button class="go" id="pk-save" style="background:var(--brand);">💾 บันทึกข้อมูลการจัดตู้</button>
+        <button class="go" id="pk-savenew" style="background:#0891b2;" title="บันทึกลิสท์ปัจจุบันเป็นรอบใหม่ (ไม่ทับของเดิม) — เหมาะกับการคัดลอกตู้เก่ามาแก้เป็นตู้ใหม่">💾 บันทึกเป็นตู้ใหม่</button>
       </div>
       <div id="pk-draft-ts" class="muted" style="font-size:11px;margin-bottom:8px;"></div>
       <div id="pk-ship" style="margin-bottom:14px;"></div>
@@ -7478,7 +7480,7 @@ function renderUrgent(){
     {k:'red',label:'🔴 ต้องรีบสั่งซื้อ'},{k:'warn',label:'⏰ ใกล้ถึงจุดสั่ง'},{k:'watch',label:'เฝ้าระวัง'},{k:'noneed',label:'🟢 ยังไม่ต้องสั่ง'},
     {k:'none',label:'⚪ ยังไม่กรอก Lead Time'},{k:'start',label:'▶️ เริ่มต้นการผลิต'},
     {k:'follow1',label:'📞 ตามรอบที่ 1'},{k:'follow2',label:'📞 ตามรอบที่ 2'},{k:'processing',label:'⚙️ กำลังผลิต'},
-    {k:'due',label:'📦 ครบกำหนด'},{k:'partial',label:'📦 จัดบางส่วน'},{k:'packed',label:'✅ จัดตู้เสร็จแล้ว'}
+    {k:'due',label:'📦 ครบกำหนด'},{k:'loadwait',label:'⛔ ค้างโหลดตู้'},{k:'partial',label:'📦 จัดบางส่วน'},{k:'packed',label:'✅ จัดตู้เสร็จแล้ว'}
   ];
   const SHIP_LABELS={ship_wait:'⏳ รอโหลด', ship_load:'📦 กำลังโหลด', ship_cls:'🔒 ปิดตู้แล้ว', ship_sail:'🚢 เรือเดินทาง', ship_th:'🇹🇭 ถึงไทย', ship_wh:'🏭 ถึงคลังแล้ว'};
   const labels={all:'ทั้งหมด', prep:'🗂️ เตรียมเปิด PO', suspended:'⛔ ระงับการสั่งซื้อ'}; STATUS_DEFS.forEach(d=>labels[d.k]=d.label); Object.assign(labels, SHIP_LABELS);
@@ -7492,7 +7494,7 @@ function renderUrgent(){
   const CATS=[
     {id:'order', label:'📍 จุดสั่งซื้อ', keys:['red','warn','watch','noneed']},
     {id:'prep',  label:'🗂️ เตรียมเปิด PO', keys:['prep']},
-    {id:'po',    label:'🏭 ติดตาม PO',  keys:['none','start','follow1','follow2','processing','due','partial','packed']},
+    {id:'po',    label:'🏭 ติดตาม PO',  keys:['none','start','follow1','follow2','processing','due','loadwait','partial','packed']},
     {id:'ship',  label:'🚚 ขนส่ง',      keys:['ship_wait','ship_load','ship_cls','ship_sail','ship_th','ship_wh']},
     {id:'susp',  label:'⛔ ระงับการสั่งซื้อ', keys:['suspended']}
   ];
@@ -7613,7 +7615,26 @@ function packingItemOptions(sel){
   const keys = Object.keys(window.BC_PACKING||{}).sort();
   return '<option value="">— เลือกสินค้า —</option>' + keys.map(k=>{ const d=window.BC_PACKING[k]; return `<option value="${k}" ${k===sel?'selected':''}>${k} — ${(d.desc||'').slice(0,45)}</option>`; }).join('');
 }
-function pkItem(code){ return window.BC_PACKING ? window.BC_PACKING[code] : null; }
+window.pkCustomDims = window.pkCustomDims || {};   // มิติสินค้ากรอกเอง (นอก PO) · key = รหัสสังเคราะห์ CUSTOM-*
+function pkItem(code){ if(window.BC_PACKING && window.BC_PACKING[code]) return window.BC_PACKING[code]; return (window.pkCustomDims && window.pkCustomDims[code]) ? window.pkCustomDims[code] : null; }
+function pkIsCustom(code){ return !!(code && window.pkCustomDims && window.pkCustomDims[code]); }
+// เพิ่มแถวสินค้ากรอกเอง (นอก PO) — มิติ/ชื่อ/RMB กรอกเอง · ใช้ได้ทั้ง Forecast และ Released
+function pkAddCustomRow(){
+  window.pkCustomDims = window.pkCustomDims || {};
+  window._pkCustSeq = (window._pkCustSeq||0)+1;
+  const code='CUSTOM-'+window._pkCustSeq+'-'+(pkNowStr().replace(/\D/g,'').slice(-6));
+  window.pkCustomDims[code]={L:0,W:0,H:0,pcs:1,desc:'',rmb:''};
+  window.packingRows.push({item:code, custom:true, loads:[], lots:[], costIdx:null});
+  renderPacking();
+}
+function pkCustSet(i, field, val){
+  const r=window.packingRows[i]; if(!r||!r.custom) return;
+  window.pkCustomDims = window.pkCustomDims || {};
+  const cd = window.pkCustomDims[r.item] || (window.pkCustomDims[r.item]={L:0,W:0,H:0,pcs:1,desc:'',rmb:''});
+  if(field==='desc'||field==='rmb') cd[field]=val;
+  else { cd[field]=Math.max(0,+val||0); if(field==='pcs' && !(cd.pcs>0)) cd.pcs=1; }
+  renderPacking();
+}
 function pkBoxCbm(code){ const d=pkItem(code); return d ? (d.L*d.W*d.H)/1000000 : 0; }        // CBM/กล่อง
 function pkUnitCost(code){ const it=(typeof getItem==='function')?getItem(code):null; return it?(it.unitCost||0):0; }
 function pkCell(code, pieces){ pieces=+pieces||0; const d=pkItem(code); if(!d||!pieces) return {boxes:0,cbm:0}; const boxes=d.pcs>0?pieces/d.pcs:0; return {boxes, cbm:boxes*pkBoxCbm(code)}; }
@@ -7638,6 +7659,7 @@ function pkLotList(item){
 }
 // คืน {lot,po,rmb,thb,out} ของแถวตามที่เลือก (r.costIdx) · ไม่เลือก → rmb=null
 function pkRowCost(r){
+  if(r && r.custom){ const cd=(window.pkCustomDims||{})[r.item]||{}; const rmb=(cd.rmb!=null&&cd.rmb!=='')?+cd.rmb:null; return {lot:'', po:'', rmb, thb:(rmb!=null?rmb*pkFxVal():null), out:null}; }
   const list=pkLotList(r.item);
   if(!list.length || r.costIdx==null || r.costIdx==='' || !list[r.costIdx]) return {lot:'', po:'', rmb:null, thb:null, out:null};
   const e=list[r.costIdx];
@@ -7912,8 +7934,10 @@ function renderPacking(){
       }
       cells+=`<td class="num" style="vertical-align:top">${pieceInput}<br>${lotPart}</td>`;
     });
+    const cust=!!r.custom;
     let costSel, capNote='';
-    if(!r.item){ costSel=`<span class="muted" style="font-size:11px;">—</span>`; }
+    if(cust){ const cd=(window.pkCustomDims||{})[r.item]||{}; costSel=`<input type="number" min="0" step="0.01" value="${cd.rmb==null?'':cd.rmb}" onchange="pkCustSet(${i},'rmb',this.value)" placeholder="RMB/ชิ้น (ถ้ามี)" title="ต้นทุน RMB ต่อชิ้น — ไม่บังคับ" style="width:120px;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`; }
+    else if(!r.item){ costSel=`<span class="muted" style="font-size:11px;">—</span>`; }
     else if(!lotList.length){ costSel=`<span class="muted" style="font-size:11px;">${window.pkMode==='released'?'ไม่มี PO Released ค้างรับ':'ไม่มีข้อมูล PO'}</span>`; }
     else {
       const lotDl='<datalist id="pk-lotdl-'+i+'">'+lotList.map(e=>`<option value="${pkLotLabelOf(e).replace(/"/g,'&quot;')}"></option>`).join('')+'</datalist>';
@@ -7923,12 +7947,12 @@ function renderPacking(){
     }
     rows += `<tr>
       <td style="white-space:nowrap;"><input type="checkbox" ${(window.pkRowSel&&window.pkRowSel.has(i))?'checked':''} onchange="pkToggleRow(${i},this.checked)" title="เลือกเพื่อลบหลายแถว" style="vertical-align:middle;margin-right:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${pkColor(i)};vertical-align:middle;"></span> <b>${i+1}</b></td>
-      <td><input list="pk-itemdl" value="${pkItemLabel(r.item).replace(/"/g,'&quot;')}" onchange="pkPickItem(${i},this.value)" onfocus="this.select()" placeholder="🔍 พิมพ์ค้นหาสินค้า" autocomplete="off" style="min-width:220px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"></td>
-      <td>${d?d.desc:'<span class="muted">—</span>'}</td>
-      <td class="num">${d?fmt1(d.L):'-'}</td>
-      <td class="num">${d?fmt1(d.W):'-'}</td>
-      <td class="num">${d?fmt1(d.H):'-'}</td>
-      <td class="num">${d?fmtNum(d.pcs):'-'}</td>
+      <td>${cust?`<span class="tag" style="background:#ecfeff;color:#0e7490;font-size:11px;white-space:nowrap;">✎ กรอกเอง (นอก PO)</span>`:`<input list="pk-itemdl" value="${pkItemLabel(r.item).replace(/"/g,'&quot;')}" onchange="pkPickItem(${i},this.value)" onfocus="this.select()" placeholder="🔍 พิมพ์ค้นหาสินค้า" autocomplete="off" style="min-width:220px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`}</td>
+      <td>${cust?`<input type="text" value="${(d?d.desc:'').replace(/"/g,'&quot;')}" onchange="pkCustSet(${i},'desc',this.value)" placeholder="ชื่อสินค้า (กรอกเอง)" style="min-width:150px;width:100%;box-sizing:border-box;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?d.desc:'<span class="muted">—</span>')}</td>
+      <td class="num">${cust?`<input type="number" min="0" step="0.1" value="${d?d.L:0}" onchange="pkCustSet(${i},'L',this.value)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.L):'-')}</td>
+      <td class="num">${cust?`<input type="number" min="0" step="0.1" value="${d?d.W:0}" onchange="pkCustSet(${i},'W',this.value)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.W):'-')}</td>
+      <td class="num">${cust?`<input type="number" min="0" step="0.1" value="${d?d.H:0}" onchange="pkCustSet(${i},'H',this.value)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.H):'-')}</td>
+      <td class="num">${cust?`<input type="number" min="1" step="1" value="${d?d.pcs:1}" onchange="pkCustSet(${i},'pcs',this.value)" style="width:60px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmtNum(d.pcs):'-')}</td>
       <td>${costSel}${capNote}</td>
       <td class="num" id="pk-rmb-${i}">${rc.rmb==null?'<span class="muted">-</span>':('¥'+pkYuan(rc.rmb))}</td>
       <td class="num" id="pk-thb-${i}">${rc.thb==null?'<span class="muted">-</span>':('฿'+rc.thb.toLocaleString('en-US',{maximumFractionDigits:2}))}</td>
@@ -8051,7 +8075,7 @@ function pkSnapshot(){
     const d=pkItem(r.item), rs=pkRowSum(r), rc=pkRowCost(r);
     const rmb=rc.rmb||0;
     const per = window.pkContainers.map((ct,c)=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p); const cellLot=(window.pkMode==='released')?(rc.lot||''):((r.lots||[])[c]||''); return {pcs:p, lot:cellLot, boxes:cc.boxes, cbm:cc.cbm, valRmb:p*rmb}; });
-    return {item:r.item, desc:d?d.desc:'', L:d?d.L:0, W:d?d.W:0, H:d?d.H:0, pcsPerBox:d?d.pcs:0, po:rc.po||'', costIdx:(r.costIdx==null?null:r.costIdx), lotMax:(r.lotMax==null?null:r.lotMax), costLot:rc.lot||'', rmb:rc.rmb, thb:rc.thb, per, pcs:rs.pcs, boxes:rs.box, cbm:rs.cbm, valRmb:rs.valRmb, valThb:rs.valThb};
+    return {item:r.item, custom:!!r.custom, desc:d?d.desc:'', L:d?d.L:0, W:d?d.W:0, H:d?d.H:0, pcsPerBox:d?d.pcs:0, po:rc.po||'', costIdx:(r.costIdx==null?null:r.costIdx), lotMax:(r.lotMax==null?null:r.lotMax), costLot:rc.lot||'', rmb:rc.rmb, thb:rc.thb, per, pcs:rs.pcs, boxes:rs.box, cbm:rs.cbm, valRmb:rs.valRmb, valThb:rs.valThb};
   }).filter(r=>r.item);
   const contTotals = window.pkContainers.map((ct,c)=>{ const cs=pkContSum(c); return {pcs:cs.pcs, boxes:cs.box, cbm:cs.cbm, valRmb:cs.valRmb, valThb:cs.valThb}; });
   let gp=0,gb=0,gc=0,gvr=0,gvt=0; rows.forEach(r=>{gp+=r.pcs;gb+=r.boxes;gc+=r.cbm;gvr+=r.valRmb;gvt+=r.valThb;});
@@ -8065,7 +8089,8 @@ function pkPackCap(po,item){
   if(oq!=null) return {cap:oq, kind:'จำนวนสั่งผลิต'};
   return {cap: pkOutstandingFor(po,item), kind:'ค้างรับใน PO'};
 }
-function pkSaveRound(){
+function pkSaveRound(asNew){
+  const editIdx = asNew ? null : window.pkEditIdx;   // asNew = บันทึกเป็นรอบใหม่ ไม่ทับของเดิม
   // ดึงค่าจากช่องกรอกวันที่ (ที่ยังไม่ได้กดบันทึกวันที่) มาใส่ ct.dates ก่อนสร้าง snapshot (โหมด Released)
   if(window.pkMode==='released'){ window.pkContainers.forEach((ct,c)=>{ if(!ct.dates) ct.dates={}; PK_DATEF.forEach(f=>{ const inp=document.getElementById('pk-d-'+c+'-'+f.k); if(inp && inp.value && !ct.dates[f.k]) ct.dates[f.k]=inp.value; }); }); }
   const snap=pkSnapshot();
@@ -8079,7 +8104,7 @@ function pkSaveRound(){
   // ป้องกันจัดตู้เกินจำนวนสั่งผลิต / ค้างรับใน PO (นับรวมทุกรอบที่บันทึกไว้)
   if(snap.mode==='released'){
     const thisRound={}; snap.rows.forEach(r=>{ if(r.po){ const k=r.po+'|'+r.item; thisRound[k]=(thisRound[k]||0)+(r.pcs||0); } });
-    const others={}; (window.pkLog||[]).forEach((s,idx)=>{ if(window.pkEditIdx!=null && idx===window.pkEditIdx) return; (s.rows||[]).forEach(r=>{ if(r.po){ const k=r.po+'|'+r.item; others[k]=(others[k]||0)+(r.pcs||0); } }); });
+    const others={}; (window.pkLog||[]).forEach((s,idx)=>{ if(editIdx!=null && idx===editIdx) return; (s.rows||[]).forEach(r=>{ if(r.po){ const k=r.po+'|'+r.item; others[k]=(others[k]||0)+(r.pcs||0); } }); });
     for(const k in thisRound){
       const sep=k.indexOf('|'), po=k.slice(0,sep), item=k.slice(sep+1), cp=pkPackCap(po,item);
       if(cp.cap!=null){ const total=(others[k]||0)+thisRound[k];
@@ -8088,10 +8113,13 @@ function pkSaveRound(){
     }
   }
   let savedIdx=0;
-  if(window.pkEditIdx!=null && window.pkLog[window.pkEditIdx]){
-    snap.ts = window.pkLog[window.pkEditIdx].ts + ' (แก้ไข '+pkNowStr()+')';   // คงเวลาเดิม + ประทับเวลาแก้ไข
-    window.pkLog[window.pkEditIdx]=snap; savedIdx=window.pkEditIdx; window.pkEditIdx=null;
-  } else { window.pkLog.unshift(snap); savedIdx=0; }
+  if(editIdx!=null && window.pkLog[editIdx]){
+    snap.ts = window.pkLog[editIdx].ts + ' (แก้ไข '+pkNowStr()+')';   // คงเวลาเดิม + ประทับเวลาแก้ไข
+    window.pkLog[editIdx]=snap; savedIdx=editIdx; window.pkEditIdx=null;
+  } else {
+    if(asNew) snap.ts = pkNowStr()+' · คัดลอกเป็นตู้ใหม่';
+    window.pkLog.unshift(snap); savedIdx=0; window.pkEditIdx=null;
+  }
   pkSaveLogStore(); renderPkLog(); pkUpdateSaveBtn();
   if(window.tabRendered && window.tabRendered.leadtime) poRefresh();   // อัปเดตสถานะ PO ในหน้า Lead Time
   if(window.pkDirHandle){ pkExportExcel(savedIdx); pkExportImage(savedIdx); }
@@ -8146,8 +8174,10 @@ function pkPrintRound(idx){
 function pkLoadRound(idx){
   const s=window.pkLog[idx]; if(!s) return;
   window.pkContainers = s.containers.map(c=>({name:c.name, dates: Object.assign({}, c.dates||{}), dateLog: (c.dateLog||[]).slice()}));
+  window.pkCustomDims = window.pkCustomDims || {};
   window.packingRows  = s.rows.map(r=>{
     let lm=(r.lotMax==null?null:r.lotMax);
+    if(r.custom){ window.pkCustomDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1), desc:r.desc||'', rmb:(r.rmb==null?'':r.rmb)}; return {item:r.item, custom:true, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:null, lotMax:null}; }
     if(s.mode==='released' && r.po){ const cp=pkPackCap(r.po,r.item); if(cp.cap!=null){ let others=0; (window.pkLog||[]).forEach((ss,i)=>{ if(i===idx) return; (ss.rows||[]).forEach(rr=>{ if(rr.po===r.po && rr.item===r.item) others+=(rr.pcs||0); }); }); lm=Math.max(0,cp.cap-others); } }   // เหลือจัดได้ = จำนวนสั่งผลิต/ค้างรับ − ที่จัดในรอบอื่น
     return {item:r.item, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:(r.costIdx==null?null:r.costIdx), lotMax:lm};
   });
@@ -8343,7 +8373,7 @@ const PO_STAGES=[
   {label:'ครบกำหนด',  color:'#dc2626'},
   {label:'จัดตู้',     color:'#16a34a'}
 ];
-function poStageIndex(key){ const m={none:-1,start:0,follow1:1,processing:1,follow2:2,due:3,partial:4,packed:4}; return (key in m)?m[key]:-1; }
+function poStageIndex(key){ const m={none:-1,start:0,follow1:1,processing:1,follow2:2,due:3,loadwait:3,partial:4,packed:4}; return (key in m)?m[key]:-1; }
 function poProgressHtml(po,item,packedQ){
   const st=poStatus(po,item,packedQ||0), cur=poStageIndex(st.key);
   const dots=PO_STAGES.map((s,i)=>{ const done=i<cur,isCur=i===cur; const bg=isCur?s.color:(done?'#16a34a':'var(--line)'); const sz=isCur?12:9;
@@ -8473,8 +8503,12 @@ function poStatus(po, item, packedQ){
   }
   const o=poFI(po,item), sc=poSchedule(po,item), today=poToday();
   if(!sc.valid) return {key:'none', label:'ยังไม่กรอก Lead Time', emoji:'⚪', color:'var(--muted)'};
-  // ครบทั้งสอง Follow + ถึงวันสิ้นสุด → ไปจัดตู้
-  if(o.f1.done && o.f2.done && today>=sc.endDate) return {key:'due', label:'ครบกำหนด · ไปจัดตู้', emoji:'📦', color:'var(--bad)'};
+  // ครบทั้งสอง Follow + ถึงวันสิ้นสุด → ไปจัดตู้ · ถ้าเลยกำหนดผลิต ≥ 15 วันแต่ยังไม่จัดตู้ → ค้างโหลดตู้
+  if(o.f1.done && o.f2.done && today>=sc.endDate){
+    const overdue = Math.floor((new Date(today) - new Date(sc.endDate))/DAY);   // วันหลังครบกำหนดผลิต (วันที่เป็น ISO string)
+    if(overdue>=15) return {key:'loadwait', label:'ค้างโหลดตู้ · เกิน '+overdue+' วัน', emoji:'⛔', color:'#b91c1c', overdue};
+    return {key:'due', label:'ครบกำหนด · ไปจัดตู้', emoji:'📦', color:'var(--bad)'};
+  }
   // ถึงวัน Follow รอบ 1 แต่ยังไม่ยืนยัน → ตามรอบที่ 1 (คาไว้แม้เลยรอบ 2 แล้ว)
   if(!o.f1.done && today>=sc.f1date) return {key:'follow1', label:'ตามรอบที่ 1', emoji:'📞', color:'#d97706'};
   // ยืนยันรอบ 1 แล้ว + ถึงวัน Follow รอบ 2 แต่ยังไม่ยืนยันรอบ 2 → ตามรอบที่ 2
@@ -8490,7 +8524,7 @@ function itemMergedPO(item){
   const pos = (window.BC_PO && window.BC_PO[item]) ? (window.BC_PO[item].pos||[]).filter(p=>p[4]==='Released') : [];
   if(!pos.length) return null;
   const packed = (typeof poPackedMap==='function')?poPackedMap():{};
-  const PRIO={due:6, partial:6, follow1:5, follow2:5, none:4, start:3, processing:3, packed:1};
+  const PRIO={loadwait:7, due:6, partial:6, follow1:5, follow2:5, none:4, start:3, processing:3, packed:1};
   let bestSt=null, bestPrio=-1, bestPo='';
   pos.forEach(p=>{ const po=p[0]; const pq=packed[po]?(packed[po].items[item]||0):0; const st=(typeof poStatus==='function')?poStatus(po,item,pq):null; if(st){ const pr=PRIO[st.key]||0; if(pr>bestPrio){ bestPrio=pr; bestSt=st; bestPo=po; } } });
   return bestSt? {st:bestSt, po:bestPo} : null;
@@ -8501,7 +8535,38 @@ function itemMergedStatusTag(item, reorderTagHtml){
   const isNone = m.st.key==='none';
   const label = isNone ? 'ยังไม่กรอก Lead Time ✍️' : (m.st.label+' '+(m.st.emoji||''));
   // คลิกสถานะ PO → ไปเลือก PO นั้นในหน้าติดตาม PO (กรอก/จัดการ Lead Time)
-  return `<span class="tag" onclick="event.stopPropagation(); poFollowGoto('${m.po}','${item}')" title="PO ${m.po} — คลิกเพื่อไปกรอก Lead Time ในหน้าติดตาม PO" style="background:${m.st.color};color:#fff;cursor:pointer;${isNone?'outline:1px dashed #fff;':''}">${label}</span>`;
+  const tag = `<span class="tag" onclick="event.stopPropagation(); poFollowGoto('${m.po}','${item}')" title="PO ${m.po} — คลิกเพื่อไปกรอก Lead Time ในหน้าติดตาม PO" style="background:${m.st.color};color:#fff;cursor:pointer;${isNone?'outline:1px dashed #fff;':''}">${label}</span>`;
+  // ค้างโหลดตู้ — ต้องกรอกเหตุผลที่ยังไม่จัดตู้
+  if(m.st.key==='loadwait'){
+    const o=poFI(m.po,item), rsn=(o.loadWaitReason||'').trim();
+    const reasonUi = rsn
+      ? `<div style="font-size:10.5px;color:var(--muted);margin-top:3px;line-height:1.35;">📝 ${rsn.replace(/</g,'&lt;')} <a href="#" onclick="event.stopPropagation();poAskLoadWaitReason('${m.po}','${item}');return false;" style="font-size:10px;">แก้</a></div>`
+      : `<div style="margin-top:4px;"><a href="#" onclick="event.stopPropagation();poAskLoadWaitReason('${m.po}','${item}');return false;" style="font-size:11px;color:var(--bad);font-weight:700;">⛔ ระบุเหตุผลที่ยังไม่จัดตู้</a></div>`;
+    return tag+reasonUi;
+  }
+  return tag;
+}
+// กล่องกรอกข้อความ (แทน prompt() ที่ถูกบล็อกในลิงก์ Artifact)
+function pkPrompt(msg, initial, onOk){
+  let ov=document.getElementById('pk-prompt-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='pk-prompt-ov'; ov.style.cssText='position:fixed;inset:0;z-index:100003;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';
+  const box=document.createElement('div'); box.style.cssText='background:var(--card,#fff);color:var(--ink,#111);max-width:480px;width:100%;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:22px;';
+  box.innerHTML='<div style="font-size:14px;margin-bottom:12px;white-space:pre-line;">'+String(msg).replace(/</g,'&lt;')+'</div><textarea id="pk-prompt-in" style="width:100%;box-sizing:border-box;min-height:72px;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;"></textarea><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;"><button id="pk-prompt-no" class="go" style="background:#64748b;">ยกเลิก</button><button id="pk-prompt-yes" class="go" style="background:var(--brand);">บันทึก</button></div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  const ta=box.querySelector('#pk-prompt-in'); ta.value=initial||''; setTimeout(()=>ta.focus(),30);
+  const close=()=>{ if(ov&&ov.parentNode) ov.parentNode.removeChild(ov); };
+  box.querySelector('#pk-prompt-yes').onclick=()=>{ const v=ta.value.trim(); close(); if(onOk) onOk(v); };
+  box.querySelector('#pk-prompt-no').onclick=close;
+  ov.onclick=(e)=>{ if(e.target===ov) close(); };
+}
+function poAskLoadWaitReason(po,item){
+  const o=poFI(po,item);
+  pkPrompt('เหตุผลที่ยังไม่จัดตู้ (ค้างโหลดตู้)\nPO '+po+' · '+item, o.loadWaitReason||'', function(v){
+    o.loadWaitReason=v; o.loadWaitTs=pkNowStr(); poSaveFollow();
+    if(typeof renderUrgent==='function') renderUrgent();
+    if(typeof renderPoFollow==='function') renderPoFollow();
+    pkToast(v?'บันทึกเหตุผลแล้ว ✓':'ล้างเหตุผลแล้ว','good');
+  });
 }
 // เลือก PO ในหน้าติดตาม PO แล้วเลื่อนไปยังการ์ดนั้น (สำหรับกรอก Lead Time)
 function poFollowGoto(po, item){
@@ -8768,13 +8833,15 @@ document.querySelectorAll('.tab').forEach(t=>{
   };
 });
 document.getElementById('pk-add').onclick = pkAddRow;
+document.getElementById('pk-addcustom').onclick = pkAddCustomRow;
 document.getElementById('pk-addcont').onclick = pkAddCont;
 document.getElementById('pk-delsel').onclick = pkDelSelected;
 document.getElementById('pk-clearrows').onclick = pkClearRows;
 document.getElementById('pk-cap').oninput = ()=>{ renderPacking(); };
 document.getElementById('pk-fx').oninput = pkSetFx;
 document.querySelectorAll('input[name="pk-mode"]').forEach(rb=>{ rb.onchange = function(){ if(this.checked) pkSetMode(this.value); }; });
-document.getElementById('pk-save').onclick = pkSaveRound;
+document.getElementById('pk-save').onclick = ()=>pkSaveRound(false);
+document.getElementById('pk-savenew').onclick = ()=>pkSaveRound(true);
 document.getElementById('pk-savedraft').onclick = ()=>pkSaveDraft(false);
 document.getElementById('pk-setdir').onclick = pkSetDir;
 document.getElementById('pk-export').onclick = pkExportBackup;
