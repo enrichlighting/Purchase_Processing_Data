@@ -6870,8 +6870,8 @@ function renderCustChart(scope){
   const qmap={}; srcArr.forEach(p=>qmap[p[0]]=p[1]);
   const data=monthsBetween(from,to).map(ym=>[ym, qmap[ym]||0]);
   const total=data.reduce((s,d)=>s+d[1],0);
-  let h=`<div class="section-title" style="margin-top:20px;">📊 ยอดซื้อรายเดือน — <span style="color:var(--brand)">${cname}</span> <span class="muted" style="font-weight:400">(รวมช่วงที่เลือก ${fmtNum(total)} ${it.uom})</span></div>`;
-  h+='<div class="chartbox">'+custBars(data)+'</div>';
+  let h=`<div class="section-title" style="margin-top:20px;">📊 ยอดซื้อรายเดือน — <span style="color:#ea580c">${cname}</span> <span class="muted" style="font-weight:400">(รวมช่วงที่เลือก ${fmtNum(total)} ${it.uom})</span></div>`;
+  h+='<div class="chartbox">'+custBars(data,'#ea580c')+'</div>';
   wrap.innerHTML=h;
 }
 
@@ -8248,13 +8248,14 @@ function renderPoFollow(){
   list.forEach(po=>{ const doc=PD[po.po]; if(!doc) return; const v=po.vendor||'(ไม่ระบุผู้ขาย)';
     if(!byVendor[v]) byVendor[v]={vendor:v,pos:[],oldest:doc};
     const totOut=po.items.reduce((s,x)=>s+(+x.out||0),0);
-    byVendor[v].pos.push({po:po.po,doc,out:totOut}); if(doc<byVendor[v].oldest) byVendor[v].oldest=doc; });
+    const lots=[...new Set(po.items.map(x=>(poRelLot(po.po,x.item)||{}).lot).filter(Boolean))];
+    byVendor[v].pos.push({po:po.po,doc,out:totOut,lot:lots.join(', ')}); if(doc<byVendor[v].oldest) byVendor[v].oldest=doc; });
   const vendors=Object.values(byVendor).sort((a,b)=> a.oldest<b.oldest?-1:(a.oldest>b.oldest?1:0)).slice(0,5);
   window._poVendList=vendors.map(v=>v.vendor);
   const rowsT=vendors.map((v,i)=>{ const days=Math.round((new Date(today)-new Date(v.oldest))/86400000); const open=window.poVendorExpanded===v.vendor;
     let h=`<tr style="cursor:pointer;${open?'background:var(--brand-soft);':''}" onclick="poToggleVendorIdx(${i})" title="คลิกดู PO ของผู้ขายนี้"><td style="text-align:center;">${open?'▼':'▶'}</td><td><b style="font-size:11px;">${(v.vendor||'').slice(0,24)}</b><br><span class="muted" style="font-size:10px;">${v.pos.length} PO</span></td><td class="num" style="font-size:11px;"><b style="color:var(--bad)">ค้าง ${fmtNum(days)} วัน</b></td></tr>`;
     if(open){ v.pos.slice().sort((a,b)=> a.doc<b.doc?-1:1).forEach(p=>{ const pd=Math.round((new Date(today)-new Date(p.doc))/86400000);
-      h+=`<tr style="cursor:pointer;${window.poSelected===p.po?'outline:2px solid var(--brand);':''}" onclick="poSelectPO('${p.po}')" title="เลือก PO นี้"><td></td><td style="padding-left:12px;"><b style="font-size:11px;">${p.po}</b><br><span class="muted" style="font-size:10px;">ค้าง ${fmtNum(p.out)}</span></td><td class="num" style="font-size:11px;">${poThaiShort(p.doc)}<br>${fmtNum(pd)} วัน</td></tr>`; }); }
+      h+=`<tr style="cursor:pointer;${window.poSelected===p.po?'outline:2px solid var(--brand);':''}" onclick="poSelectPO('${p.po}')" title="เลือก PO นี้"><td></td><td style="padding-left:12px;"><b style="font-size:11px;">${p.po}</b>${p.lot?' <span class="muted" style="font-size:10px;">· Lot: '+p.lot+'</span>':''}<br><span class="muted" style="font-size:10px;">ค้าง ${fmtNum(p.out)}</span></td><td class="num" style="font-size:11px;">${poThaiShort(p.doc)}<br>${fmtNum(pd)} วัน</td></tr>`; }); }
     return h;
   }).join('');
   const tbl=`<div style="flex:1 1 260px;min-width:250px;max-width:360px;">
