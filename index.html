@@ -7668,7 +7668,12 @@ function pkDelSelected(){ const idx=[...(window.pkRowSel||[])].sort((a,b)=>b-a);
 function pkClearRows(){ pkConfirm('ล้างรายการทั้งหมดในลิสท์ Packing? (ตู้และวันที่ยังอยู่)', function(){ window.packingRows=[{item:'',loads:[],lots:[],costIdx:null}]; window.pkRowSel=new Set(); renderPacking(); pkToast('ล้างลิสท์แล้ว','good'); }); }
 function pkAddCont(){ window.pkContainers.push({name:pkDefName(window.pkContainers.length)}); renderPacking(); }
 function pkDelCont(c){ window.pkContainers.splice(c,1); window.packingRows.forEach(r=>{ if(r.loads) r.loads.splice(c,1); if(r.lots) r.lots.splice(c,1); }); if(!window.pkContainers.length){ window.pkContainers.push({name:'ตู้ A'}); } renderPacking(); }
-function pkSetContName(c, v){ window.pkContainers[c].name=v; renderContainers(); }
+function pkSetContName(c, v){ const ct=window.pkContainers[c]; const old=ct.name||pkDefName(c); ct.name=v;
+  if(String(v).trim()!==String(old).trim()){ ct.dates={}; ct.dateLog=[]; ct.editing=true;   // เปลี่ยนชื่อตู้ = ถือเป็นตู้ใหม่ → ล้างวันที่ให้กรอกใหม่
+    if(typeof pkToast==='function') pkToast('เปลี่ยนชื่อตู้เป็น "'+v+'" · ล้างวันที่ตู้แล้ว กรอกใหม่ได้เลย','info'); renderPacking(); }
+  else renderContainers();
+}
+function pkClearContDates(c){ const ct=window.pkContainers[c]; pkConfirm('ล้างวันที่ตู้ "'+(ct.name||pkDefName(c))+'" ทั้งหมด เพื่อกรอกใหม่?', function(){ ct.dates={}; ct.dateLog=[]; ct.editing=true; renderShipPanel(); pkToast('ล้างวันที่ตู้แล้ว — กรอกใหม่ได้เลย','good'); }); }
 
 // จำลองตู้ตามที่กรอกจริง (แต่ละตู้ = คอลัมน์)
 window.pkView = window.pkView || 'cap';   // 'cap' = สเกลเทียบความจุ 68 · 'fill' = ขยายเต็มพื้นที่ดูสัดส่วนสินค้า
@@ -7801,9 +7806,10 @@ function renderShipPanel(){
         </div>`;
       }
     });
-    const btns = editing
+    const clearBtn = hasAny ? ` <button onclick="pkClearContDates(${c})" style="font-size:12px;border:1px solid var(--bad);color:var(--bad);background:var(--bg);border-radius:8px;padding:7px 12px;cursor:pointer;">🗑️ ล้างวันที่ตู้</button>` : '';
+    const btns = (editing
       ? `<button onclick="pkSaveDates(${c})" class="go" style="font-size:13px;">💾 บันทึกวันที่ตู้นี้</button> ${hasAny?`<button onclick="pkCancelEdit(${c})" style="font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:7px 12px;cursor:pointer;">ยกเลิก</button>`:''}`
-      : `<button onclick="pkEditDates(${c})" class="go" style="background:var(--warn);font-size:13px;">✏️ แก้ไขวันที่ตู้</button>`;
+      : `<button onclick="pkEditDates(${c})" class="go" style="background:var(--warn);font-size:13px;">✏️ แก้ไขวันที่ตู้</button>`) + clearBtn;
     cards+=`<div style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--card);margin-bottom:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
         <div style="font-weight:700;">🚢 ${ct.name||pkDefName(c)}${editing?' <span class="muted" style="font-weight:400;font-size:11px;">· กำลังแก้ไข</span>':''}</div>
