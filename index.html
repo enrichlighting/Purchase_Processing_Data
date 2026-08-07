@@ -6297,6 +6297,7 @@ const RESERVE_LOCS = ['WH-RESERVE'];
 const fmtDate = d => new Date(d).toLocaleDateString('th-TH',{day:'2-digit',month:'short',year:'numeric'});
 const fmtNum  = n => Math.round(n).toLocaleString('th-TH');
 const fmt1    = n => Number(n).toLocaleString('th-TH',{maximumFractionDigits:1});
+const fmtMo   = n => isFinite(n) ? Number(n).toLocaleString('th-TH',{minimumFractionDigits:1,maximumFractionDigits:1}) : '∞';   // จำนวนเดือน — ทศนิยม 1 ตำแหน่งเสมอ
 const addDays = (d,n) => new Date(+d + n*DAY);
 
 /* --- seeded RNG เพื่อให้ข้อมูลตัวอย่างคงที่ทุกครั้งที่เปิด --- */
@@ -6722,7 +6723,7 @@ function lMoqCalcQty(){
   const moq=Math.max(0, +((document.getElementById('moq-in-qty')||{}).value)||0);
   const sug=+m.suggest||0, total=Math.max(sug, moq), extra=Math.max(0,total-sug);
   if(m.paidDaily>0){ const days=Math.ceil(total/m.paidDaily);
-    res.innerHTML=`ต้องสั่งเพิ่มจากควรสั่งอีก <b style="color:var(--bad)">${fmtNum(extra)}</b> ${m.uom} · รวมสั่ง <b>${fmtNum(total)}</b> → อยู่ได้ <b>${fmtNum(days)}</b> วัน (<b>${fmt1(days/30)}</b> เดือน)`;
+    res.innerHTML=`ต้องสั่งเพิ่มจากควรสั่งอีก <b style="color:var(--bad)">${fmtNum(extra)}</b> ${m.uom} · รวมสั่ง <b>${fmtNum(total)}</b> → อยู่ได้ <b>${fmtNum(days)}</b> วัน (<b>${fmtMo(days/30)}</b> เดือน)`;
   } else res.innerHTML=`ต้องสั่งเพิ่มอีก <b style="color:var(--bad)">${fmtNum(extra)}</b> ${m.uom} · รวมสั่ง <b>${fmtNum(total)}</b> <span class="muted">(ไม่มียอดขาย)</span>`;
   box.innerHTML=moqBoxHtml(total);
 }
@@ -6816,7 +6817,7 @@ function renderLeadtime(){
   const suggestQty = sug3;                                          // ควรสั่งหลัก = หมวด 3
   const coverDays = targetDays, netAvail = cat3;                    // (คงชื่อไว้ให้โค้ดด้านล่างเดิม)
   // การ์ดสรุปแต่ละหมวด
-  const _catMo = d => isFinite(d) ? ` <span class="muted" style="font-weight:400;">(${fmt1(d/30)} ด.)</span>` : '';
+  const _catMo = d => isFinite(d) ? ` <span class="muted" style="font-weight:400;">(${fmtMo(d/30)} ด.)</span>` : '';
   const mkCat = (badge,title,comps,sum,dos,sug,hi) => {
     const dTxt = isFinite(dos) ? fmtNum(Math.round(dos))+' วัน'+_catMo(dos) : '∞';
     return `<div style="flex:1;min-width:230px;border:${hi?'2.5px solid var(--brand)':'1px solid var(--line)'};background:${hi?'var(--brand-soft)':'var(--card)'};border-radius:14px;padding:14px 16px;">
@@ -6830,7 +6831,7 @@ function renderLeadtime(){
   };
 
   // สถานะรวม (เกณฑ์เดือน · ยึดหมวด 3): ≤3 ควรสั่งซื้อ · ≤3.5 ใกล้ · ≤4 เฝ้าระวัง · >4 ยังไม่ต้องสั่ง
-  const _moTxt = isFinite(cov3moL) ? fmt1(cov3moL)+' เดือน' : 'ไม่มียอดขาย';
+  const _moTxt = isFinite(cov3moL) ? fmtMo(cov3moL)+' เดือน' : 'ไม่มียอดขาย';
   const STMSG = {
     red:   {level:'bad',  msg:`🔴 ควรสั่งซื้อ — หมวด 3 อยู่ได้ ${_moTxt} (≤ 3 เดือน)`},
     warn:  {level:'warn', msg:`⏰ ใกล้ถึงจุดสั่ง — หมวด 3 อยู่ได้ ${_moTxt} (3–3.5 เดือน)`},
@@ -6856,7 +6857,7 @@ function renderLeadtime(){
   if(qSample>0) poExtra.push(`ตัวอย่าง ${fmtNum(qSample)}`);
   html += kpi('กำลังจะเข้า (จัดซื้อ POA)', fmtNum(incoming)+` <small>${it.uom}</small>` + (poExtra.length?`<span style="display:block;font-size:11px;font-weight:700;margin-top:3px;line-height:1.3;">${poExtra.join(' · ')}</span>`:''), incoming>0?'good':'');
   const dosNote = (includePO && isFinite(daysOnHand) && Math.abs(daysOfSupply-daysOnHand)>=2) ? ` <small>(ของในมือ ${fmtNum(daysOnHand)} + PO)</small>` : '';
-  const dosMonths = isFinite(daysOfSupply) ? ` <small>(${fmt1(daysOfSupply/30)} เดือน)</small>` : '';
+  const dosMonths = isFinite(daysOfSupply) ? ` <small>(${fmtMo(daysOfSupply/30)} เดือน)</small>` : '';
   html += kpi('อยู่ได้อีก', (isFinite(daysOfSupply)?fmtNum(daysOfSupply):'∞')+' <small>วัน</small>'+dosMonths+dosNote, daysOfSupply<it.leadTime?'bad':daysOfSupply<it.leadTime*1.5?'warn':'good');
   html += kpi('Lead Time รวม', it.leadTime+' <small>วัน</small>' + (it.leadReal?` <small>(โรงงาน ${it.leadFactory} + เรือ ${it.leadShip})</small>`:''), '');
   html += kpi('ของจะหมดวันที่', stockoutDate?fmtDate(stockoutDate):'—', stockoutDate?'':'good');
@@ -6872,7 +6873,7 @@ function renderLeadtime(){
   html += mkCat('③','คลัง + PO + จัดตู้ + สั่งผลิต', `คลัง ${fmtNum(availRawL)} + PO เหลือ ${fmtNum(poRemainL)} <span class="muted" style="font-size:10px;">(PO ${fmtNum(incoming)} − จัดตู้/ผลิต)</span> + จัดตู้ ${fmtNum(packedL)} + ผลิต ${fmtNum(productionL)}`, cat3, dCat3, sug3, true);
   html += `</div>`;
   // กรอบเน้น "จำนวนที่ควรสั่งเพิ่ม" (ยึดหมวด 3)
-  const coverText = paidDaily>0 && suggestQty>0 ? `<div style="font-size:12px;font-weight:600;color:var(--muted);margin-top:2px;">≈ สั่งแล้วอยู่ได้รวม ${fmt1((cat3+suggestQty)/paidDaily/30)} เดือน</div>` : '';
+  const coverText = paidDaily>0 && suggestQty>0 ? `<div style="font-size:12px;font-weight:600;color:var(--muted);margin-top:2px;">≈ สั่งแล้วอยู่ได้รวม ${fmtMo((cat3+suggestQty)/paidDaily/30)} เดือน</div>` : '';
   html += `<div style="margin-top:16px;border:2.5px solid var(--brand);background:var(--brand-soft);border-radius:14px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
     <span style="font-weight:800;font-size:16px;">📦 จำนวนที่ควรสั่งเพิ่ม <span style="font-size:12px;font-weight:600;color:var(--muted);">(ยึดหมวด 3)</span></span>
     <span style="text-align:right;"><b style="color:var(--brand);font-size:30px;letter-spacing:-.5px;">${fmtNum(suggestQty)}</b> <span style="font-size:15px;font-weight:600;color:var(--muted);">${it.uom}</span>${coverText}</span>
@@ -6880,7 +6881,7 @@ function renderLeadtime(){
   // ช่องเผื่อ MOQ / วางแผนสั่งเพิ่ม — 2 โหมด (ตามจำนวนสั่ง / ตามระยะเวลา) + จำนวนกล่อง (ปัดขึ้น)
   const _pcs=(window.BC_PACKING && window.BC_PACKING[itemNo])?(window.BC_PACKING[itemNo].pcs||0):0;
   const _initDays = paidDaily>0 ? Math.ceil(suggestQty/paidDaily) : 0;
-  const _initRes = paidDaily>0 ? `ควรสั่ง <b>${fmtNum(suggestQty)}</b> ${it.uom} → อยู่ได้ <b>${fmtNum(_initDays)}</b> วัน (<b>${fmt1(_initDays/30)}</b> เดือน)` : `ควรสั่ง <b>${fmtNum(suggestQty)}</b> ${it.uom} <span class="muted">(ไม่มียอดขาย)</span>`;
+  const _initRes = paidDaily>0 ? `ควรสั่ง <b>${fmtNum(suggestQty)}</b> ${it.uom} → อยู่ได้ <b>${fmtNum(_initDays)}</b> วัน (<b>${fmtMo(_initDays/30)}</b> เดือน)` : `ควรสั่ง <b>${fmtNum(suggestQty)}</b> ${it.uom} <span class="muted">(ไม่มียอดขาย)</span>`;
   const _initBox = _pcs>0 ? `📦 <b>${fmtNum(Math.ceil(suggestQty/_pcs))}</b> กล่อง <span class="muted" style="font-size:11px;font-weight:400;">(${fmtNum(_pcs)} ชิ้น/กล่อง)</span>` : '<span class="muted" style="font-size:13px;">— ไม่มีข้อมูลกล่อง</span>';
   const _inp='width:110px;text-align:right;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);';
   window._moq={suggest:suggestQty, paidDaily:paidDaily, pcs:_pcs, uom:it.uom}; window._moqMode='qty';
@@ -7419,7 +7420,7 @@ function prepTableHtml(){
   if(!items.length) return '<div class="empty">ยังไม่มีสินค้าเตรียมเปิด PO — เลือกสินค้าจากตารางสถานะ → กรอก MOQ (ถ้ามี) → กด "เตรียมเปิด PO"</div>';
   window.prepSel = window.prepSel || new Set();
   const rows=items.map(no=>{ const e=map[no]; const days=(e.paidDaily>0)?Math.ceil(e.qty/e.paidDaily):null; const ck=window.prepSel.has(no)?'checked':'';
-    return `<tr><td><input type="checkbox" ${ck} onchange="prepToggleSel('${no}',this.checked)"></td><td><b>${no}</b></td><td style="min-width:200px;">${e.name||(getItem(no)||{}).desc||''}</td><td class="num"><b>${fmtNum(e.qty)}</b></td><td class="num">${days==null?'∞':fmtNum(days)+' วัน ('+fmt1(days/30)+' ด.)'}</td><td><a href="#" style="color:var(--bad);font-size:12px;" onclick="planUnprep('${no}');return false;">✕</a></td></tr>`; }).join('');
+    return `<tr><td><input type="checkbox" ${ck} onchange="prepToggleSel('${no}',this.checked)"></td><td><b>${no}</b></td><td style="min-width:200px;">${e.name||(getItem(no)||{}).desc||''}</td><td class="num"><b>${fmtNum(e.qty)}</b></td><td class="num">${days==null?'∞':fmtNum(days)+' วัน ('+fmtMo(days/30)+' ด.)'}</td><td><a href="#" style="color:var(--bad);font-size:12px;" onclick="planUnprep('${no}');return false;">✕</a></td></tr>`; }).join('');
   return `<div style="overflow-x:auto;"><table style="width:100%;font-size:12.5px;"><thead><tr><th style="width:28px;"></th><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th class="num">จำนวนที่ต้องสั่ง</th><th class="num">อยู่ได้ (วัน · เดือน)</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function renderPrepPanel(){
@@ -7549,12 +7550,12 @@ function renderUrgent(){
         return;
       }
       const dos=Math.round(r.dosPaid), dosTxt=isFinite(dos)?dos:'∞';
-      const dosMo=isFinite(r.dosPaid)?`<br><span class="muted" style="font-size:10px;">(${fmt1(r.dosPaid/30)} เดือน)</span>`:'';
+      const dosMo=isFinite(r.dosPaid)?`<br><span class="muted" style="font-size:10px;">(${fmtMo(r.dosPaid/30)} เดือน)</span>`:'';
       const paidMo=`<br><span class="muted" style="font-size:10px;">(${fmtNum(Math.round(r.paidDaily*30))}/เดือน)</span>`;
       // อยู่ได้หลังสั่งเพิ่ม = หมวด 3 (คลัง−DIY + PO + จัดตู้ + สั่งผลิต) + จำนวนที่ควรสั่ง
       const totCov = Math.max(0, r.c3 + r.suggestQty);
       const sd = (r.paidDaily>0) ? Math.round(totCov/r.paidDaily) : null;
-      const sdTxt = sd==null ? '∞' : `${fmtNum(sd)} <span class="muted" style="font-size:10px;">(${fmt1(sd/30)} เดือน)</span>`;
+      const sdTxt = sd==null ? '∞' : `${fmtNum(sd)} <span class="muted" style="font-size:10px;">(${fmtMo(sd/30)} เดือน)</span>`;
       // ปุ่ม ✕ ระงับการสั่งซื้อ — เฉพาะรายการในหมวดจุดสั่งซื้อ (แดง/ใกล้/เฝ้าระวัง)
       const xBtn=(row.mkey==='red'||row.mkey==='warn'||row.mkey==='watch') ? ` <a href="#" title="ระงับการสั่งซื้อสินค้านี้" style="color:var(--bad);font-weight:800;text-decoration:none;font-size:15px;" onclick="event.stopPropagation();urgentSuspend('${it.no}');return false;">✕</a>` : '';
       const statusCell = (row.mkey==='prep')
