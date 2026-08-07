@@ -6800,9 +6800,9 @@ function renderLeadtime(){
   const availRawL = onHand - poDiy - draftDiy;                       // ในคลังหัก DIY แล้ว
   const packedL = (typeof itemPackedQty==='function') ? itemPackedQty(itemNo) : 0;         // จัดตู้แล้ว (ทุก PO)
   const productionL = (typeof itemProductionQty==='function') ? itemProductionQty(itemNo) : 0; // จำนวนสั่งผลิตที่กรอก (ทุก PO)
-  const cat1 = availRawL - reserve + incoming;                      // หมวด 1: คลัง + PO − จองนอกระบบ
-  const cat2 = availRawL + incoming + packedL;                      // หมวด 2: คลัง + PO + จัดตู้แล้ว
-  const cat3 = availRawL + incoming + packedL + productionL;        // หมวด 3: + จำนวนสั่งผลิต
+  const cat1 = availRawL - reserve;                                 // หมวด 1: คลัง − จองนอกระบบ (ไม่รวม PO)
+  const cat2 = availRawL + packedL;                                 // หมวด 2: คลัง + จัดตู้แล้ว (ไม่รวม PO)
+  const cat3 = availRawL + incoming + packedL + productionL;        // หมวด 3: คลัง + PO + จัดตู้ + สั่งผลิต
   const targetDays = (window.RTARGET==='legacy') ? (it.leadTime + basis) : 120;             // legacy vs 4 เดือน
   const targetQty = (window.RTARGET==='legacy') ? (paidDaily*targetDays + (it.safety||0)) : (paidDaily*targetDays);
   const targetLabel = (window.RTARGET==='legacy') ? `Lead Time ${it.leadTime} วัน + ${basisMonths} เดือน = ${targetDays} วัน${it.safety?' + Safety':''}` : 'ให้อยู่ได้ 4 เดือน (120 วัน)';
@@ -6866,8 +6866,8 @@ function renderLeadtime(){
   html += `<div class="section-title">3 หมวดการคำนวณ (หัก DIY · ฐาน ${basisMonths} เดือน · <span style="color:var(--brand)">${grpLabel}</span>)</div>`;
   html += `<div style="font-size:11.5px;color:var(--muted);margin:-4px 0 10px;line-height:1.5;">เป้าหมายที่ใช้คำนวณ "ควรสั่งเพิ่ม": <b style="color:var(--brand)">${targetLabel}</b> = <b>${fmtNum(Math.round(targetQty))}</b> ${it.uom} · เปลี่ยนสูตรได้ที่ช่อง "สูตรเป้าหมาย" ด้านบน</div>`;
   html += `<div style="display:flex;gap:12px;flex-wrap:wrap;">`;
-  html += mkCat('①','คลัง + PO − จองนอกระบบ', `คลัง(หัก DIY) ${fmtNum(availRawL)}${reserve?` − จอง ${fmtNum(reserve)}`:''} + PO ${fmtNum(incoming)}`, cat1, dCat1, sug1, false);
-  html += mkCat('②','คลัง + PO + จัดตู้แล้ว', `คลัง ${fmtNum(availRawL)} + PO ${fmtNum(incoming)} + จัดตู้ ${fmtNum(packedL)}`, cat2, dCat2, sug2, false);
+  html += mkCat('①','คลัง − จองนอกระบบ', `คลัง(หัก DIY) ${fmtNum(availRawL)}${reserve?` − จอง ${fmtNum(reserve)}`:''}`, cat1, dCat1, sug1, false);
+  html += mkCat('②','คลัง + จัดตู้แล้ว', `คลัง ${fmtNum(availRawL)} + จัดตู้ ${fmtNum(packedL)}`, cat2, dCat2, sug2, false);
   html += mkCat('③','คลัง + PO + จัดตู้ + สั่งผลิต', `คลัง ${fmtNum(availRawL)} + PO ${fmtNum(incoming)} + จัดตู้ ${fmtNum(packedL)} + ผลิต ${fmtNum(productionL)}`, cat3, dCat3, sug3, true);
   html += `</div>`;
   // กรอบเน้น "จำนวนที่ควรสั่งเพิ่ม" (ยึดหมวด 3)
@@ -7368,9 +7368,9 @@ function reorderCalc(it, basisDays, custGroup){
   const paidWindow = it.ileReal ? paidWindowFor(it, basisDays, custGroup) : 0;
   const paidDaily = it.ileReal ? paidWindow/basisDays : usage;
   // ===== 3 หมวดการคำนวณ (ฐานสต๊อก = availRaw หัก DIY แล้ว) =====
-  const c1 = availRaw - reserve + incoming;                            // คลัง + PO − จองนอกระบบ
-  const c2 = availRaw + incoming + packed;                             // คลัง + PO + จัดตู้แล้ว
-  const c3 = availRaw + incoming + packed + production;                // + จำนวนสั่งผลิต
+  const c1 = availRaw - reserve;                                       // คลัง − จองนอกระบบ (ไม่รวม PO)
+  const c2 = availRaw + packed;                                        // คลัง + จัดตู้แล้ว (ไม่รวม PO)
+  const c3 = availRaw + incoming + packed + production;                // คลัง + PO + จัดตู้ + สั่งผลิต
   // ===== ควรสั่งเพิ่มแต่ละหมวด (ตามสูตรเป้าหมายที่เลือก) =====
   const targetQty = reorderTargetQty(it, basisDays, paidDaily);
   const sug = c => Math.max(0, Math.round(targetQty - c));
