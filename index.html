@@ -205,9 +205,11 @@
   <a onclick="tocGo('leadtime','sec-urgent')">• สินค้าที่ต้องรีบสั่งซื้อ</a>
   <a onclick="tocGo('leadtime','po-follow-card')">• ติดตามสถานะ PO &amp; จัดตู้</a>
   <a onclick="tocGo('leadtime','planner-card')">• วางแผนสั่งซื้อรายสินค้า</a>
+  <a onclick="tocGo('leadtime','sec-cust-l')">• ยอดขายรายลูกค้า</a>
   <div class="toc-grp">🔎 ค้นหาสต๊อก</div>
   <a onclick="tocGo('search','sec-search')">• ค้นหา / เลือกสินค้า</a>
   <a onclick="tocGo('search','sec-itemlist')">• รายการสินค้าทั้งหมด</a>
+  <a onclick="tocGo('search','sec-cust-s')">• ยอดขายรายลูกค้า</a>
   <div class="toc-grp">📦 Packing List</div>
   <a onclick="tocGo('packing','sec-packing')">• จัดตู้ (คำนวณ CBM)</a>
   <a onclick="tocGo('packing','pk-logcard')">• ประวัติการบันทึก</a>
@@ -6819,7 +6821,7 @@ function custCardHtml(it, scope){
   const rangeLabel = fullRange ? 'ทุกช่วงเวลา' : `${monthLabel(from)} – ${monthLabel(to)}`;
   const opt = v => allM.map(ym=>`<option value="${ym}" ${ym===v?'selected':''}>${monthLabel(ym)}</option>`).join('');
 
-  let h = `<div class="card"><h2>🧑‍💼 ลูกค้าหลักที่ซื้อสินค้านี้ <span class="muted" style="font-size:12px;font-weight:400;">(Top ${it.topCust.length} จาก ${fmtNum(it.custCount)} ราย)</span></h2>`;
+  let h = `<div class="card" id="sec-cust-${scope}"><h2>🧑‍💼 ลูกค้าหลักที่ซื้อสินค้านี้ <span class="muted" style="font-size:12px;font-weight:400;">(Top ${it.topCust.length} จาก ${fmtNum(it.custCount)} ราย)</span></h2>`;
   h += `<p class="hint">เลือกลูกค้า/รวมทั้งหมด และช่วงเดือน — ตาราง+กราฟจะเปลี่ยนตาม (หรือคลิกแถวในตารางก็ได้)${!hasName?' · (รหัสลูกค้า)':''}</p>`;
   // ตัวเลือกลูกค้า (ดูกราฟ) + ช่วงเดือน (คุมทั้งการ์ด)
   const custOpt = `<option value="ALL" ${st.code==='ALL'?'selected':''}>รวมลูกค้าทั้งหมด</option>`
