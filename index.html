@@ -154,6 +154,20 @@
   #page-packing #pk-result table th, #page-packing #pk-result table td { padding:8px 9px; font-size:12.5px; }
   #page-packing #pk-result table td:nth-child(3){ max-width:260px; }
   code.k { background:var(--bg); border:1px solid var(--line); padding:1px 6px; border-radius:6px; font-size:12px; }
+  /* แถบสารบัญด้านซ้าย (ล็อคขณะเลื่อน) */
+  #toc { position:fixed; left:0; top:0; bottom:0; width:190px; background:var(--card); border-right:1px solid var(--line); z-index:600; overflow-y:auto; padding:14px 10px 40px; box-sizing:border-box; font-size:13px; }
+  #toc-head { display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:14px; margin-bottom:4px; }
+  #toc-close { cursor:pointer; padding:1px 9px; border-radius:6px; font-size:15px; color:var(--muted); }
+  #toc-close:hover { background:var(--line); }
+  #toc .toc-grp { font-weight:800; font-size:11.5px; color:var(--muted); margin:12px 4px 3px; letter-spacing:.2px; }
+  #toc a { display:block; padding:7px 9px; border-radius:7px; color:var(--ink); text-decoration:none; cursor:pointer; line-height:1.3; }
+  #toc a:hover { background:var(--brand-soft); }
+  #toc-open-btn { position:fixed; left:10px; top:78px; z-index:600; background:var(--brand); color:#fff; border-radius:9px; padding:8px 11px; cursor:pointer; font-size:16px; box-shadow:0 4px 12px rgba(0,0,0,.22); display:none; }
+  body.toc-open { padding-left:190px; }
+  body.toc-open #page-packing { width:auto; margin-left:0; padding:0; }
+  body:not(.toc-open) #toc { display:none; }
+  body:not(.toc-open) #toc-open-btn { display:block; }
+  @media (max-width:820px){ body.toc-open { padding-left:0; } body.toc-open #toc { box-shadow:6px 0 40px rgba(0,0,0,.35); } }
 </style>
 </head>
 <body>
@@ -185,6 +199,20 @@
   try{ i.focus(); }catch(e){}
 })();
 </script>
+<nav id="toc">
+  <div id="toc-head">📑 สารบัญ <span id="toc-close" onclick="tocToggle(false)" title="ซ่อนแถบ">✕</span></div>
+  <div class="toc-grp">🚨 ต้องรีบสั่ง &amp; วางแผน</div>
+  <a onclick="tocGo('leadtime','sec-urgent')">• สินค้าที่ต้องรีบสั่งซื้อ</a>
+  <a onclick="tocGo('leadtime','po-follow-card')">• ติดตามสถานะ PO &amp; จัดตู้</a>
+  <a onclick="tocGo('leadtime','planner-card')">• วางแผนสั่งซื้อรายสินค้า</a>
+  <div class="toc-grp">🔎 ค้นหาสต๊อก</div>
+  <a onclick="tocGo('search','sec-search')">• ค้นหา / เลือกสินค้า</a>
+  <a onclick="tocGo('search','sec-itemlist')">• รายการสินค้าทั้งหมด</a>
+  <div class="toc-grp">📦 Packing List</div>
+  <a onclick="tocGo('packing','sec-packing')">• จัดตู้ (คำนวณ CBM)</a>
+  <a onclick="tocGo('packing','pk-logcard')">• ประวัติการบันทึก</a>
+</nav>
+<div id="toc-open-btn" onclick="tocToggle(true)" title="เปิดสารบัญ">📑</div>
 <div class="wrap">
   <header class="top">
     <div class="logo">R</div>
@@ -203,7 +231,7 @@
 
   <!-- ============ PAGE: PACKING LIST ============ -->
   <div class="page" id="page-packing">
-    <div class="card">
+    <div class="card" id="sec-packing">
       <h2>📦 Packing List (คำนวณกล่อง &amp; CBM)</h2>
       <p class="hint">เลือกสินค้าในแต่ละแถว → ข้อมูลขนาดกล่อง (L/W/H) และจำนวนชิ้น/กล่อง จะเติมให้อัตโนมัติ · กรอก "จำนวนชิ้นที่โหลด" แล้วระบบคำนวณ จำนวนกล่อง · CBM · Total CBM · มูลค่า (¥/฿) ให้</p>
       <div id="pk-mode-box" style="margin-bottom:12px;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--brand-soft);">
@@ -252,7 +280,7 @@
 
   <!-- ============ PAGE 1: STOCK SEARCH + ITEM LIST ============ -->
   <div class="page" id="page-search">
-    <div class="card">
+    <div class="card" id="sec-search">
       <h2>ค้นหา / เลือกสินค้า</h2>
       <p class="hint">พิมพ์เลือกรหัสสินค้าด้านล่าง หรือคลิกจากตารางรายการสินค้า เพื่อดูรายละเอียด (คงเหลือ · Lead Time · แหล่งผลิต · ลูกค้า)</p>
       <div class="controls">
@@ -280,7 +308,7 @@
     <div id="s-result"></div>
 
     <!-- รายการสินค้าทั้งหมด (ยุบรวมมาจากแท็บเดิม) -->
-    <div class="card">
+    <div class="card" id="sec-itemlist">
       <h2>📋 รายการสินค้าทั้งหมด (Brand ENRICH)</h2>
       <p class="hint">ค้นหา/กรองได้ทั้งจาก รหัส · ชื่อ · Vendor · Factory · รหัส DIY/Big C · คลิกที่รหัสสินค้าเพื่อดูรายละเอียดด้านบน</p>
       <div class="controls">
@@ -304,7 +332,7 @@
   <div class="page active" id="page-leadtime">
 
     <!-- ===== ส่วนที่ 1: สินค้าที่ต้องรีบสั่งซื้อ ===== -->
-    <div class="card">
+    <div class="card" id="sec-urgent">
       <h2>🚨 สินค้าที่ต้องรีบสั่งซื้อ</h2>
       <p class="hint">เรียงจาก "ของใกล้หมดที่สุด" (ยอดคงเหลือ ÷ ยอดขายจริง/วัน · ตัด free item) · 🔴 = ของจะหมดก่อน Lead Time จะมาทัน · คลิกแถวเพื่อดึงมาวางแผนสั่งซื้อด้านล่าง</p>
       <div class="controls">
@@ -7101,6 +7129,13 @@ function reorderCalc(it, basisDays, custGroup){
   return { onHand, poDiy, availRaw, avail, usage, incoming, paidDaily, dosOnHand, dosCover, dosPaid, coverPaid, suggestQty };
 }
 
+/* --- ระงับการสั่งซื้อรายสินค้า (ย้ายออกจากการคำนวณจุดสั่งซื้อ · เก็บในเครื่อง) --- */
+function suspLoad(){ try{ const s=localStorage.getItem('suspendedItemsV1'); window.suspendedItems=new Set(s?JSON.parse(s):[]); }catch(e){ window.suspendedItems=new Set(); } }
+function suspHas(no){ if(!window.suspendedItems) suspLoad(); return window.suspendedItems.has(no); }
+function suspToggle(no,on){ if(!window.suspendedItems) suspLoad(); if(on) window.suspendedItems.add(no); else window.suspendedItems.delete(no); try{ localStorage.setItem('suspendedItemsV1', JSON.stringify([...window.suspendedItems])); }catch(e){} }
+function urgentSuspend(no){ pkConfirm('⛔ ยืนยันที่จะระงับการสั่งซื้อสินค้านี้หรือไม่?\n\n'+no+'\n\nเมื่อระงับแล้ว ระบบจะหยุดคำนวณจุดสั่งซื้อทั้งหมด และแสดงเฉพาะยอดคงเหลือในคลัง (ย้ายไปหมวด "ระงับการสั่งซื้อ")', function(){ suspToggle(no,true); renderUrgent(); pkToast('ระงับการสั่งซื้อ '+no+' แล้ว','good'); }); }
+function urgentUnsuspend(no){ suspToggle(no,false); renderUrgent(); pkToast('นำ '+no+' กลับมาคำนวณจุดสั่งซื้อแล้ว','good'); }
+
 /* --- ลิสท์สินค้าที่ต้องรีบสั่ง 10 อันดับ (ของใกล้หมดที่สุดขึ้นก่อน) --- */
 // คลิกหัวคอลัมน์ตัวเลขเพื่อเรียงลำดับ (สลับ น้อย→มาก / มาก→น้อย)
 function sortUrgent(key){
@@ -7127,8 +7162,8 @@ function renderUrgent(){
   all.forEach(x=>{
     x.status = x.r.coverPaid<=x.it.leadTime ? 'red' : x.r.coverPaid<=x.it.leadTime*1.5 ? 'warn' : 'watch';
   });
-  // สถานะรวมต่อรายการ (ไม่มี PO=รีบสั่ง · มี PO=สถานะผลิต/จัดตู้)
-  all.forEach(x=>{ x.mkey = itemMergedStatusKey(x.it.no, x.status); });
+  // สถานะรวมต่อรายการ (ไม่มี PO=รีบสั่ง · มี PO=สถานะผลิต/จัดตู้) · สินค้าที่ถูกระงับ → หมวด suspended
+  all.forEach(x=>{ x.mkey = suspHas(x.it.no) ? 'suspended' : itemMergedStatusKey(x.it.no, x.status); });
   const STATUS_DEFS=[
     {k:'red',label:'🔴 ต้องรีบสั่งซื้อ'},{k:'warn',label:'⏰ ใกล้ถึงจุดสั่ง'},{k:'watch',label:'เฝ้าระวัง'},
     {k:'none',label:'⚪ ยังไม่กรอก Lead Time'},{k:'start',label:'▶️ เริ่มต้นการผลิต'},
@@ -7136,7 +7171,7 @@ function renderUrgent(){
     {k:'due',label:'📦 ครบกำหนด'},{k:'partial',label:'📦 จัดบางส่วน'},{k:'packed',label:'✅ จัดตู้เสร็จแล้ว'}
   ];
   const SHIP_LABELS={ship_wait:'⏳ รอโหลด', ship_load:'📦 กำลังโหลด', ship_cls:'🔒 ปิดตู้แล้ว', ship_sail:'🚢 เรือเดินทาง', ship_th:'🇹🇭 ถึงไทย', ship_wh:'🏭 ถึงคลังแล้ว'};
-  const labels={all:'ทั้งหมด'}; STATUS_DEFS.forEach(d=>labels[d.k]=d.label); Object.assign(labels, SHIP_LABELS);
+  const labels={all:'ทั้งหมด', suspended:'⛔ ระงับการสั่งซื้อ'}; STATUS_DEFS.forEach(d=>labels[d.k]=d.label); Object.assign(labels, SHIP_LABELS);
   // ค้นหาสินค้า (รหัส/ชื่อ) — ให้มีผลกับตัวนับทุกปุ่มสถานะด้วย ไม่ใช่แค่แถวที่แสดง
   const iq = (window.urgentItemQuery||'').trim().toLowerCase();
   const base = iq ? all.filter(x=> (x.it.no+' '+(x.it.desc||'')).toLowerCase().includes(iq)) : all;
@@ -7147,7 +7182,8 @@ function renderUrgent(){
   const CATS=[
     {id:'order', label:'📍 จุดสั่งซื้อ', keys:['red','warn','watch']},
     {id:'po',    label:'🏭 ติดตาม PO',  keys:['none','start','follow1','follow2','processing','due','partial','packed']},
-    {id:'ship',  label:'🚚 ขนส่ง',      keys:['ship_wait','ship_load','ship_cls','ship_sail','ship_th','ship_wh']}
+    {id:'ship',  label:'🚚 ขนส่ง',      keys:['ship_wait','ship_load','ship_cls','ship_sail','ship_th','ship_wh']},
+    {id:'susp',  label:'⛔ ระงับการสั่งซื้อ', keys:['suspended']}
   ];
   window.urgentCatOpen = window.urgentCatOpen || {};
   let fbHtml = `<button class="fbtn ${f==='all'?'active':''}" onclick="setUrgentFilter('all')">ทั้งหมด (${base.length})</button>`;
@@ -7190,7 +7226,19 @@ function renderUrgent(){
   else {
     html = '<div class="chartbox" style="max-height:460px;overflow:auto;"><table>' + thead;
     rows.forEach((row,idx)=>{
-      const it=row.it, r=row.r, dos=Math.round(r.dosPaid), dosTxt=isFinite(dos)?dos:'∞';
+      const it=row.it, r=row.r;
+      // ---- สินค้าที่ถูกระงับการสั่งซื้อ: หยุดคำนวณ · โชว์เฉพาะยอดคงเหลือ + ปุ่มนำกลับ ----
+      if(row.mkey==='suspended'){
+        html += `<tr style="cursor:pointer;background:var(--bg);" onclick="openLeadtime('${it.no}')">
+          <td><b>${idx+1}</b></td>
+          <td style="min-width:150px;"><span class="tag" style="background:#e5e7eb;color:#374151;">⛔ ระงับการสั่งซื้อ</span><br><a href="#" style="font-size:11px;" onclick="event.stopPropagation();urgentUnsuspend('${it.no}');return false;">↩ นำกลับมาคำนวณ</a></td>
+          <td style="white-space:normal;min-width:180px;"><b>${it.no}</b> <span class="muted">${it.desc||''}</span></td>
+          <td class="num"><b>${fmtNum(r.onHand)}</b> <span class="muted" style="font-size:10px;">${it.uom||''}</span></td>
+          <td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">—</td>
+        </tr>`;
+        return;
+      }
+      const dos=Math.round(r.dosPaid), dosTxt=isFinite(dos)?dos:'∞';
       const dosMo=isFinite(r.dosPaid)?`<br><span class="muted" style="font-size:10px;">(${fmt1(r.dosPaid/30)} เดือน)</span>`:'';
       const paidMo=`<br><span class="muted" style="font-size:10px;">(${fmtNum(Math.round(r.paidDaily*30))}/เดือน)</span>`;
       // อยู่ได้รวมทั้งไปป์ไลน์ = สต๊อก + PO ค้างรับ (รวมของที่จัดตู้/กำลังขนส่ง) + จำนวนที่ควรสั่ง
@@ -7200,9 +7248,11 @@ function renderUrgent(){
       const totCov = Math.max(0, _stockPart + r.incoming + r.suggestQty);
       const sd = (r.paidDaily>0) ? Math.round(totCov/r.paidDaily) : null;
       const sdTxt = sd==null ? '∞' : `${fmtNum(sd)} <span class="muted" style="font-size:10px;">(${fmt1(sd/30)} เดือน)</span>`;
+      // ปุ่ม ✕ ระงับการสั่งซื้อ — เฉพาะรายการในหมวดจุดสั่งซื้อ (แดง/ใกล้/เฝ้าระวัง)
+      const xBtn=(row.mkey==='red'||row.mkey==='warn'||row.mkey==='watch') ? ` <a href="#" title="ระงับการสั่งซื้อสินค้านี้" style="color:var(--bad);font-weight:800;text-decoration:none;font-size:15px;" onclick="event.stopPropagation();urgentSuspend('${it.no}');return false;">✕</a>` : '';
       html += `<tr style="cursor:pointer" onclick="openLeadtime('${it.no}')">
         <td><b>${idx+1}</b></td>
-        <td style="min-width:150px;">${itemMergedStatusTag(it.no, tagOf(row.status))}${(function(){ const si=itemShipStatus(it.no); return si?`<div style="margin-top:6px;border-top:1px dashed var(--line);padding-top:5px;"><span style="font-size:10px;font-weight:700;color:var(--muted);">🚚 ${si.contName} · การขนส่ง</span>${pkShipStatusHtml(si.dates)}</div>`:''; })()}</td>
+        <td style="min-width:150px;">${itemMergedStatusTag(it.no, tagOf(row.status))}${xBtn}${(function(){ const si=itemShipStatus(it.no); return si?`<div style="margin-top:6px;border-top:1px dashed var(--line);padding-top:5px;"><span style="font-size:10px;font-weight:700;color:var(--muted);">🚚 ${si.contName} · การขนส่ง</span>${pkShipStatusHtml(si.dates)}</div>`:''; })()}</td>
         <td style="white-space:normal;min-width:180px;"><b>${it.no}</b> <span class="muted">${it.desc||''}</span></td>
         <td class="num">${r.poDiy>0
           ? `<div style="line-height:1.35;">
@@ -8175,6 +8225,16 @@ function poGoPackSelected(){
   const res=document.getElementById('pk-result'); if(res) res.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
+// แถวตาราง "รายการ Lead Time ที่บันทึกไว้" — กรองตามสถานะ + คำค้น (ชื่อ/รหัส/Lot)
+function poTrkRowsHtml(){
+  const tracked=poTrackedList(), packed=poPackedMap();
+  const q=(window.poTrkQuery||'').trim().toLowerCase();
+  let shown=tracked.filter(t=> window.poFilter==='all' || t.status.key===window.poFilter);
+  if(q) shown=shown.filter(t=>{ const nm=((getItem(t.item)||{}).desc||'').toLowerCase(); return nm.includes(q)||String(t.item||'').toLowerCase().includes(q)||String(t.lot||'').toLowerCase().includes(q); });
+  if(!shown.length) return '<tr><td colspan="5" class="muted" style="text-align:center;padding:12px;">'+(q?'ไม่พบสินค้า/Lot ที่ค้นหา':'ไม่มีรายการในสถานะนี้')+'</td></tr>';
+  return shown.map(t=>`<tr style="cursor:pointer;${window.poSelected===t.po?'background:var(--brand-soft);':''}" onclick="poSelectPO('${t.po}')" title="คลิกเพื่อดู PO นี้"><td><b>${t.po}</b>${t.lot?'<br><span class="muted" style="font-size:10px;">(Lot: '+t.lot+')</span>':''}</td><td style="min-width:180px;"><b>${t.item}</b><br><span class="muted" style="font-size:10px;">${(getItem(t.item)||{}).desc||''}</span></td><td class="num">${t.orderQty==null?'<span class=muted>-</span>':fmtNum(t.orderQty)}</td><td class="num">${t.leadDays===''||t.leadDays==null?'<span class=muted>-</span>':(fmtNum(t.leadDays)+' วัน')}</td><td style="min-width:160px;">${poProgressHtml(t.po,t.item,(packed[t.po]?(packed[t.po].items[t.item]||0):0))}</td></tr>`).join('');
+}
+function poTrkFilter(){ window.poTrkQuery=(document.getElementById('po-trk-search')||{}).value||''; const c=document.getElementById('po-trk-rows'); if(c) c.innerHTML=poTrkRowsHtml(); }
 function renderPoFollow(){
   const el=document.getElementById('po-follow'); if(!el) return;
   if(!window.pkLog||!window.pkLog.length) pkLoadLog();
@@ -8272,13 +8332,11 @@ function renderPoFollow(){
     const FILTERS=[['all','ทั้งหมด'],['start','เริ่มต้น ▶️'],['follow1','ตามรอบที่ 1 📞'],['follow2','ตามรอบที่ 2 📞'],['processing','กำลังผลิต ⚙️'],['due','ครบกำหนด 📦'],['partial','จัดบางส่วน 📦'],['packed','จัดตู้เสร็จแล้ว ✅']];
     const cnt=k=> k==='all'?tracked.length:tracked.filter(t=>t.status.key===k).length;
     const fbtns=FILTERS.map(([k,lb])=>{ const active=(window.poFilter===k); const c=cnt(k); return `<button onclick="poSetFilter('${k}')" style="padding:4px 11px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid ${active?'transparent':'var(--line)'};${active?'background:var(--brand);color:#fff;font-weight:700;':'background:var(--bg);color:var(--ink);'}">${lb}${c?' ('+c+')':''}</button>`; }).join(' ');
-    const shown=tracked.filter(t=> window.poFilter==='all' || t.status.key===window.poFilter);
-    const trows=shown.length? shown.map(t=>`<tr style="cursor:pointer;${window.poSelected===t.po?'background:var(--brand-soft);':''}" onclick="poSelectPO('${t.po}')" title="คลิกเพื่อดู PO นี้"><td><b>${t.po}</b>${t.lot?'<br><span class="muted" style="font-size:10px;">(Lot: '+t.lot+')</span>':''}</td><td style="min-width:180px;"><b>${t.item}</b><br><span class="muted" style="font-size:10px;">${(getItem(t.item)||{}).desc||''}</span></td><td class="num">${t.orderQty==null?'<span class=muted>-</span>':fmtNum(t.orderQty)}</td><td class="num">${t.leadDays===''||t.leadDays==null?'<span class=muted>-</span>':(fmtNum(t.leadDays)+' วัน')}</td><td style="min-width:160px;">${poProgressHtml(t.po,t.item,(packed[t.po]?(packed[t.po].items[t.item]||0):0))}</td></tr>`).join('')
-      : '<tr><td colspan="5" class="muted" style="text-align:center;padding:12px;">ไม่มีรายการในสถานะนี้</td></tr>';
     trkTbl=`<div style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px;">
       <div style="font-weight:700;font-size:13px;margin-bottom:8px;">📋 รายการ Lead Time ที่บันทึกไว้ <span class="muted" style="font-weight:400;font-size:11px;">(คลิกแถวเพื่อดู PO)</span></div>
+      <input type="search" id="po-trk-search" value="${(window.poTrkQuery||'').replace(/"/g,'&quot;')}" oninput="poTrkFilter()" placeholder="🔍 ค้นหาชื่อสินค้า / รหัส / Lot No" style="width:100%;max-width:380px;box-sizing:border-box;margin-bottom:8px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;">
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">${fbtns}</div>
-      <div style="overflow-x:auto;"><table style="width:100%;font-size:12px;"><tr><th>PO</th><th>Item</th><th class="num">จำนวนสั่งผลิต</th><th class="num">Lead Time</th><th>สถานะปัจจุบัน</th></tr>${trows}</table></div></div>`;
+      <div style="overflow-x:auto;"><table style="width:100%;font-size:12px;"><thead><tr><th>PO</th><th>Item</th><th class="num">จำนวนสั่งผลิต</th><th class="num">Lead Time</th><th>สถานะปัจจุบัน</th></tr></thead><tbody id="po-trk-rows">${poTrkRowsHtml()}</tbody></table></div></div>`;
   }
   // ===== กล่อง "พร้อมจัดตู้" — ติ๊กเลือกหลาย PO/สินค้า ไปจัดตู้พร้อมกัน =====
   const ready=poReadyList();
@@ -8418,6 +8476,15 @@ function init(){
   // เรนเดอร์เฉพาะแท็บที่เปิดอยู่ (lazy) — แท็บอื่นเรนเดอร์เมื่อคลิกครั้งแรก
   const active = (document.querySelector('.tab.active')||{}).dataset ? document.querySelector('.tab.active').dataset.tab : 'leadtime';
   renderTab(active);
+  // ค่าเริ่มต้นแถบสารบัญ: เปิดบนจอกว้าง · จำค่าที่ผู้ใช้เลือกไว้
+  { let s=null; try{ s=localStorage.getItem('tocOpen'); }catch(e){} const op = s!=null ? s==='1' : (window.innerWidth>=1000); document.body.classList.toggle('toc-open', op); }
+}
+/* ===== แถบสารบัญด้านซ้าย ===== */
+function tocToggle(open){ document.body.classList.toggle('toc-open', open); try{ localStorage.setItem('tocOpen', open?'1':'0'); }catch(e){} }
+function tocGo(tab, anchor){
+  const t=document.querySelector('.tab[data-tab="'+tab+'"]'); if(t && !t.classList.contains('active')) t.click();
+  setTimeout(function(){ const el=document.getElementById(anchor); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 80);
+  if(window.innerWidth<=820) tocToggle(false);   // จอเล็ก: ปิดแถบหลังเลือก
 }
 init();
 
