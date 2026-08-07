@@ -6424,6 +6424,7 @@ function fillFactoryDropdown(selId, vendor){
   el.innerHTML='<option value="">ทุก Factory</option>'+opts.map(v=>`<option value="${v}">${v}</option>`).join('');
   el.value = opts.includes(cur) ? cur : '';
 }
+function itemHasReleasedPO(it){ const no=(typeof it==='string')?it:(it&&it.no); return !!(no && window.BC_PO && window.BC_PO[no] && (window.BC_PO[no].pos||[]).some(p=>p[4]==='Released')); }
 function itemHasVendor(it,v){ return !v || (it.sources||[]).some(x=>x.vendor===v); }
 function itemHasFactory(it,f){ return !f || (it.sources||[]).some(x=>x.factory===f); }
 function sourcesText(it){ return (it.sources||[]).map(x=>`${x.vendor}→${x.factory}`).join(', '); }
@@ -7441,7 +7442,7 @@ function renderUrgent(){
   { const e=document.getElementById('u-basis'); if(e)e.value=String(uBasis); const g=document.getElementById('u-custgroup'); if(g)g.value=uGroup; const tg=document.getElementById('u-target'); if(tg)tg.value=(window.RTARGET||'m4'); const dd=document.getElementById('u-draftdiy'); if(dd) dd.checked=draftDiyOn(); }
   // คำนวณ + จัดสถานะ: แสดงถ้ามียอดขายจริง หรือ มีจอง PO DIY หรือ มี PO กำลังเข้า
   // (สินค้าตามฤดูกาลที่ไม่มียอดขายใน 6 เดือน แต่มีภาระจอง/PO ค้างรับ ก็ต้องเห็นในตาราง)
-  const all = ITEMS.filter(i=>i.ileReal && (!uType||i.itemType===uType) && (!uSub||i.subType===uSub) && itemHasVendor(i,uVen) && itemHasFactory(i,uFac))
+  const all = ITEMS.filter(i=>(i.ileReal || itemHasReleasedPO(i)) && (!uType||i.itemType===uType) && (!uSub||i.subType===uSub) && itemHasVendor(i,uVen) && itemHasFactory(i,uFac))
     .map(i=>({ it:i, r:reorderCalc(i,uBasis,uGroup) }))
     .filter(x=> x.r.paidDaily>0 || x.r.poDiy>0 || x.r.incoming>0 || x.r.draftDiy>0)
     .sort((a,b)=> (a.r.dosPaid - b.r.dosPaid) || (b.r.paidDaily - a.r.paidDaily));
