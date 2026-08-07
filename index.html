@@ -359,6 +359,12 @@
             <option value="3">กลุ่ม 3 · ลูกค้าอื่น ๆ (ไม่รวม DIY และ Big C)</option>
           </select>
         </div>
+        <div class="field"><label>สูตรเป้าหมาย "ควรสั่งเพิ่ม" (ทั้งหน้า)</label>
+          <select id="u-target">
+            <option value="m4" selected>ให้อยู่ได้ 4 เดือน (เกณฑ์ใหม่)</option>
+            <option value="legacy">Lead Time + ช่วงที่เลือก (สูตรเดิม)</option>
+          </select>
+        </div>
       </div>
       <div class="controls" style="margin-top:12px;">
         <div class="field" style="flex:1;min-width:300px;"><label>ค้นหาสินค้า (รหัส / ชื่อ)</label>
@@ -433,6 +439,13 @@
             <option value="1avg">กลุ่ม 1 · Mr.DIY (เฉลี่ย ซื้อ+ขายหน้าร้าน)</option>
             <option value="2">กลุ่ม 2 · Big C</option>
             <option value="3">กลุ่ม 3 · ลูกค้าอื่น ๆ (ไม่รวม DIY และ Big C)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>สูตรเป้าหมาย "ควรสั่งเพิ่ม" (ทั้งหน้า)</label>
+          <select id="l-target">
+            <option value="m4" selected>ให้อยู่ได้ 4 เดือน (เกณฑ์ใหม่)</option>
+            <option value="legacy">Lead Time + ช่วงที่เลือก (สูตรเดิม)</option>
           </select>
         </div>
         <div class="field" style="flex:0 0 auto; min-width:auto;">
@@ -6737,7 +6750,7 @@ function renderLeadtime(){
   const basis = +window.RBASIS || 180;                 // ค่ากลางร่วม (ลิสท์ด่วน + วางแผน)
   const basisMonths = basis/30;
   const custGroup = window.RGROUP || 'all';
-  { const e=document.getElementById('l-basis'); if(e)e.value=String(basis); const g=document.getElementById('l-custgroup'); if(g)g.value=custGroup; }
+  { const e=document.getElementById('l-basis'); if(e)e.value=String(basis); const g=document.getElementById('l-custgroup'); if(g)g.value=custGroup; const tg=document.getElementById('l-target'); if(tg)tg.value=(window.RTARGET||'m4'); }
   const grpLabel = { all:'ทุกกลุ่มรวมกัน', '1':'กลุ่ม 1 · Mr.DIY (ยอดซื้อจากเรา)', '1s':'กลุ่ม 1 · Mr.DIY (ยอดขายหน้าร้าน)', '1avg':'กลุ่ม 1 · Mr.DIY (เฉลี่ย ซื้อ+ขายหน้าร้าน)', '2':'กลุ่ม 2 · Big C', '3':'กลุ่ม 3 · ลูกค้าอื่น ๆ (ไม่รวม DIY และ Big C)' }[custGroup];
   const usesSell = (custGroup==='1s' || custGroup==='1avg');   // โหมดที่ใช้ยอดขายหน้าร้าน
   const paidWindow = paidWindowFor(it, basis, custGroup);
@@ -6783,22 +6796,49 @@ function renderLeadtime(){
   // ต้องสั่งซื้อภายใน = วันที่ของหมด - lead time (เผื่อเวลาให้ของมาทัน)
   const orderByDate = stockoutDate ? addDays(stockoutDate, -it.leadTime) : null;
 
-  // === คำนวณจำนวนที่ควรสั่งเพิ่ม (อัตราหลัก paidDaily/paidMonthly คำนวณด้านบนแล้ว) ===
-  const coverDays = it.leadTime + basis;                            // ครอบคลุม Lead Time + ช่วงที่เลือก
-  const targetQty = paidDaily*coverDays + it.safety;
-  const netAvail = available + (includePO? incoming : 0);
-  const suggestQty = Math.max(0, Math.round(targetQty - netAvail));
+  // === 3 หมวดการคำนวณ + ควรสั่งเพิ่ม (ตามสูตรเป้าหมายที่เลือกทั้งหน้า · หัก DIY เสมอ) ===
+  const availRawL = onHand - poDiy - draftDiy;                       // ในคลังหัก DIY แล้ว
+  const packedL = (typeof itemPackedQty==='function') ? itemPackedQty(itemNo) : 0;         // จัดตู้แล้ว (ทุก PO)
+  const productionL = (typeof itemProductionQty==='function') ? itemProductionQty(itemNo) : 0; // จำนวนสั่งผลิตที่กรอก (ทุก PO)
+  const cat1 = availRawL - reserve + incoming;                      // หมวด 1: คลัง + PO − จองนอกระบบ
+  const cat2 = availRawL + incoming + packedL;                      // หมวด 2: คลัง + PO + จัดตู้แล้ว
+  const cat3 = availRawL + incoming + packedL + productionL;        // หมวด 3: + จำนวนสั่งผลิต
+  const targetDays = (window.RTARGET==='legacy') ? (it.leadTime + basis) : 120;             // legacy vs 4 เดือน
+  const targetQty = (window.RTARGET==='legacy') ? (paidDaily*targetDays + (it.safety||0)) : (paidDaily*targetDays);
+  const targetLabel = (window.RTARGET==='legacy') ? `Lead Time ${it.leadTime} วัน + ${basisMonths} เดือน = ${targetDays} วัน${it.safety?' + Safety':''}` : 'ให้อยู่ได้ 4 เดือน (120 วัน)';
+  const sugOf = c => Math.max(0, Math.round(targetQty - c));
+  const sug1=sugOf(cat1), sug2=sugOf(cat2), sug3=sugOf(cat3);
+  const dosOf = q => paidDaily>0 ? q/paidDaily : Infinity;           // อยู่ได้ (วัน)
+  const dCat1=dosOf(cat1), dCat2=dosOf(cat2), dCat3=dosOf(cat3);
+  const cov3moL = paidDaily>0 ? cat3/(paidDaily*30) : Infinity;      // เดือนที่อยู่ได้ (หมวด 3) → ตัดสินสถานะ
+  const statusKeyL = reorderStatusFromMonths(cov3moL);
+  const suggestQty = sug3;                                          // ควรสั่งหลัก = หมวด 3
+  const coverDays = targetDays, netAvail = cat3;                    // (คงชื่อไว้ให้โค้ดด้านล่างเดิม)
+  // การ์ดสรุปแต่ละหมวด
+  const _catMo = d => isFinite(d) ? ` <span class="muted" style="font-weight:400;">(${fmt1(d/30)} ด.)</span>` : '';
+  const mkCat = (badge,title,comps,sum,dos,sug,hi) => {
+    const dTxt = isFinite(dos) ? fmtNum(Math.round(dos))+' วัน'+_catMo(dos) : '∞';
+    return `<div style="flex:1;min-width:230px;border:${hi?'2.5px solid var(--brand)':'1px solid var(--line)'};background:${hi?'var(--brand-soft)':'var(--card)'};border-radius:14px;padding:14px 16px;">
+      <div style="font-size:12px;font-weight:800;color:${hi?'var(--brand)':'var(--muted)'};margin-bottom:6px;">${badge} ${title}${hi?' · ตัวตัดสินใจ':''}</div>
+      <div style="font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:8px;">${comps} = <b style="color:var(--ink);">${fmtNum(sum)}</b> ${it.uom}</div>
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+        <div><div style="font-size:10.5px;color:var(--muted);">อยู่ได้</div><div style="font-size:15px;font-weight:700;">${dTxt}</div></div>
+        <div style="text-align:right;"><div style="font-size:10.5px;color:var(--muted);">ควรสั่งเพิ่ม</div><div style="font-size:20px;font-weight:800;color:${sug>0?'var(--brand)':'var(--good)'};">${fmtNum(sug)}</div></div>
+      </div>
+    </div>`;
+  };
 
-  // สถานะรวม
-  let level='good', msg='สต๊อกเพียงพอ ยังไม่ถึงจุดสั่งซื้อ';
-  if(orderByDate){
-    const dToOrder = Math.round((orderByDate-APP_TODAY)/DAY);
-    if(dToOrder<=0){ level='bad'; msg='⚠️ ต้องสั่งซื้อทันที — เลยกำหนดสั่งเพื่อให้ของมาทันแล้ว'; }
-    else if(dToOrder<=14){ level='warn'; msg=`⏰ ใกล้ถึงจุดสั่งซื้อ — ควรสั่งภายใน ${dToOrder} วัน (ภายใน ${fmtDate(orderByDate)})`; }
-    else { msg=`สั่งซื้อภายใน ${fmtDate(orderByDate)} (อีก ${dToOrder} วัน)`; }
-  }
-
-  let html = `<div class="banner ${level}">${msg}</div>`;
+  // สถานะรวม (เกณฑ์เดือน · ยึดหมวด 3): ≤3 ควรสั่งซื้อ · ≤3.5 ใกล้ · ≤4 เฝ้าระวัง · >4 ยังไม่ต้องสั่ง
+  const _moTxt = isFinite(cov3moL) ? fmt1(cov3moL)+' เดือน' : 'ไม่มียอดขาย';
+  const STMSG = {
+    red:   {level:'bad',  msg:`🔴 ควรสั่งซื้อ — หมวด 3 อยู่ได้ ${_moTxt} (≤ 3 เดือน)`},
+    warn:  {level:'warn', msg:`⏰ ใกล้ถึงจุดสั่ง — หมวด 3 อยู่ได้ ${_moTxt} (3–3.5 เดือน)`},
+    watch: {level:'warn', msg:`👀 เฝ้าระวัง — หมวด 3 อยู่ได้ ${_moTxt} (3.5–4 เดือน)`},
+    noneed:{level:'good', msg:`🟢 ยังไม่ต้องสั่ง — หมวด 3 อยู่ได้ ${_moTxt} (> 4 เดือน)`}
+  };
+  const _st = STMSG[statusKeyL] || STMSG.noneed;
+  const level = _st.level;
+  let html = `<div class="banner ${level}">${_st.msg}</div>`;
 
   html += '<div class="card"><div class="kpis">';
   html += kpi('ยอดคงเหลือ', fmtNum(onHand)+` <small>${it.uom}</small>`, '');
@@ -6822,20 +6862,18 @@ function renderLeadtime(){
   html += kpi('ต้องสั่งภายใน', orderByDate?fmtDate(orderByDate):'—', level);
   html += '</div>';
 
-  // แนะนำจำนวนสั่ง — คิดจากยอดขายเฉลี่ย (ตัด free item) ช่วงที่เลือก
-  html += `<div class="section-title">คำแนะนำการสั่งซื้อ (ฐาน ${basisMonths} เดือน · <span style="color:var(--brand)">${grpLabel}</span> · ตัด free item)</div>`;
-  html += `<table>
-    <tr><td>ยอดขายเฉลี่ย/เดือน (ไม่รวม free item · ${grpLabel})</td><td class="num"><b>${fmtNum(paidMonthly)}</b> ${it.uom}</td></tr>
-    <tr><td>ยอดขายเฉลี่ย/วัน (ไม่รวม free item)</td><td class="num">${fmt1(paidDaily)} ${it.uom}</td></tr>
-    <tr><td>เป้าหมายให้ครอบคลุม (Lead Time ${it.leadTime} วัน + ${basisMonths} เดือน = ${coverDays} วัน)${it.safety?' + Safety':''}</td><td class="num">${fmtNum(targetQty)} ${it.uom}</td></tr>
-    <tr><td>หัก: ของพร้อมขาย (${fmtNum(available)})${includePO?` + PO กำลังเข้า (${fmtNum(incoming)})`:''}</td><td class="num">− ${fmtNum(netAvail)} ${it.uom}</td></tr>
-  </table>`;
-  // จำนวนที่ควรสั่งเพิ่ม ใช้ได้กี่วัน/เดือน (= จำนวนสั่ง ÷ ยอดขาย/วัน)
-  const coverDaysOrder = paidDaily>0 ? Math.round(suggestQty/paidDaily) : 0;
-  const coverText = paidDaily>0 && suggestQty>0 ? `<div style="font-size:12px;font-weight:600;color:var(--muted);margin-top:2px;">≈ ใช้ได้ ${fmtNum(coverDaysOrder)} วัน (${fmt1(coverDaysOrder/30)} เดือน)</div>` : '';
-  // กรอบเน้น "จำนวนที่ควรสั่งเพิ่ม"
+  // === 3 หมวดการคำนวณ (แต่ละหมวด: ควรสั่งเพิ่ม + อยู่ได้ · หัก DIY) ===
+  html += `<div class="section-title">3 หมวดการคำนวณ (หัก DIY · ฐาน ${basisMonths} เดือน · <span style="color:var(--brand)">${grpLabel}</span>)</div>`;
+  html += `<div style="font-size:11.5px;color:var(--muted);margin:-4px 0 10px;line-height:1.5;">เป้าหมายที่ใช้คำนวณ "ควรสั่งเพิ่ม": <b style="color:var(--brand)">${targetLabel}</b> = <b>${fmtNum(Math.round(targetQty))}</b> ${it.uom} · เปลี่ยนสูตรได้ที่ช่อง "สูตรเป้าหมาย" ด้านบน</div>`;
+  html += `<div style="display:flex;gap:12px;flex-wrap:wrap;">`;
+  html += mkCat('①','คลัง + PO − จองนอกระบบ', `คลัง(หัก DIY) ${fmtNum(availRawL)}${reserve?` − จอง ${fmtNum(reserve)}`:''} + PO ${fmtNum(incoming)}`, cat1, dCat1, sug1, false);
+  html += mkCat('②','คลัง + PO + จัดตู้แล้ว', `คลัง ${fmtNum(availRawL)} + PO ${fmtNum(incoming)} + จัดตู้ ${fmtNum(packedL)}`, cat2, dCat2, sug2, false);
+  html += mkCat('③','คลัง + PO + จัดตู้ + สั่งผลิต', `คลัง ${fmtNum(availRawL)} + PO ${fmtNum(incoming)} + จัดตู้ ${fmtNum(packedL)} + ผลิต ${fmtNum(productionL)}`, cat3, dCat3, sug3, true);
+  html += `</div>`;
+  // กรอบเน้น "จำนวนที่ควรสั่งเพิ่ม" (ยึดหมวด 3)
+  const coverText = paidDaily>0 && suggestQty>0 ? `<div style="font-size:12px;font-weight:600;color:var(--muted);margin-top:2px;">≈ สั่งแล้วอยู่ได้รวม ${fmt1((cat3+suggestQty)/paidDaily/30)} เดือน</div>` : '';
   html += `<div style="margin-top:16px;border:2.5px solid var(--brand);background:var(--brand-soft);border-radius:14px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-    <span style="font-weight:800;font-size:16px;">📦 จำนวนที่ควรสั่งเพิ่ม</span>
+    <span style="font-weight:800;font-size:16px;">📦 จำนวนที่ควรสั่งเพิ่ม <span style="font-size:12px;font-weight:600;color:var(--muted);">(ยึดหมวด 3)</span></span>
     <span style="text-align:right;"><b style="color:var(--brand);font-size:30px;letter-spacing:-.5px;">${fmtNum(suggestQty)}</b> <span style="font-size:15px;font-weight:600;color:var(--muted);">${it.uom}</span>${coverText}</span>
   </div>`;
   // ช่องเผื่อ MOQ / วางแผนสั่งเพิ่ม — 2 โหมด (ตามจำนวนสั่ง / ตามระยะเวลา) + จำนวนกล่อง (ปัดขึ้น)
@@ -7305,24 +7343,49 @@ function draftDiyOn(){ if(window._draftDiyOn==null){ try{ window._draftDiyOn = l
 function setDraftDiy(on){ window._draftDiyOn=!!on; try{ localStorage.setItem('showDraftDiy', on?'1':'0'); }catch(e){} if(typeof renderUrgent==='function') renderUrgent(); if(typeof renderLeadtime==='function' && comboValue('l-item')) renderLeadtime(); }
 function draftDiyQty(itemNo){ const D=(typeof window!=='undefined')?window.BC_PODIYDRAFT:null; return (D&&D[itemNo])?(+D[itemNo].qty||0):0; }
 function draftDiyCommitted(itemNo){ return draftDiyOn()? draftDiyQty(itemNo) : 0; }
+// จำนวนที่จัดตู้แล้วรวมของสินค้า (ทุก PO · จาก pkLog)
+function itemPackedQty(itemNo){ const m=(typeof poPackedMap==='function')?poPackedMap():{}; let s=0; for(const po in m){ s += (m[po].items[itemNo]||0); } return s; }
+// จำนวนสั่งผลิตที่ "กรอกไว้" รวมของสินค้า (ทุก PO · ช่องว่าง = ไม่นับ) เพื่อกันซ้ำกับ PO ค้างรับ
+function itemProductionQty(itemNo){ let s=0; const pf=window.poFollow||{}; for(const po in pf){ const items=(pf[po]||{}).items||{}; const o=items[itemNo]; if(o && o.orderQty!=='' && o.orderQty!=null) s += (+o.orderQty||0); } return s; }
+// เป้าหมายให้อยู่ได้ (วัน) ตามสูตรที่เลือกทั้งหน้า · m4 = 4 เดือน (120 วัน) · legacy = Lead Time + ช่วงที่เลือก
+function reorderTargetQty(it, basisDays, paidDaily){
+  return (window.RTARGET==='legacy') ? (paidDaily*(it.leadTime + basisDays) + (it.safety||0)) : (paidDaily*120);
+}
+// สถานะจากจำนวนเดือนที่อยู่ได้ (ยึดหมวด 3) · ≤3 รีบสั่ง · ≤3.5 ใกล้ · ≤4 เฝ้าระวัง · >4 ยังไม่ต้องสั่ง
+function reorderStatusFromMonths(mo){ return mo<=3 ? 'red' : mo<=3.5 ? 'warn' : mo<=4 ? 'watch' : 'noneed'; }
 function reorderCalc(it, basisDays, custGroup){
   basisDays = basisDays||180; custGroup = custGroup||'all';
   const onHand = stockOnHand(it.no);
   const poDiy  = poDiyCommitted(it.no);                                 // จองล่วงหน้าจาก PO DIY
   const draftDiy = draftDiyCommitted(it.no);                            // ดราฟ PO DIY (เปิด/ปิดได้)
-  const availRaw = onHand - poDiy - draftDiy;                           // ใช้ได้จริง (ติดลบได้ = ขาด, ต้องสั่งเพิ่ม)
+  const availRaw = onHand - poDiy - draftDiy;                           // ในคลังหัก DIY แล้ว (ติดลบได้ = ขาด)
   const avail  = Math.max(0, availRaw);                                 // สำหรับแสดง "อยู่ได้กี่วัน" (ไม่ติดลบ)
   const usage = avgDailyUsage(it.no);
-  const incoming = openPOs(it.no).filter(p=>poType(p.docNo).code==='POA').reduce((s,p)=>s+p.outstanding,0);  // นับเฉพาะ POA จัดซื้อ
+  const incoming = openPOs(it.no).filter(p=>poType(p.docNo).code==='POA').reduce((s,p)=>s+p.outstanding,0);  // PO ค้างรับทั้งหมด (POA)
+  const packed = (typeof itemPackedQty==='function') ? itemPackedQty(it.no) : 0;          // จัดตู้แล้ว
+  const production = (typeof itemProductionQty==='function') ? itemProductionQty(it.no) : 0; // จำนวนสั่งผลิตที่กรอก
+  const reserve = 0;                                                    // จองนอกระบบ = กรอกเองในหน้ารายละเอียด (ตารางบน = 0)
   const paidWindow = it.ileReal ? paidWindowFor(it, basisDays, custGroup) : 0;
   const paidDaily = it.ileReal ? paidWindow/basisDays : usage;
-  const coverDays = it.leadTime + basisDays;
-  const suggestQty = Math.max(0, Math.round(paidDaily*coverDays + (it.safety||0) - availRaw - incoming));  // ใช้ availRaw → รวมส่วนขาดจาก PO DIY
-  const dosOnHand = usage>0 ? avail/usage : Infinity;                  // อยู่ได้ (สต๊อกใช้ได้ · หัก PO DIY)
-  const dosCover  = usage>0 ? (avail+incoming)/usage : Infinity;       // รวม PO
-  const dosPaid   = paidDaily>0 ? avail/paidDaily : Infinity;          // อยู่ได้ตามยอดขายจริง (ตัด free · หัก PO DIY)
-  const coverPaid = paidDaily>0 ? (avail+incoming)/paidDaily : Infinity;
-  return { onHand, poDiy, draftDiy, availRaw, avail, usage, incoming, paidDaily, dosOnHand, dosCover, dosPaid, coverPaid, suggestQty };
+  // ===== 3 หมวดการคำนวณ (ฐานสต๊อก = availRaw หัก DIY แล้ว) =====
+  const c1 = availRaw - reserve + incoming;                            // คลัง + PO − จองนอกระบบ
+  const c2 = availRaw + incoming + packed;                             // คลัง + PO + จัดตู้แล้ว
+  const c3 = availRaw + incoming + packed + production;                // + จำนวนสั่งผลิต
+  // ===== ควรสั่งเพิ่มแต่ละหมวด (ตามสูตรเป้าหมายที่เลือก) =====
+  const targetQty = reorderTargetQty(it, basisDays, paidDaily);
+  const sug = c => Math.max(0, Math.round(targetQty - c));
+  const s1=sug(c1), s2=sug(c2), s3=sug(c3);
+  // ===== อยู่ได้ (วัน) แต่ละหมวด =====
+  const dos = q => paidDaily>0 ? q/paidDaily : Infinity;
+  const dos1=dos(c1), dos2=dos(c2), dos3=dos(c3);
+  const cov3mo = paidDaily>0 ? c3/(paidDaily*30) : Infinity;           // เดือนที่อยู่ได้ (หมวด 3) → ตัดสินสถานะ
+  const statusKey = reorderStatusFromMonths(cov3mo);
+  // ===== backward-compat (คอลัมน์ตารางเดิมใช้ค่าหลัก = หมวด 3) =====
+  const dosOnHand = usage>0 ? avail/usage : Infinity;
+  const dosPaid = dos3, coverPaid = dos3, suggestQty = s3;
+  return { onHand, poDiy, draftDiy, availRaw, avail, usage, incoming, packed, production, reserve,
+           paidDaily, c1, c2, c3, s1, s2, s3, dos1, dos2, dos3, cov3mo, statusKey,
+           targetQty, suggestQty, dosOnHand, dosPaid, coverPaid };
 }
 
 /* --- ระงับการสั่งซื้อรายสินค้า (ย้ายออกจากการคำนวณจุดสั่งซื้อ · เก็บในเครื่อง) --- */
@@ -7396,7 +7459,7 @@ function renderUrgent(){
   const uFac  = (document.getElementById('u-factory')||{}).value || '';
   const uBasis = +window.RBASIS || 180;   // ค่ากลางร่วม
   const uGroup = window.RGROUP || 'all';
-  { const e=document.getElementById('u-basis'); if(e)e.value=String(uBasis); const g=document.getElementById('u-custgroup'); if(g)g.value=uGroup; const dd=document.getElementById('u-draftdiy'); if(dd) dd.checked=draftDiyOn(); }
+  { const e=document.getElementById('u-basis'); if(e)e.value=String(uBasis); const g=document.getElementById('u-custgroup'); if(g)g.value=uGroup; const tg=document.getElementById('u-target'); if(tg)tg.value=(window.RTARGET||'m4'); const dd=document.getElementById('u-draftdiy'); if(dd) dd.checked=draftDiyOn(); }
   // คำนวณ + จัดสถานะ: แสดงถ้ามียอดขายจริง หรือ มีจอง PO DIY หรือ มี PO กำลังเข้า
   // (สินค้าตามฤดูกาลที่ไม่มียอดขายใน 6 เดือน แต่มีภาระจอง/PO ค้างรับ ก็ต้องเห็นในตาราง)
   const all = ITEMS.filter(i=>i.ileReal && (!uType||i.itemType===uType) && (!uSub||i.subType===uSub) && itemHasVendor(i,uVen) && itemHasFactory(i,uFac))
@@ -7404,12 +7467,12 @@ function renderUrgent(){
     .filter(x=> x.r.paidDaily>0 || x.r.poDiy>0 || x.r.incoming>0 || x.r.draftDiy>0)
     .sort((a,b)=> (a.r.dosPaid - b.r.dosPaid) || (b.r.paidDaily - a.r.paidDaily));
   all.forEach(x=>{
-    x.status = x.r.coverPaid<=x.it.leadTime ? 'red' : x.r.coverPaid<=x.it.leadTime*1.5 ? 'warn' : 'watch';
+    x.status = x.r.statusKey;   // เกณฑ์เดือน (ยึดหมวด 3): ≤3 รีบสั่ง · ≤3.5 ใกล้ · ≤4 เฝ้าระวัง · >4 ยังไม่ต้องสั่ง
   });
   // สถานะรวมต่อรายการ (ไม่มี PO=รีบสั่ง · มี PO=สถานะผลิต/จัดตู้) · สินค้าที่ถูกระงับ → หมวด suspended
   all.forEach(x=>{ x.mkey = suspHas(x.it.no) ? 'suspended' : (prepHas(x.it.no) ? 'prep' : itemMergedStatusKey(x.it.no, x.status)); });
   const STATUS_DEFS=[
-    {k:'red',label:'🔴 ต้องรีบสั่งซื้อ'},{k:'warn',label:'⏰ ใกล้ถึงจุดสั่ง'},{k:'watch',label:'เฝ้าระวัง'},
+    {k:'red',label:'🔴 ต้องรีบสั่งซื้อ'},{k:'warn',label:'⏰ ใกล้ถึงจุดสั่ง'},{k:'watch',label:'เฝ้าระวัง'},{k:'noneed',label:'🟢 ยังไม่ต้องสั่ง'},
     {k:'none',label:'⚪ ยังไม่กรอก Lead Time'},{k:'start',label:'▶️ เริ่มต้นการผลิต'},
     {k:'follow1',label:'📞 ตามรอบที่ 1'},{k:'follow2',label:'📞 ตามรอบที่ 2'},{k:'processing',label:'⚙️ กำลังผลิต'},
     {k:'due',label:'📦 ครบกำหนด'},{k:'partial',label:'📦 จัดบางส่วน'},{k:'packed',label:'✅ จัดตู้เสร็จแล้ว'}
@@ -7424,7 +7487,7 @@ function renderUrgent(){
   const f = window.urgentFilter || 'all';
   // ===== ปุ่มกรอง แบ่ง 3 หมวด (พับได้) =====
   const CATS=[
-    {id:'order', label:'📍 จุดสั่งซื้อ', keys:['red','warn','watch']},
+    {id:'order', label:'📍 จุดสั่งซื้อ', keys:['red','warn','watch','noneed']},
     {id:'prep',  label:'🗂️ เตรียมเปิด PO', keys:['prep']},
     {id:'po',    label:'🏭 ติดตาม PO',  keys:['none','start','follow1','follow2','processing','due','partial','packed']},
     {id:'ship',  label:'🚚 ขนส่ง',      keys:['ship_wait','ship_load','ship_cls','ship_sail','ship_th','ship_wh']},
@@ -7444,7 +7507,7 @@ function renderUrgent(){
   });
   document.getElementById('urgent-filters').innerHTML = fbHtml;
   let rows = (f==='all') ? base : (String(f).indexOf('ship_')===0 ? base.filter(x=>x.shipKey===f) : base.filter(x=>x.mkey===f));
-  const tagOf = s => s==='red'?'<span class="tag bad">🔴 ต้องรีบสั่งซื้อ</span>':s==='warn'?'<span class="tag warn">⏰ ใกล้ถึงจุดสั่ง</span>':'<span class="tag info">เฝ้าระวัง</span>';
+  const tagOf = s => s==='red'?'<span class="tag bad">🔴 ต้องรีบสั่งซื้อ</span>':s==='warn'?'<span class="tag warn">⏰ ใกล้ถึงจุดสั่ง</span>':s==='noneed'?'<span class="tag" style="background:#dcfce7;color:#166534;">🟢 ยังไม่ต้องสั่ง</span>':'<span class="tag info">เฝ้าระวัง</span>';
 
   // การเรียงลำดับ (คลิกหัวคอลัมน์ตัวเลข) — ค่าเริ่มต้น: อยู่ได้น้อย→มาก
   const sort = window.urgentSort || (window.urgentSort = {key:'dosPaid', dir:'asc'});
@@ -7486,11 +7549,8 @@ function renderUrgent(){
       const dos=Math.round(r.dosPaid), dosTxt=isFinite(dos)?dos:'∞';
       const dosMo=isFinite(r.dosPaid)?`<br><span class="muted" style="font-size:10px;">(${fmt1(r.dosPaid/30)} เดือน)</span>`:'';
       const paidMo=`<br><span class="muted" style="font-size:10px;">(${fmtNum(Math.round(r.paidDaily*30))}/เดือน)</span>`;
-      // อยู่ได้รวมทั้งไปป์ไลน์ = สต๊อก + PO ค้างรับ (รวมของที่จัดตู้/กำลังขนส่ง) + จำนวนที่ควรสั่ง
-      // กลุ่มที่ไม่ใช่ DIY (Big C / ลูกค้าอื่น) → หัก PO DIY เต็มจำนวนจากทั้งไปป์ไลน์ (ของนั้นถูกกันไว้ให้ DIY)
-      const _nonDiy = (uGroup==='2' || uGroup==='3');
-      const _stockPart = _nonDiy ? r.availRaw : r.avail;   // availRaw = สต๊อก − PO DIY (ติดลบได้)
-      const totCov = Math.max(0, _stockPart + r.incoming + r.suggestQty);
+      // อยู่ได้หลังสั่งเพิ่ม = หมวด 3 (คลัง−DIY + PO + จัดตู้ + สั่งผลิต) + จำนวนที่ควรสั่ง
+      const totCov = Math.max(0, r.c3 + r.suggestQty);
       const sd = (r.paidDaily>0) ? Math.round(totCov/r.paidDaily) : null;
       const sdTxt = sd==null ? '∞' : `${fmtNum(sd)} <span class="muted" style="font-size:10px;">(${fmt1(sd/30)} เดือน)</span>`;
       // ปุ่ม ✕ ระงับการสั่งซื้อ — เฉพาะรายการในหมวดจุดสั่งซื้อ (แดง/ใกล้/เฝ้าระวัง)
@@ -8726,7 +8786,12 @@ document.getElementById('l-vendor').onchange = ()=>{ fillFactoryDropdown('l-fact
 document.getElementById('l-factory').onchange = ()=>{ populateLeadtimeItems(); renderLeadtime(); };
 window.RBASIS = window.RBASIS || 180;
 window.RGROUP = window.RGROUP || 'all';
+try{ window.RTARGET = window.RTARGET || localStorage.getItem('rTargetV1') || 'm4'; }catch(e){ window.RTARGET = window.RTARGET || 'm4'; }
 function applyReorderChange(){ if(window.tabRendered && window.tabRendered.leadtime){ renderUrgent(); renderLeadtime(); } }
+// สลับสูตรเป้าหมาย "ควรสั่งเพิ่ม" — มีผลทั้งหน้า (ตารางสถานะ + รายละเอียด)
+function setRTarget(v){ window.RTARGET = (v==='legacy'?'legacy':'m4'); try{ localStorage.setItem('rTargetV1', window.RTARGET); }catch(e){} const a=document.getElementById('u-target'); if(a)a.value=window.RTARGET; const b=document.getElementById('l-target'); if(b)b.value=window.RTARGET; applyReorderChange(); }
+{ const e=document.getElementById('u-target'); if(e){ e.value=window.RTARGET; e.onchange=function(){ setRTarget(this.value); }; } }
+{ const e=document.getElementById('l-target'); if(e){ e.value=window.RTARGET; e.onchange=function(){ setRTarget(this.value); }; } }
 document.getElementById('l-basis').onchange = function(){ window.RBASIS = +this.value; applyReorderChange(); };
 document.getElementById('l-custgroup').onchange = function(){ window.RGROUP = this.value; applyReorderChange(); };
 document.getElementById('l-includepo').onchange = renderLeadtime;
