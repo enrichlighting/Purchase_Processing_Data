@@ -249,6 +249,8 @@
       <div style="margin-bottom:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
         <button class="go" id="pk-add">+ เพิ่มแถวสินค้า</button>
         <button class="go" id="pk-addcont" style="background:var(--good);">+ เพิ่มตู้</button>
+        <button class="go" id="pk-delsel" style="background:var(--bad);" title="ติ๊กช่องหน้าแถว แล้วกดเพื่อลบหลายแถวพร้อมกัน">🗑️ ลบที่เลือก (0)</button>
+        <button class="go" id="pk-clearrows" style="background:#64748b;" title="ล้างรายการสินค้าทั้งหมดในลิสท์">ล้างลิสท์ทั้งหมด</button>
         <label style="font-size:13px;font-weight:600;">ความจุตู้: <input type="number" id="pk-cap" value="68" min="1" step="0.5" style="width:80px;text-align:right;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> CBM/ตู้</label>
         <label style="font-size:13px;font-weight:600;">Exchange Rate: <input type="number" id="pk-fx" value="5" min="0" step="0.01" style="width:80px;text-align:right;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/หยวน</label>
         <span style="flex:1"></span>
@@ -7593,7 +7595,10 @@ function pkGrand(){
   if(e=document.getElementById('pk-gvt')) e.innerHTML='<b>฿'+pkMoney(vt)+'</b>';
 }
 function pkAddRow(){ window.packingRows.push({item:'',loads:[],lots:[],costIdx:null}); renderPacking(); }
-function pkDelRow(i){ window.packingRows.splice(i,1); if(!window.packingRows.length)window.packingRows.push({item:'',loads:[],lots:[],costIdx:null}); renderPacking(); }
+function pkDelRow(i){ window.packingRows.splice(i,1); if(!window.packingRows.length)window.packingRows.push({item:'',loads:[],lots:[],costIdx:null}); if(window.pkRowSel)window.pkRowSel=new Set(); renderPacking(); }
+function pkToggleRow(i,on){ window.pkRowSel=window.pkRowSel||new Set(); if(on)window.pkRowSel.add(i); else window.pkRowSel.delete(i); const b=document.getElementById('pk-delsel'); if(b) b.textContent='🗑️ ลบที่เลือก ('+window.pkRowSel.size+')'; }
+function pkDelSelected(){ const idx=[...(window.pkRowSel||[])].sort((a,b)=>b-a); if(!idx.length){ pkToast('ยังไม่ได้เลือกแถว — ติ๊กช่องหน้าแถวก่อน','bad'); return; } pkConfirm('ลบ '+idx.length+' แถวที่เลือกออกจากลิสท์ Packing?', function(){ idx.forEach(i=>window.packingRows.splice(i,1)); if(!window.packingRows.length)window.packingRows.push({item:'',loads:[],lots:[],costIdx:null}); window.pkRowSel=new Set(); renderPacking(); pkToast('ลบ '+idx.length+' แถวแล้ว','good'); }); }
+function pkClearRows(){ pkConfirm('ล้างรายการทั้งหมดในลิสท์ Packing? (ตู้และวันที่ยังอยู่)', function(){ window.packingRows=[{item:'',loads:[],lots:[],costIdx:null}]; window.pkRowSel=new Set(); renderPacking(); pkToast('ล้างลิสท์แล้ว','good'); }); }
 function pkAddCont(){ window.pkContainers.push({name:pkDefName(window.pkContainers.length)}); renderPacking(); }
 function pkDelCont(c){ window.pkContainers.splice(c,1); window.packingRows.forEach(r=>{ if(r.loads) r.loads.splice(c,1); if(r.lots) r.lots.splice(c,1); }); if(!window.pkContainers.length){ window.pkContainers.push({name:'ตู้ A'}); } renderPacking(); }
 function pkSetContName(c, v){ window.pkContainers[c].name=v; renderContainers(); }
@@ -7781,7 +7786,7 @@ function renderPacking(){
       if(window.pkMode==='released' && r.lotMax!=null) capNote=`<div class="muted" style="font-size:10px;margin-top:2px;">รวมได้สูงสุด ${fmtNum(r.lotMax)} ชิ้น</div>`;
     }
     rows += `<tr>
-      <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${pkColor(i)};margin-right:5px;vertical-align:middle;"></span><b>${i+1}</b></td>
+      <td style="white-space:nowrap;"><input type="checkbox" ${(window.pkRowSel&&window.pkRowSel.has(i))?'checked':''} onchange="pkToggleRow(${i},this.checked)" title="เลือกเพื่อลบหลายแถว" style="vertical-align:middle;margin-right:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${pkColor(i)};vertical-align:middle;"></span> <b>${i+1}</b></td>
       <td><input list="pk-itemdl" value="${pkItemLabel(r.item).replace(/"/g,'&quot;')}" onchange="pkPickItem(${i},this.value)" onfocus="this.select()" placeholder="🔍 พิมพ์ค้นหาสินค้า" autocomplete="off" style="min-width:220px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"></td>
       <td>${d?d.desc:'<span class="muted">—</span>'}</td>
       <td class="num">${d?fmt1(d.L):'-'}</td>
@@ -8628,6 +8633,8 @@ document.querySelectorAll('.tab').forEach(t=>{
 });
 document.getElementById('pk-add').onclick = pkAddRow;
 document.getElementById('pk-addcont').onclick = pkAddCont;
+document.getElementById('pk-delsel').onclick = pkDelSelected;
+document.getElementById('pk-clearrows').onclick = pkClearRows;
 document.getElementById('pk-cap').oninput = ()=>{ renderPacking(); };
 document.getElementById('pk-fx').oninput = pkSetFx;
 document.querySelectorAll('input[name="pk-mode"]').forEach(rb=>{ rb.onchange = function(){ if(this.checked) pkSetMode(this.value); }; });
