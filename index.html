@@ -246,18 +246,28 @@
           <span><b>Released PO Packing List</b><br><span class="muted" style="font-size:12px;">เลือกจาก PO ที่ Released &amp; ยังค้างรับ · เลือก Lot No แล้วดึงจำนวนค้างรับมาใส่ตู้แรกให้ (แก้ได้ แต่ไม่เกินจำนวนใน Lot) · รวมมูลค่า ¥/฿</span></span>
         </label>
       </div>
-      <div style="margin-bottom:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
-        <button class="go" id="pk-add">+ เพิ่มแถวสินค้า</button>
-        <button class="go" id="pk-addcustom" style="background:#0891b2;" title="เพิ่มสินค้าที่ไม่มีในระบบ/ไม่มี PO — กรอกชื่อ ขนาดกล่อง จำนวนชิ้น/กล่อง และ RMB เอง">✎ เพิ่มสินค้ากรอกเอง</button>
-        <button class="go" id="pk-addcont" style="background:var(--good);">+ เพิ่มตู้</button>
-        <button class="go" id="pk-delsel" style="background:var(--bad);" title="ติ๊กช่องหน้าแถว แล้วกดเพื่อลบหลายแถวพร้อมกัน">🗑️ ลบที่เลือก (0)</button>
-        <button class="go" id="pk-clearrows" style="background:#64748b;" title="ล้างรายการสินค้าทั้งหมดในลิสท์">ล้างลิสท์ทั้งหมด</button>
+      <div style="margin-bottom:12px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;">
+        <fieldset style="border:1.5px dashed #2563eb;border-radius:10px;padding:6px 12px 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0;">
+          <legend style="font-size:12px;font-weight:800;color:#2563eb;padding:0 6px;">➕ เพิ่ม</legend>
+          <button class="go" id="pk-add">+ เพิ่มแถวสินค้า</button>
+          <button class="go" id="pk-addcustom" style="background:#0891b2;" title="เพิ่มสินค้าที่ไม่มีในระบบ/ไม่มี PO — กรอกชื่อ ขนาดกล่อง จำนวนชิ้น/กล่อง และ RMB เอง">✎ เพิ่มสินค้ากรอกเอง</button>
+          <button class="go" id="pk-addcont" style="background:var(--good);">+ เพิ่มตู้</button>
+        </fieldset>
+        <fieldset style="border:1.5px dashed var(--bad);border-radius:10px;padding:6px 12px 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0;">
+          <legend style="font-size:12px;font-weight:800;color:var(--bad);padding:0 6px;">🗑️ ลบ</legend>
+          <button class="go" id="pk-delsel" style="background:var(--bad);" title="ติ๊กช่องหน้าแถว แล้วกดเพื่อลบหลายแถวพร้อมกัน">🗑️ ลบที่เลือก (0)</button>
+          <button class="go" id="pk-clearrows" style="background:#64748b;" title="ล้างรายการสินค้าทั้งหมดในลิสท์">ล้างลิสท์ทั้งหมด</button>
+        </fieldset>
+        <fieldset style="border:1.5px dashed var(--good);border-radius:10px;padding:6px 12px 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0;">
+          <legend style="font-size:12px;font-weight:800;color:var(--good);padding:0 6px;">💾 บันทึก</legend>
+          <button class="go" id="pk-savedraft" style="background:var(--warn);" title="เก็บสิ่งที่กำลังจัดค้างไว้ กันหายเมื่อปิด/เปิดใหม่ (ยังไม่ลงประวัติ)">💾 บันทึกแบบร่าง (กันหาย)</button>
+          <button class="go" id="pk-save" style="background:var(--brand);">💾 บันทึกข้อมูลการจัดตู้</button>
+          <button class="go" id="pk-savenew" style="background:#0891b2;" title="บันทึกลิสท์ปัจจุบันเป็นรอบใหม่ (ไม่ทับของเดิม) — เหมาะกับการคัดลอกตู้เก่ามาแก้เป็นตู้ใหม่">💾 บันทึกเป็นตู้ใหม่</button>
+        </fieldset>
+      </div>
+      <div style="margin-bottom:12px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:2px 4px;">
         <label style="font-size:13px;font-weight:600;">ความจุตู้: <input type="number" id="pk-cap" value="68" min="1" step="0.5" style="width:80px;text-align:right;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> CBM/ตู้</label>
         <label style="font-size:13px;font-weight:600;">Exchange Rate: <input type="number" id="pk-fx" value="5" min="0" step="0.01" style="width:80px;text-align:right;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/หยวน</label>
-        <span style="flex:1"></span>
-        <button class="go" id="pk-savedraft" style="background:var(--warn);" title="เก็บสิ่งที่กำลังจัดค้างไว้ กันหายเมื่อปิด/เปิดใหม่ (ยังไม่ลงประวัติ)">💾 บันทึกแบบร่าง (กันหาย)</button>
-        <button class="go" id="pk-save" style="background:var(--brand);">💾 บันทึกข้อมูลการจัดตู้</button>
-        <button class="go" id="pk-savenew" style="background:#0891b2;" title="บันทึกลิสท์ปัจจุบันเป็นรอบใหม่ (ไม่ทับของเดิม) — เหมาะกับการคัดลอกตู้เก่ามาแก้เป็นตู้ใหม่">💾 บันทึกเป็นตู้ใหม่</button>
       </div>
       <div id="pk-draft-ts" class="muted" style="font-size:11px;margin-bottom:8px;"></div>
       <div id="pk-ship" style="margin-bottom:14px;"></div>
