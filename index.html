@@ -6905,6 +6905,25 @@ function renderLeadtime(){
     <span style="font-weight:800;font-size:16px;">📦 จำนวนที่ควรสั่งเพิ่ม <span style="font-size:12px;font-weight:600;color:var(--muted);">(ยึดหมวด 3)</span></span>
     <span style="text-align:right;"><b style="color:var(--brand);font-size:30px;letter-spacing:-.5px;">${fmtNum(suggestQty)}</b> <span style="font-size:15px;font-weight:600;color:var(--muted);">${it.uom}</span>${coverText}</span>
   </div>`;
+  // === จุดที่ต้องเตรียมนำเข้า (กรอบชมพู) — เอาจำนวน ÷ 3 แล้วเทียบว่าอยู่ได้กี่เดือน (ยอดขายเฉลี่ย/เดือนตามฐาน) ===
+  { const _stk=onHand, _tu=packedL, _mo=paidMonthly;
+    const prepA = _mo>0 ? (_stk/3)/_mo : Infinity;
+    const prepB = _mo>0 ? ((_stk+_tu)/3)/_mo : Infinity;
+    const _hi = mo => !isFinite(mo) ? '' : (mo<=2 ? 'background:#fb923c;color:#7c2d12;' : (mo<=2.5 ? 'background:#fde047;color:#713f12;' : ''));
+    const _card = (badge,title,calcHtml,mo) => `<div style="flex:1;min-width:240px;background:#fff;border:1px solid #f9a8d4;border-radius:10px;padding:12px 14px;">
+        <div style="font-size:12.5px;font-weight:800;color:#9d174d;margin-bottom:6px;">${badge} ${title}</div>
+        <div style="font-size:11.5px;color:#475569;line-height:1.5;">${calcHtml}</div>
+        <div style="margin-top:7px;font-size:13px;">อยู่ได้ <b style="padding:2px 9px;border-radius:6px;${_hi(mo)}">${isFinite(mo)?fmtMo(mo):'∞'} เดือน</b></div>
+      </div>`;
+    html += `<div style="margin-top:16px;border:2px solid #ec4899;background:#fdf2f8;border-radius:14px;padding:14px 18px;">
+      <div style="font-weight:800;font-size:15px;color:#be185d;">📥 จุดที่ต้องเตรียมนำเข้า</div>
+      <div style="font-size:11.5px;color:#9d174d;margin:2px 0 10px;">เอาจำนวน ÷ 3 แล้วเทียบว่าอยู่ได้กี่เดือน · คิดจากยอดขายเฉลี่ย <b>${fmtNum(Math.round(_mo))}</b>/เดือน (ฐาน ${basisMonths} เดือน) · <span style="background:#fde047;padding:0 5px;border-radius:4px;">เหลือง 2–2.5 ด.</span> <span style="background:#fb923c;padding:0 5px;border-radius:4px;">ส้ม ≤ 2 ด.</span></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        ${_card('①','ตอนที่อยู่ใน Stock', `Stock ${fmtNum(_stk)} ÷ 3 = <b style="color:#0f172a;">${fmtNum(Math.round(_stk/3))}</b> ${it.uom}`, prepA)}
+        ${_card('②','ตอนที่อยู่ใน Stock + ตู้', `(Stock ${fmtNum(_stk)} + ตู้ ${fmtNum(_tu)}) ÷ 3 = <b style="color:#0f172a;">${fmtNum(Math.round((_stk+_tu)/3))}</b> ${it.uom} <span class="muted" style="font-size:10px;">(ตู้ = จัดตู้แล้ว)</span>`, prepB)}
+      </div>
+    </div>`;
+  }
   // ช่องเผื่อ MOQ / วางแผนสั่งเพิ่ม — 2 โหมด (ตามจำนวนสั่ง / ตามระยะเวลา) + จำนวนกล่อง (ปัดขึ้น)
   const _pcs=(window.BC_PACKING && window.BC_PACKING[itemNo])?(window.BC_PACKING[itemNo].pcs||0):0;
   const _initDaysX = paidDaily>0 ? (cat3+suggestQty)/paidDaily : 0;   // ค่าต่อเนื่อง (ไม่ปัดก่อน) เพื่อให้ "เดือน" ตรงกับหัวข้อ
