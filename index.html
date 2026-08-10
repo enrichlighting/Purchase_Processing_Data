@@ -438,9 +438,18 @@
         <div class="field">
           <label>ฐานคำนวณยอดขายเฉลี่ย (ตัด free item)</label>
           <select id="l-basis">
-            <option value="90">3 เดือนย้อนหลัง</option>
-            <option value="180" selected>6 เดือนย้อนหลัง</option>
+            <option value="90">3 เดือนย้อนหลัง (90 วัน)</option>
+            <option value="180" selected>6 เดือนย้อนหลัง (180 วัน)</option>
+            <option value="custom">กำหนดช่วงเอง (between)</option>
           </select>
+        </div>
+        <div class="field" id="l-range-wrap" style="display:none;min-width:260px;">
+          <label>ช่วงเดือน (ตั้งแต่ – ถึง)</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select id="l-rfrom" style="flex:1;min-width:auto;"></select>
+            <span>–</span>
+            <select id="l-rto" style="flex:1;min-width:auto;"></select>
+          </div>
         </div>
         <div class="field">
           <label>กลุ่มลูกค้า (ฐานคำนวณ)</label>
@@ -6742,15 +6751,35 @@ function renderLeadtime(){
   const onHand = stockOnHand(itemNo);
   const usage = avgDailyUsage(itemNo);                 // อัตราเบิกออกรวม (สำรอง กรณีไม่มี ILE)
   // === อัตราขายเฉลี่ย/วัน (ตัด free item · ตามฐาน+กลุ่มที่เลือก) — ใช้เป็น "อัตราหลัก" ทั้งหน้า ให้ทุกตัวเลขตรงกัน ===
-  const basis = +window.RBASIS || 180;                 // ค่ากลางร่วม (ลิสท์ด่วน + วางแผน)
-  const basisMonths = basis/30;
   const custGroup = window.RGROUP || 'all';
-  { const e=document.getElementById('l-basis'); if(e)e.value=String(basis); const g=document.getElementById('l-custgroup'); if(g)g.value=custGroup; const tg=document.getElementById('l-target'); if(tg)tg.value=(window.RTARGET||'m4'); }
   const grpLabel = { all:'ทุกกลุ่มรวมกัน', '1':'กลุ่ม 1 · Mr.DIY (ยอดซื้อจากเรา)', '1s':'กลุ่ม 1 · Mr.DIY (ยอดขายหน้าร้าน)', '1avg':'กลุ่ม 1 · Mr.DIY (เฉลี่ย ซื้อ+ขายหน้าร้าน)', '2':'กลุ่ม 2 · Big C', '3':'กลุ่ม 3 · ลูกค้าอื่น ๆ (ไม่รวม DIY และ Big C)' }[custGroup];
   const usesSell = (custGroup==='1s' || custGroup==='1avg');   // โหมดที่ใช้ยอดขายหน้าร้าน
-  const paidWindow = paidWindowFor(it, basis, custGroup);
-  const paidDaily = (usesSell || it.ileReal) ? paidWindow/basis : usage;   // /วัน · อัตราหลักของทั้งหน้า
-  const paidMonthly = paidDaily*30;
+  // === ฐานคำนวณ: 90/180 วัน หรือ "กำหนดช่วงเอง (between)" ===
+  const custMode = (window.RBASIS==='custom');
+  const _allM = custRangeMonths(it);
+  let basis, basisMonths, paidWindow, paidDaily, paidMonthly, winLabel;
+  if(custMode && _allM.length){
+    // ค่าเริ่มต้น = 3 เดือนเต็มล่าสุด (ไม่รวมเดือนปัจจุบันที่ยังไม่จบ)
+    const curYm = APP_TODAY.getFullYear()+'-'+String(APP_TODAY.getMonth()+1).padStart(2,'0');
+    if(!window.RRTO || !window.RRFROM){ let dto=_allM.filter(m=>m<curYm).pop()||_allM[_allM.length-1]; window.RRTO=dto; window.RRFROM=ymAdd(dto,-2); if(window.RRFROM<_allM[0]) window.RRFROM=_allM[0]; }
+    let rf=window.RRFROM, rt=window.RRTO; if(rf>rt){ const t=rf; rf=rt; rt=t; }
+    window.RRFROM=rf; window.RRTO=rt;
+    const days=daysInRange(rf,rt); basisMonths=monthsCountYm(rf,rt); basis=days;
+    paidWindow=paidWindowFor && paidWindowRange(it, rf, rt, custGroup);
+    paidDaily=(usesSell||it.ileReal)? paidWindow/days : usage;
+    paidMonthly = basisMonths>0 ? paidWindow/basisMonths : paidDaily*30;   // /เดือน = รวม ÷ จำนวนเดือน (ตรงกับที่เห็นในกราฟ)
+    winLabel = `${monthLabel(rf)} – ${monthLabel(rt)} · ${fmtNum(basisMonths)} เดือน (${fmtNum(days)} วัน)`;
+  } else {
+    basis = +window.RBASIS || 180; basisMonths = basis/30;
+    paidWindow = paidWindowFor(it, basis, custGroup);
+    paidDaily = (usesSell || it.ileReal) ? paidWindow/basis : usage;
+    paidMonthly = paidDaily*30;
+    winLabel = `${fmtDate(addDays(APP_TODAY,-basis+1))} – ${fmtDate(APP_TODAY)} (ย้อนหลัง ${basis} วัน)`;
+  }
+  { const e=document.getElementById('l-basis'); if(e)e.value=(custMode?'custom':String(basis)); const g=document.getElementById('l-custgroup'); if(g)g.value=custGroup; const tg=document.getElementById('l-target'); if(tg)tg.value=(window.RTARGET||'m4');
+    const rw=document.getElementById('l-range-wrap'); if(rw) rw.style.display=custMode?'':'none';
+    if(custMode){ const optM=(sel)=>_allM.map(m=>`<option value="${m}" ${m===sel?'selected':''}>${monthLabel(m)}</option>`).join(''); const ef=document.getElementById('l-rfrom'), et=document.getElementById('l-rto'); if(ef) ef.innerHTML=optM(window.RRFROM); if(et) et.innerHTML=optM(window.RRTO); }
+  }
   const poDiy = poDiyCommitted(itemNo);                // จองล่วงหน้าจาก PO DIY (Mr.DIY)
   const draftDiy = draftDiyCommitted(itemNo);          // ดราฟ PO DIY (คาดการณ์ · เปิด/ปิดได้)
   const available = onHand - reserve - poDiy - draftDiy;  // ของพร้อมขายหลังหักจอง (นอกระบบ + PO DIY + Draft)
@@ -6847,7 +6876,7 @@ function renderLeadtime(){
   if(poDiy>0 || poDiyDone>0) html += kpi('จอง PO DIY (เหลือ)', fmtNum(poDiy)+` <small>${it.uom}</small>`+(poDiyDone>0?`<br><small class="muted" style="font-weight:400;">ขายให้ DIY แล้ว ${fmtNum(poDiyDone)}</small>`:''), poDiy>0?'warn':'good');
   if(draftDiy>0) html += kpi('<span style="color:#374151;">Draft PO DIY</span>', `<span style="color:#374151;">${fmtNum(draftDiy)}</span> <small>${it.uom}</small><br><small class="muted" style="font-weight:400;">คาดการณ์ · ยังไม่เป็น PO จริง (PLU ${(window.BC_PODIYDRAFT&&window.BC_PODIYDRAFT[itemNo]?window.BC_PODIYDRAFT[itemNo].plu:'-')})</small>`, '');
   html += kpi('พร้อมขายจริง', fmtNum(available)+` <small>${it.uom}</small>`, available<=it.safety?'bad':'good');
-  html += kpi('ขายเฉลี่ย/วัน', fmt1(paidDaily)+` <small>${it.uom} (${fmtNum(Math.round(paidMonthly))}/เดือน)</small>`+`<br><small class="muted" style="font-weight:400;line-height:1.25;display:block;margin-top:2px;">ตัด free item · ฐาน ${basisMonths} เดือน · ${grpLabel}</small>`, '');
+  html += kpi('ขายเฉลี่ย/วัน', fmt1(paidDaily)+` <small>${it.uom} (${fmtNum(Math.round(paidMonthly))}/เดือน)</small>`+`<br><small class="muted" style="font-weight:400;line-height:1.3;display:block;margin-top:2px;">ตัด free item · ${grpLabel}<br>📅 คิดจาก ${winLabel}${(paidWindow>=0)?` · รวม ${fmtNum(Math.round(paidWindow))} ${it.uom}`:''}</small>`, '');
   html += '</div><div class="kpis">';
   const poExtra = [];
   if(overdueQty>0) poExtra.push(`<span style="color:var(--bad)">⚠ เลยกำหนด ${fmtNum(overdueQty)}</span>`);
@@ -7355,6 +7384,19 @@ function paidWindowFor(it, basis, custGroup){
   if(!it.grpSales) return basis===90 ? (it.p90||0) : (it.p180||0);
   if(custGroup==='all') return gw(1)+gw(2)+gw(3);
   return gw(custGroup);
+}
+// ===== กำหนดช่วงเอง (between) : รวมยอดขายจากยอดรายเดือน ตามช่วง [from,to] =====
+function salesRangeSum(arr, from, to){ let s=0; (arr||[]).forEach(p=>{ if(p[0]>=from && p[0]<=to) s+=p[1]; }); return s; }
+function daysInRange(from,to){ const [fy,fm]=from.split('-').map(Number), [ty,tm]=to.split('-').map(Number); const a=Date.UTC(fy,fm-1,1), b=Date.UTC(ty,tm,0); return Math.round((b-a)/DAY)+1; }   // วันแรกของ from → วันสุดท้ายของ to
+function monthsCountYm(from,to){ const [fy,fm]=from.split('-').map(Number), [ty,tm]=to.split('-').map(Number); return (ty*12+tm)-(fy*12+fm)+1; }
+function paidWindowRange(it, from, to, custGroup){
+  const cm = it.custMon||{};
+  if(custGroup==='1s') return salesRangeSum(it.mrdiySell?it.mrdiySell.mon:[], from, to);
+  if(custGroup==='1avg'){ const buy=salesRangeSum(cm['DOCUS23120013'],from,to), sell=it.mrdiySell?salesRangeSum(it.mrdiySell.mon,from,to):null; return sell===null?buy:(buy+sell)/2; }
+  if(custGroup==='1') return salesRangeSum(cm['DOCUS23120013'], from, to);
+  if(custGroup==='2') return salesRangeSum(cm['DOCUS23120083'], from, to);
+  if(custGroup==='3'){ let s=0; for(const c in cm){ if(c!=='DOCUS23120013'&&c!=='DOCUS23120083') s+=salesRangeSum(cm[c],from,to); } return s; }
+  return salesRangeSum(it.monthly&&it.monthly.length?it.monthly:(it.itemMon||[]), from, to);   // all
 }
 // จอง PO DIY ที่ "ยังเหลือ" = จำนวนจอง − ยอดขายจริงที่ส่งให้ DIY ในเดือนเดียวกับกำหนดส่ง PO
 // (match ระดับเดือน · จองจะหมดไปเมื่อมีการขายให้ DIY ในเดือนนั้น)
@@ -8911,7 +8953,9 @@ function applyReorderChange(){ if(window.tabRendered && window.tabRendered.leadt
 function setRTarget(v){ window.RTARGET = (v==='legacy'?'legacy':'m4'); try{ localStorage.setItem('rTargetV1', window.RTARGET); }catch(e){} const a=document.getElementById('u-target'); if(a)a.value=window.RTARGET; const b=document.getElementById('l-target'); if(b)b.value=window.RTARGET; applyReorderChange(); }
 { const e=document.getElementById('u-target'); if(e){ e.value=window.RTARGET; e.onchange=function(){ setRTarget(this.value); }; } }
 { const e=document.getElementById('l-target'); if(e){ e.value=window.RTARGET; e.onchange=function(){ setRTarget(this.value); }; } }
-document.getElementById('l-basis').onchange = function(){ window.RBASIS = +this.value; applyReorderChange(); };
+document.getElementById('l-basis').onchange = function(){ window.RBASIS = (this.value==='custom')?'custom':(+this.value); if(this.value==='custom'){ renderLeadtime(); } else { applyReorderChange(); } };
+{ const e=document.getElementById('l-rfrom'); if(e) e.onchange=function(){ window.RRFROM=this.value; renderLeadtime(); }; }
+{ const e=document.getElementById('l-rto');   if(e) e.onchange=function(){ window.RRTO=this.value; renderLeadtime(); }; }
 document.getElementById('l-custgroup').onchange = function(){ window.RGROUP = this.value; applyReorderChange(); };
 document.getElementById('l-includepo').onchange = renderLeadtime;
 document.getElementById('l-reserve').oninput = renderLeadtime;
