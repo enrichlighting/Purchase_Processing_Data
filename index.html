@@ -6927,8 +6927,8 @@ function renderLeadtime(){
           <span class="muted" style="font-size:11px;">(ควรสั่ง ${fmtNum(suggestQty)})</span>
         </div>
         <div id="moq-row-time" style="display:none;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;">
-          <span>อยากให้อยู่ได้</span><input type="number" id="moq-in-time" min="0" step="1" value="3" oninput="lMoqCalcTime()" style="${_inp}">
-          <select id="moq-unit" onchange="lMoqCalcTime()" style="padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;"><option value="month">เดือน</option><option value="day">วัน</option></select>
+          <span>อยากให้อยู่ได้</span><input type="number" id="moq-in-time" min="0" step="1" value="3" oninput="lMoqCalcTime()" style="width:70px;text-align:right;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">
+          <select id="moq-unit" onchange="lMoqCalcTime()" style="width:78px;padding:6px 6px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;"><option value="month">เดือน</option><option value="day">วัน</option></select>
         </div>
         <div id="moq-result" style="margin-top:10px;font-size:14px;font-weight:700;color:var(--brand);">${_initRes}</div>
       </div>
