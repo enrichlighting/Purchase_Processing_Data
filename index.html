@@ -6999,7 +6999,7 @@ function salesBars(monthly){
     const yTop = H-padB-h;
     bars += `<rect x="${x.toFixed(1)}" y="${yTop.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="var(--brand)" opacity="0.85"/>`;
     bars += `<text x="${(x+w/2).toFixed(1)}" y="${(yTop-4).toFixed(1)}" font-size="9" fill="var(--muted)" text-anchor="middle">${fmtNum(m[1])}</text>`;
-    labels += `<text x="${(x+w/2).toFixed(1)}" y="${H-padB+14}" font-size="9" fill="var(--muted)" text-anchor="middle" transform="rotate(0)">${m[0].slice(2)}</text>`;
+    labels += `<text x="${(x+w/2).toFixed(1)}" y="${H-padB+14}" font-size="9" fill="var(--muted)" text-anchor="middle" transform="rotate(0)">${xMon(m[0])}</text>`;
   });
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
     <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="var(--line)"/>
@@ -7011,6 +7011,9 @@ function salesBars(monthly){
 // ===== กราฟรายเดือนแยกตามลูกค้า =====
 const MON_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function monthLabel(ym){ const p=ym.split('-'); return MON_ABBR[(+p[1])-1]+' '+p[0].slice(2); }  // "2025-01" -> "Jan 25"
+// รูปแบบแกน X มาตรฐานของทุกกราฟ: เดือน(ตัวย่อ)-ปี(2หลัก) เช่น "2025-07" -> "Jul-25"
+function xMon(ym){ const p=ym.split('-'); return MON_ABBR[(+p[1])-1]+'-'+p[0].slice(2); }
+function xMonDate(d){ return MON_ABBR[d.getMonth()]+'-'+String(d.getFullYear()).slice(2); }
 function ymAdd(ym,n){ const p=ym.split('-'); let idx=(+p[0])*12+((+p[1])-1)+n; return Math.floor(idx/12)+'-'+String(idx%12+1).padStart(2,'0'); }
 function monthsBetween(a,b){ const out=[]; let cur=a, g=0; while(cur<=b && g<400){ out.push(cur); cur=ymAdd(cur,1); g++; } return out; }
 function itemAllMonths(it){ const s=new Set(); Object.values(it.custMon||{}).forEach(arr=>arr.forEach(p=>s.add(p[0]))); return [...s].sort(); }
@@ -7034,7 +7037,7 @@ function custBars(data, color){   // data = [[ym, qty], ...] ต่อเนื�
     const h=(H-padT-padB)*(m[1]/maxV), x=padL+i*bw+bw*0.15, w=bw*0.7, yTop=H-padB-h;
     bars += `<rect x="${x.toFixed(1)}" y="${yTop.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${fill}" opacity="${m[1]?0.9:0.15}"/>`;
     if(m[1]) bars += `<text x="${(x+w/2).toFixed(1)}" y="${(yTop-4).toFixed(1)}" font-size="9" fill="var(--muted)" text-anchor="middle">${fmtNum(m[1])}</text>`;
-    if(i%step===0) labels += `<text x="${(x+w/2).toFixed(1)}" y="${H-padB+16}" font-size="9.5" fill="var(--muted)" text-anchor="middle">${monthLabel(m[0])}</text>`;
+    if(i%step===0) labels += `<text x="${(x+w/2).toFixed(1)}" y="${H-padB+16}" font-size="9.5" fill="var(--muted)" text-anchor="middle">${xMon(m[0])}</text>`;
   });
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet" xmlns="http://www.w3.org/2000/svg" style="min-width:${W}px;">
     <line x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}" stroke="var(--line)"/>
@@ -7180,7 +7183,7 @@ function lineChart(series, it, rop){
   const ySafety = y(it.safety), yZero = y(0);
   // ป้ายแกน X (ทุก ~30 วัน)
   let xlab='';
-  for(let i=0;i<series.length;i+=30){ xlab += `<text x="${x(i)}" y="${H-8}" font-size="10" fill="var(--muted)" text-anchor="middle">${fmtDate(series[i].date).replace(/ \d{4}/,'')}</text>`; }
+  for(let i=0;i<series.length;i+=30){ xlab += `<text x="${x(i)}" y="${H-8}" font-size="10" fill="var(--muted)" text-anchor="middle">${xMonDate(series[i].date)}</text>`; }
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
     <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="var(--brand)" stop-opacity=".28"/><stop offset="1" stop-color="var(--brand)" stop-opacity="0"/>
