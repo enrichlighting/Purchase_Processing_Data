@@ -7704,6 +7704,7 @@ function pkCoverInfo(itemCode){
   return {stock:rc.onHand, mo:rc.paidDaily*30};
 }
 function pkCoverColor(m){ return m<=2 ? '#ea580c' : (m<3 ? '#ca8a04' : '#16a34a'); }   // ≤2 ส้ม · 2–2.9 เหลือง · ≥3 เขียว
+function pkCoverHi(m){ return m<=2 ? 'background:#fb923c;color:#7c2d12;' : (m<3 ? 'background:#fde047;color:#713f12;' : 'background:#86efac;color:#14532d;'); }   // ไฮไลท์พื้นหลัง
 window.pkCustomDims = window.pkCustomDims || {};   // มิติสินค้ากรอกเอง (นอก PO) · key = รหัสสังเคราะห์ CUSTOM-*
 function pkItem(code){ if(window.BC_PACKING && window.BC_PACKING[code]) return window.BC_PACKING[code]; return (window.pkCustomDims && window.pkCustomDims[code]) ? window.pkCustomDims[code] : null; }
 function pkIsCustom(code){ return !!(code && window.pkCustomDims && window.pkCustomDims[code]); }
@@ -8037,7 +8038,7 @@ function renderPacking(){
       }
       let covLine='';
       if(_cov){ const tu=+((r.loads||[])[c])||0; const m1=(_cov.stock/3)/_cov.mo, m2=((_cov.stock+tu)/3)/_cov.mo; const mmR=Math.round((tu>0?m2:m1)*10)/10;
-        covLine=`<div style="font-size:9.5px;font-weight:800;color:${pkCoverColor(mmR)};margin-top:3px;white-space:nowrap;" title="อยู่ได้ = (สต๊อก ${fmtNum(_cov.stock)}${tu>0?' + ตู้ '+fmtNum(tu):''} ÷ 3) ÷ ยอดขายเฉลี่ย ${fmtNum(Math.round(_cov.mo))}/เดือน${tu>0?'':' · ยังไม่กรอกจำนวนตู้ = คิดจากสต๊อกอย่างเดียว'}">อยู่ได้ ${fmtMo(mmR)} ด.${tu>0?'':' <span style="font-weight:400;opacity:.8;">(สต๊อก)</span>'}</div>`; }
+        covLine=`<div style="margin-top:4px;text-align:right;white-space:nowrap;"><span style="display:inline-block;font-size:12.5px;font-weight:800;padding:2px 9px;border-radius:6px;${pkCoverHi(mmR)}" title="อยู่ได้ = (สต๊อก ${fmtNum(_cov.stock)}${tu>0?' + ตู้ '+fmtNum(tu):''} ÷ 3) ÷ ยอดขายเฉลี่ย ${fmtNum(Math.round(_cov.mo))}/เดือน${tu>0?'':' · ยังไม่กรอกจำนวนตู้ = คิดจากสต๊อกอย่างเดียว'}">อยู่ได้ ${fmtMo(mmR)} ด.${tu>0?'':' (สต๊อก)'}</span></div>`; }
       cells+=`<td class="num" style="vertical-align:top">${pieceInput}<br>${lotPart}${covLine}</td>`;
     });
     const cust=!!r.custom;
