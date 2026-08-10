@@ -6799,17 +6799,21 @@ function renderLeadtime(){
   const coverDays = targetDays, netAvail = cat3;                    // (คงชื่อไว้ให้โค้ดด้านล่างเดิม)
   // การ์ดสรุปแต่ละหมวด
   const _catMo = d => isFinite(d) ? ` <span class="muted" style="font-weight:400;">(${fmtMo(d/30)} ด.)</span>` : '';
-  const mkCat = (badge,title,comps,sum,dos,sug,hi) => {
+  const mkCat = (badge,title,comps,sum,dos,sug,th) => {
     const dTxt = isFinite(dos) ? fmtNum(Math.round(dos))+' วัน'+_catMo(dos) : '∞';
-    return `<div style="flex:1;min-width:230px;border:${hi?'2.5px solid var(--brand)':'1px solid var(--line)'};background:${hi?'var(--brand-soft)':'var(--card)'};border-radius:14px;padding:14px 16px;">
-      <div style="font-size:12px;font-weight:800;color:${hi?'var(--brand)':'var(--muted)'};margin-bottom:6px;">${badge} ${title}${hi?' · ตัวตัดสินใจ':''}</div>
-      <div style="font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:8px;">${comps} = <b style="color:var(--ink);">${fmtNum(sum)}</b> ${it.uom}</div>
+    const sugCol = sug>0 ? '#c2410c' : '#15803d';   // ต้องสั่งเพิ่ม=ส้ม · ไม่ต้อง=เขียว
+    return `<div style="flex:1;min-width:230px;border:${th.bw} solid ${th.bd};background:${th.bg};border-radius:14px;padding:14px 16px;">
+      <div style="font-size:14px;font-weight:800;color:${th.tc};margin-bottom:8px;">${badge} ${title}${th.dec?' · ตัวตัดสินใจ':''}</div>
+      <div style="font-size:11.5px;color:#475569;line-height:1.5;margin-bottom:8px;">${comps} = <b style="color:#0f172a;">${fmtNum(sum)}</b> ${it.uom}</div>
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-end;flex-wrap:wrap;">
-        <div><div style="font-size:10.5px;color:var(--muted);">อยู่ได้</div><div style="font-size:15px;font-weight:700;">${dTxt}</div></div>
-        <div style="text-align:right;"><div style="font-size:10.5px;color:var(--muted);">ควรสั่งเพิ่ม</div><div style="font-size:20px;font-weight:800;color:${sug>0?'var(--brand)':'var(--good)'};">${fmtNum(sug)}</div></div>
+        <div><div style="font-size:11px;color:#64748b;">อยู่ได้</div><div style="font-size:15px;font-weight:700;color:#1e293b;">${dTxt}</div></div>
+        <div style="text-align:right;"><div style="font-size:11px;color:#64748b;">ควรสั่งเพิ่ม</div><div style="font-size:20px;font-weight:800;color:${sugCol};">${fmtNum(sug)}</div></div>
       </div>
     </div>`;
   };
+  const TH1={bg:'#dcfce7',bd:'#86efac',bw:'1.5px',tc:'#15803d',dec:false};   // ช่อง 1 เขียวอ่อน
+  const TH2={bg:'#fef9c3',bd:'#fde047',bw:'1.5px',tc:'#a16207',dec:false};   // ช่อง 2 เหลืองอ่อน
+  const TH3={bg:'#fde68a',bd:'#f59e0b',bw:'2.5px',tc:'#92400e',dec:true};    // ช่อง 3 เหลืองเข้ม (ตัวตัดสินใจ)
 
   // สถานะรวม (เกณฑ์เดือน · ยึดหมวด 3): ≤3 ควรสั่งซื้อ · ≤3.5 ใกล้ · ≤4 เฝ้าระวัง · >4 ยังไม่ต้องสั่ง
   const _moTxt = isFinite(cov3moL) ? fmtMo(cov3moL)+' เดือน' : 'ไม่มียอดขาย';
@@ -6849,9 +6853,9 @@ function renderLeadtime(){
   html += `<div class="section-title">3 หมวดการคำนวณ (หัก DIY · ฐาน ${basisMonths} เดือน · <span style="color:var(--brand)">${grpLabel}</span>)</div>`;
   html += `<div style="font-size:11.5px;color:var(--muted);margin:-4px 0 10px;line-height:1.5;">เป้าหมายที่ใช้คำนวณ "ควรสั่งเพิ่ม": <b style="color:var(--brand)">${targetLabel}</b> = <b>${fmtNum(Math.round(targetQty))}</b> ${it.uom} · เปลี่ยนสูตรได้ที่ช่อง "สูตรเป้าหมาย" ด้านบน</div>`;
   html += `<div style="display:flex;gap:12px;flex-wrap:wrap;">`;
-  html += mkCat('①','คลัง − จองนอกระบบ', `คลัง(หัก DIY) ${fmtNum(availRawL)}${reserve?` − จอง ${fmtNum(reserve)}`:''}`, cat1, dCat1, sug1, false);
-  html += mkCat('②','คลัง + จัดตู้แล้ว', `คลัง ${fmtNum(availRawL)} + จัดตู้ ${fmtNum(packedL)}`, cat2, dCat2, sug2, false);
-  html += mkCat('③','คลัง + PO + จัดตู้ + สั่งผลิต', `คลัง ${fmtNum(availRawL)} + PO เหลือ ${fmtNum(poRemainL)} <span class="muted" style="font-size:10px;">(PO ${fmtNum(incoming)} − จัดตู้/ผลิต)</span> + จัดตู้ ${fmtNum(packedL)} + ผลิต ${fmtNum(productionL)}`, cat3, dCat3, sug3, true);
+  html += mkCat('①','คลัง − จองนอกระบบ', `คลัง(หัก DIY) ${fmtNum(availRawL)}${reserve?` − จอง ${fmtNum(reserve)}`:''}`, cat1, dCat1, sug1, TH1);
+  html += mkCat('②','คลัง + จัดตู้แล้ว', `คลัง ${fmtNum(availRawL)} + จัดตู้ ${fmtNum(packedL)}`, cat2, dCat2, sug2, TH2);
+  html += mkCat('③','คลัง + PO + จัดตู้ + สั่งผลิต', `คลัง ${fmtNum(availRawL)} + PO เหลือ ${fmtNum(poRemainL)} <span style="font-size:10px;color:#78716c;">(PO ${fmtNum(incoming)} − จัดตู้/ผลิต)</span> + จัดตู้ ${fmtNum(packedL)} + ผลิต ${fmtNum(productionL)}`, cat3, dCat3, sug3, TH3);
   html += `</div>`;
   // กรอบเน้น "จำนวนที่ควรสั่งเพิ่ม" (ยึดหมวด 3)
   const coverText = paidDaily>0 && suggestQty>0 ? `<div style="font-size:12px;font-weight:600;color:var(--muted);margin-top:2px;">≈ สั่งแล้วอยู่ได้รวม ${fmtMo((cat3+suggestQty)/paidDaily/30)} เดือน</div>` : '';
