@@ -6905,25 +6905,7 @@ function renderLeadtime(){
     <span style="font-weight:800;font-size:16px;">📦 จำนวนที่ควรสั่งเพิ่ม <span style="font-size:12px;font-weight:600;color:var(--muted);">(ยึดหมวด 3)</span></span>
     <span style="text-align:right;"><b style="color:var(--brand);font-size:30px;letter-spacing:-.5px;">${fmtNum(suggestQty)}</b> <span style="font-size:15px;font-weight:600;color:var(--muted);">${it.uom}</span>${coverText}</span>
   </div>`;
-  // === จุดที่ต้องเตรียมนำเข้า (กรอบชมพู) — เอาจำนวน ÷ 3 แล้วเทียบว่าอยู่ได้กี่เดือน (ยอดขายเฉลี่ย/เดือนตามฐาน) ===
-  { const _stk=onHand, _tu=packedL, _mo=paidMonthly;
-    const prepA = _mo>0 ? (_stk/3)/_mo : Infinity;
-    const prepB = _mo>0 ? ((_stk+_tu)/3)/_mo : Infinity;
-    const _hi = mo => !isFinite(mo) ? '' : (mo<=2 ? 'background:#fb923c;color:#7c2d12;' : (mo<=2.5 ? 'background:#fde047;color:#713f12;' : ''));
-    const _card = (badge,title,calcHtml,mo) => `<div style="flex:1;min-width:240px;background:#fff;border:1px solid #f9a8d4;border-radius:10px;padding:12px 14px;">
-        <div style="font-size:12.5px;font-weight:800;color:#9d174d;margin-bottom:6px;">${badge} ${title}</div>
-        <div style="font-size:11.5px;color:#475569;line-height:1.5;">${calcHtml}</div>
-        <div style="margin-top:7px;font-size:13px;">อยู่ได้ <b style="padding:2px 9px;border-radius:6px;${_hi(mo)}">${isFinite(mo)?fmtMo(mo):'∞'} เดือน</b></div>
-      </div>`;
-    html += `<div style="margin-top:16px;border:2px solid #ec4899;background:#fdf2f8;border-radius:14px;padding:14px 18px;">
-      <div style="font-weight:800;font-size:15px;color:#be185d;">📥 จุดที่ต้องเตรียมนำเข้า</div>
-      <div style="font-size:11.5px;color:#9d174d;margin:2px 0 10px;">เอาจำนวน ÷ 3 แล้วเทียบว่าอยู่ได้กี่เดือน · คิดจากยอดขายเฉลี่ย <b>${fmtNum(Math.round(_mo))}</b>/เดือน (ฐาน ${basisMonths} เดือน) · <span style="background:#fde047;padding:0 5px;border-radius:4px;">เหลือง 2–2.5 ด.</span> <span style="background:#fb923c;padding:0 5px;border-radius:4px;">ส้ม ≤ 2 ด.</span></div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        ${_card('①','ตอนที่อยู่ใน Stock', `Stock ${fmtNum(_stk)} ÷ 3 = <b style="color:#0f172a;">${fmtNum(Math.round(_stk/3))}</b> ${it.uom}`, prepA)}
-        ${_card('②','ตอนที่อยู่ใน Stock + ตู้', `(Stock ${fmtNum(_stk)} + ตู้ ${fmtNum(_tu)}) ÷ 3 = <b style="color:#0f172a;">${fmtNum(Math.round((_stk+_tu)/3))}</b> ${it.uom} <span class="muted" style="font-size:10px;">(ตู้ = จัดตู้แล้ว)</span>`, prepB)}
-      </div>
-    </div>`;
-  }
+  // (ย้าย "จุดที่ต้องเตรียมนำเข้า" ไปแสดงต่อแถวสินค้าในหน้า Packing List แล้ว)
   // ช่องเผื่อ MOQ / วางแผนสั่งเพิ่ม — 2 โหมด (ตามจำนวนสั่ง / ตามระยะเวลา) + จำนวนกล่อง (ปัดขึ้น)
   const _pcs=(window.BC_PACKING && window.BC_PACKING[itemNo])?(window.BC_PACKING[itemNo].pcs||0):0;
   const _initDaysX = paidDaily>0 ? (cat3+suggestQty)/paidDaily : 0;   // ค่าต่อเนื่อง (ไม่ปัดก่อน) เพื่อให้ "เดือน" ตรงกับหัวข้อ
@@ -7712,6 +7694,16 @@ function packingItemOptions(sel){
   const keys = Object.keys(window.BC_PACKING||{}).sort();
   return '<option value="">— เลือกสินค้า —</option>' + keys.map(k=>{ const d=window.BC_PACKING[k]; return `<option value="${k}" ${k===sel?'selected':''}>${k} — ${(d.desc||'').slice(0,45)}</option>`; }).join('');
 }
+// "อยู่ได้กี่เดือน" ต่อสินค้าในหน้า Packing: (สต๊อก[+ตู้] ÷ 3) ÷ ยอดขายเฉลี่ย/เดือน
+function pkCoverInfo(itemCode){
+  if(!itemCode || typeof getItem!=='function') return null;
+  const it=getItem(itemCode); if(!it || !it.ileReal) return null;
+  const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180);
+  const rc=(typeof reorderCalc==='function')?reorderCalc(it, basis, window.RGROUP||'all'):null;
+  if(!rc || !(rc.paidDaily>0)) return null;
+  return {stock:rc.onHand, mo:rc.paidDaily*30};
+}
+function pkCoverColor(m){ return m<=2 ? '#ea580c' : (m<3 ? '#ca8a04' : '#16a34a'); }   // ≤2 ส้ม · 2–2.9 เหลือง · ≥3 เขียว
 window.pkCustomDims = window.pkCustomDims || {};   // มิติสินค้ากรอกเอง (นอก PO) · key = รหัสสังเคราะห์ CUSTOM-*
 function pkItem(code){ if(window.BC_PACKING && window.BC_PACKING[code]) return window.BC_PACKING[code]; return (window.pkCustomDims && window.pkCustomDims[code]) ? window.pkCustomDims[code] : null; }
 function pkIsCustom(code){ return !!(code && window.pkCustomDims && window.pkCustomDims[code]); }
@@ -8030,6 +8022,7 @@ function renderPacking(){
     const d=pkItem(r.item), rs=pkRowSum(r);
     // ต้นทุนจาก PO: dropdown เลือก Lot → RMB Cost → THB Cost (ตัวเลือกตามโหมด)
     const lotList=pkLotList(r.item), rc=pkRowCost(r);
+    const _cov=pkCoverInfo(r.item);   // {stock, mo} สำหรับ "อยู่ได้กี่เดือน" ต่อสินค้า
     let cells=''; conts.forEach((ct,c)=>{
       const maxAttr=(window.pkMode==='released'&&r.lotMax!=null)?` max="${r.lotMax}"`:'';
       const pieceInput=`<input id="pk-in-${i}-${c}" type="number" value="${(r.loads||[])[c]===''||(r.loads||[])[c]==null?'':(r.loads||[])[c]}" min="0" step="1"${maxAttr} oninput="pkSetCell(${i},${c},this.value)" style="width:90px;text-align:right" title="จำนวนชิ้น">`;
@@ -8042,7 +8035,10 @@ function renderPacking(){
         const lot=((r.lots||[])[c]||'').replace(/"/g,'&quot;');
         lotPart=`<input type="text" value="${lot}" oninput="pkSetLot(${i},${c},this.value)" placeholder="Lot No" title="Lot No (กรอกเอง)" style="width:90px;text-align:right;font-size:11px;margin-top:3px;padding:2px 4px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--muted)">`;
       }
-      cells+=`<td class="num" style="vertical-align:top">${pieceInput}<br>${lotPart}</td>`;
+      let covLine='';
+      if(_cov){ const tu=+((r.loads||[])[c])||0; const m1=(_cov.stock/3)/_cov.mo, m2=((_cov.stock+tu)/3)/_cov.mo; const mmR=Math.round((tu>0?m2:m1)*10)/10;
+        covLine=`<div style="font-size:9.5px;font-weight:800;color:${pkCoverColor(mmR)};margin-top:3px;white-space:nowrap;" title="อยู่ได้ = (สต๊อก ${fmtNum(_cov.stock)}${tu>0?' + ตู้ '+fmtNum(tu):''} ÷ 3) ÷ ยอดขายเฉลี่ย ${fmtNum(Math.round(_cov.mo))}/เดือน${tu>0?'':' · ยังไม่กรอกจำนวนตู้ = คิดจากสต๊อกอย่างเดียว'}">อยู่ได้ ${fmtMo(mmR)} ด.${tu>0?'':' <span style="font-weight:400;opacity:.8;">(สต๊อก)</span>'}</div>`; }
+      cells+=`<td class="num" style="vertical-align:top">${pieceInput}<br>${lotPart}${covLine}</td>`;
     });
     const cust=!!r.custom;
     const editDims=pkDimsEditable(r);   // กรอกมิติเองได้ = custom หรือ สินค้าไม่มีมิติกล่องในระบบ
