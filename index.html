@@ -6725,8 +6725,8 @@ function lMoqCalcQty(){
   const m=window._moq||{}; const res=document.getElementById('moq-result'), box=document.getElementById('moq-box'); if(!res) return;
   const moq=Math.max(0, +((document.getElementById('moq-in-qty')||{}).value)||0);
   const sug=+m.suggest||0, total=Math.max(sug, moq), extra=Math.max(0,total-sug), avail=+m.avail||0;
-  if(m.paidDaily>0){ const days=Math.ceil((avail+total)/m.paidDaily);
-    res.innerHTML=`ต้องสั่งเพิ่มจากควรสั่งอีก <b style="color:var(--bad)">${fmtNum(extra)}</b> ${m.uom} · รวมสั่ง <b>${fmtNum(total)}</b> → ของรวมอยู่ได้ <b>${fmtNum(days)}</b> วัน (<b>${fmtMo(days/30)}</b> เดือน)`;
+  if(m.paidDaily>0){ const daysX=(avail+total)/m.paidDaily;
+    res.innerHTML=`ต้องสั่งเพิ่มจากควรสั่งอีก <b style="color:var(--bad)">${fmtNum(extra)}</b> ${m.uom} · รวมสั่ง <b>${fmtNum(total)}</b> → ของรวมอยู่ได้ <b>${fmtNum(Math.round(daysX))}</b> วัน (<b>${fmtMo(daysX/30)}</b> เดือน)`;
   } else res.innerHTML=`ต้องสั่งเพิ่มอีก <b style="color:var(--bad)">${fmtNum(extra)}</b> ${m.uom} · รวมสั่ง <b>${fmtNum(total)}</b> <span class="muted">(ไม่มียอดขาย)</span>`;
   box.innerHTML=moqBoxHtml(total);
 }
@@ -6907,8 +6907,8 @@ function renderLeadtime(){
   </div>`;
   // ช่องเผื่อ MOQ / วางแผนสั่งเพิ่ม — 2 โหมด (ตามจำนวนสั่ง / ตามระยะเวลา) + จำนวนกล่อง (ปัดขึ้น)
   const _pcs=(window.BC_PACKING && window.BC_PACKING[itemNo])?(window.BC_PACKING[itemNo].pcs||0):0;
-  const _initDays = paidDaily>0 ? Math.ceil((cat3+suggestQty)/paidDaily) : 0;
-  const _initRes = paidDaily>0 ? `ควรสั่ง <b>${fmtNum(suggestQty)}</b> ${it.uom} → ของรวมอยู่ได้ <b>${fmtNum(_initDays)}</b> วัน (<b>${fmtMo(_initDays/30)}</b> เดือน)` : `ควรสั่ง <b>${fmtNum(suggestQty)}</b> ${it.uom} <span class="muted">(ไม่มียอดขาย)</span>`;
+  const _initDaysX = paidDaily>0 ? (cat3+suggestQty)/paidDaily : 0;   // ค่าต่อเนื่อง (ไม่ปัดก่อน) เพื่อให้ "เดือน" ตรงกับหัวข้อ
+  const _initRes = paidDaily>0 ? `ควรสั่ง <b>${fmtNum(suggestQty)}</b> ${it.uom} → ของรวมอยู่ได้ <b>${fmtNum(Math.round(_initDaysX))}</b> วัน (<b>${fmtMo(_initDaysX/30)}</b> เดือน)` : `ควรสั่ง <b>${fmtNum(suggestQty)}</b> ${it.uom} <span class="muted">(ไม่มียอดขาย)</span>`;
   const _initBox = _pcs>0 ? `📦 <b>${fmtNum(Math.ceil(suggestQty/_pcs))}</b> กล่อง <span class="muted" style="font-size:11px;font-weight:400;">(${fmtNum(_pcs)} ชิ้น/กล่อง)</span>` : '<span class="muted" style="font-size:13px;">— ไม่มีข้อมูลกล่อง</span>';
   const _inp='width:110px;text-align:right;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);';
   window._moq={suggest:suggestQty, paidDaily:paidDaily, pcs:_pcs, uom:it.uom, avail:cat3}; window._moqMode='qty';
