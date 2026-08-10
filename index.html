@@ -6736,8 +6736,8 @@ function lMoqCalcTime(){
   const val=Math.max(0, +((document.getElementById('moq-in-time')||{}).value)||0);
   const unit=(document.getElementById('moq-unit')||{}).value||'month';
   const days=unit==='month'? val*30 : val;
-  if(m.paidDaily>0){ const need=Math.ceil(m.paidDaily*days);
-    res.innerHTML=`ถ้าต้องการอยู่ได้ <b>${fmtNum(val)}</b> ${unit==='month'?'เดือน':'วัน'} (${fmtNum(Math.round(days))} วัน) → ควรสั่ง <b style="color:var(--brand)">${fmtNum(need)}</b> ${m.uom}`;
+  if(m.paidDaily>0){ const avail=+m.avail||0; const target=Math.ceil(m.paidDaily*days); const need=Math.max(0, target-avail);
+    res.innerHTML=`ถ้าต้องการให้ของรวมอยู่ได้ <b>${fmtNum(val)}</b> ${unit==='month'?'เดือน':'วัน'} (${fmtNum(Math.round(days))} วัน) → ควรสั่ง <b style="color:var(--brand)">${fmtNum(need)}</b> ${m.uom}<br><small class="muted" style="font-weight:400;">ต้องมีรวม ${fmtNum(target)} − ของที่มีอยู่ (หมวด 3) ${fmtNum(avail)} = ${fmtNum(need)}</small>`;
     box.innerHTML=moqBoxHtml(need);
   } else { res.innerHTML=`<span class="muted">ไม่มียอดขาย — คำนวณจากระยะเวลาไม่ได้</span>`; box.innerHTML=''; }
 }
@@ -6911,7 +6911,7 @@ function renderLeadtime(){
   const _initRes = paidDaily>0 ? `ควรสั่ง <b>${fmtNum(suggestQty)}</b> ${it.uom} → อยู่ได้ <b>${fmtNum(_initDays)}</b> วัน (<b>${fmtMo(_initDays/30)}</b> เดือน)` : `ควรสั่ง <b>${fmtNum(suggestQty)}</b> ${it.uom} <span class="muted">(ไม่มียอดขาย)</span>`;
   const _initBox = _pcs>0 ? `📦 <b>${fmtNum(Math.ceil(suggestQty/_pcs))}</b> กล่อง <span class="muted" style="font-size:11px;font-weight:400;">(${fmtNum(_pcs)} ชิ้น/กล่อง)</span>` : '<span class="muted" style="font-size:13px;">— ไม่มีข้อมูลกล่อง</span>';
   const _inp='width:110px;text-align:right;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);';
-  window._moq={suggest:suggestQty, paidDaily:paidDaily, pcs:_pcs, uom:it.uom}; window._moqMode='qty';
+  window._moq={suggest:suggestQty, paidDaily:paidDaily, pcs:_pcs, uom:it.uom, avail:cat3}; window._moqMode='qty';
   html += `<div style="margin-top:10px;border:1px dashed var(--brand);border-radius:12px;padding:12px 16px;background:var(--card);">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
       <div style="font-size:13px;font-weight:700;">➕ เผื่อ MOQ / วางแผนสั่งเพิ่ม</div>
