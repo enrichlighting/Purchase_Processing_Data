@@ -7602,8 +7602,13 @@ function pkAddCustomRow(){
   window.packingRows.push({item:code, custom:true, loads:[], lots:[], costIdx:null});
   renderPacking();
 }
+// สินค้าที่ต้องกรอกมิติเอง = แถวกรอกเอง (custom) หรือ สินค้าที่ไม่มีมิติกล่องในระบบ (BC_PACKING)
+function pkDimsEditable(r){ return !!(r && r.item && (r.custom || !(window.BC_PACKING && window.BC_PACKING[r.item]))); }
+// เตรียมช่องมิติสำหรับสินค้าที่ไม่มีใน BC_PACKING (เช่นสินค้าใหม่ที่มี PO แต่ยังไม่มีขนาดกล่อง)
+function pkEnsureDims(code){ window.pkCustomDims=window.pkCustomDims||{}; if(!(window.BC_PACKING&&window.BC_PACKING[code]) && !window.pkCustomDims[code]){ const g=(typeof getItem==='function')?getItem(code):null; window.pkCustomDims[code]={L:0,W:0,H:0,pcs:1,desc:(g&&g.desc)||'',rmb:''}; } }
 function pkCustSet(i, field, val){
-  const r=window.packingRows[i]; if(!r||!r.custom) return;
+  const r=window.packingRows[i]; if(!r||!r.item) return;
+  if(!pkDimsEditable(r)) return;                 // สินค้ามีมิติในระบบแล้ว ไม่ให้แก้
   window.pkCustomDims = window.pkCustomDims || {};
   const cd = window.pkCustomDims[r.item] || (window.pkCustomDims[r.item]={L:0,W:0,H:0,pcs:1,desc:'',rmb:''});
   if(field==='desc'||field==='rmb') cd[field]=val;
@@ -7668,11 +7673,19 @@ function pkSetItem(i, v){
 function pkSetFx(){ renderPacking(); }
 /* ===== dropdown แบบพิมพ์ค้นหาได้ (datalist) สำหรับ Item + LOT ในหน้า Packing ===== */
 function pkItemDatalist(){
-  const keys=Object.keys(window.BC_PACKING||{}).sort();
-  return '<datalist id="pk-itemdl">'+keys.map(k=>{ const d=window.BC_PACKING[k]; return `<option value="${(k+' — '+(d.desc||'')).replace(/"/g,'&quot;')}"></option>`; }).join('')+'</datalist>';
+  const set=new Set(Object.keys(window.BC_PACKING||{}));
+  // โหมด Released: รวมสินค้าที่มี PO Released ด้วย (แม้ยังไม่มีมิติกล่องในระบบ)
+  if(window.pkMode==='released' && window.BC_PO){ for(const it in window.BC_PO){ if((window.BC_PO[it].pos||[]).some(p=>p[4]==='Released')) set.add(it); } }
+  const keys=[...set].sort();
+  return '<datalist id="pk-itemdl">'+keys.map(k=>{ const d=window.BC_PACKING&&window.BC_PACKING[k]; const nm=d?(d.desc||''):(((typeof getItem==='function')&&getItem(k))?(getItem(k).desc||''):''); return `<option value="${(k+' — '+nm).replace(/"/g,'&quot;')}"></option>`; }).join('')+'</datalist>';
 }
-function pkItemLabel(code){ if(!code) return ''; const d=pkItem(code); return code+(d?(' — '+(d.desc||'')):''); }
-function pkPickItem(i, v){ v=String(v||'').trim(); const code=v.split(' — ')[0].trim(); if(!code){ pkSetItem(i,''); return; } if(window.BC_PACKING && window.BC_PACKING[code]) pkSetItem(i, code); else pkToast('ไม่พบสินค้า — เลือกจากรายการที่ระบบแนะนำ','bad'); }
+function pkItemLabel(code){ if(!code) return ''; const d=pkItem(code); let desc=d?(d.desc||''):''; if(!desc && typeof getItem==='function'){ const g=getItem(code); if(g) desc=g.desc||''; } return code+(desc?(' — '+desc):''); }
+function pkPickItem(i, v){ v=String(v||'').trim(); const code=v.split(' — ')[0].trim(); if(!code){ pkSetItem(i,''); return; }
+  if(window.BC_PACKING && window.BC_PACKING[code]){ pkSetItem(i, code); return; }
+  // ไม่มีมิติกล่องในระบบ แต่มี PO Released → อนุญาต (กรอกมิติเอง) · ผูกกับ PO/Lot ปกติ
+  if(itemHasReleasedPO(code)){ pkEnsureDims(code); pkSetItem(i, code); return; }
+  pkToast('ไม่พบสินค้า — เลือกจากรายการที่ระบบแนะนำ','bad');
+}
 function pkLotLabelOf(e){ return (window.pkMode==='released') ? `${e.po} · ${e.lot} · ค้าง ${fmtNum(e.out)} · ¥${e.rmb}` : `${e.lot} · ¥${e.rmb}`; }
 function pkPickLot(i, v){
   const r=window.packingRows[i]; if(!r) return; v=String(v||'').trim();
@@ -7910,6 +7923,7 @@ function renderPacking(){
       cells+=`<td class="num" style="vertical-align:top">${pieceInput}<br>${lotPart}</td>`;
     });
     const cust=!!r.custom;
+    const editDims=pkDimsEditable(r);   // กรอกมิติเองได้ = custom หรือ สินค้าไม่มีมิติกล่องในระบบ
     let costSel, capNote='';
     if(cust){ const cd=(window.pkCustomDims||{})[r.item]||{}; costSel=`<input type="number" min="0" step="0.01" value="${cd.rmb==null?'':cd.rmb}" onchange="pkCustSet(${i},'rmb',this.value)" placeholder="RMB/ชิ้น (ถ้ามี)" title="ต้นทุน RMB ต่อชิ้น — ไม่บังคับ" style="width:120px;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`; }
     else if(!r.item){ costSel=`<span class="muted" style="font-size:11px;">—</span>`; }
@@ -7923,11 +7937,11 @@ function renderPacking(){
     rows += `<tr>
       <td style="white-space:nowrap;"><input type="checkbox" ${(window.pkRowSel&&window.pkRowSel.has(i))?'checked':''} onchange="pkToggleRow(${i},this.checked)" title="เลือกเพื่อลบหลายแถว" style="vertical-align:middle;margin-right:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${pkColor(i)};vertical-align:middle;"></span> <b>${i+1}</b></td>
       <td>${cust?`<span class="tag" style="background:#ecfeff;color:#0e7490;font-size:11px;white-space:nowrap;">✎ กรอกเอง (นอก PO)</span>`:`<input list="pk-itemdl" value="${pkItemLabel(r.item).replace(/"/g,'&quot;')}" onchange="pkPickItem(${i},this.value)" onfocus="this.select()" placeholder="🔍 พิมพ์ค้นหาสินค้า" autocomplete="off" style="min-width:220px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`}</td>
-      <td>${cust?`<input type="text" value="${(d?d.desc:'').replace(/"/g,'&quot;')}" onchange="pkCustSet(${i},'desc',this.value)" placeholder="ชื่อสินค้า (กรอกเอง)" style="min-width:150px;width:100%;box-sizing:border-box;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?d.desc:'<span class="muted">—</span>')}</td>
-      <td class="num">${cust?`<input type="number" min="0" step="0.1" value="${d?d.L:0}" onchange="pkCustSet(${i},'L',this.value)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.L):'-')}</td>
-      <td class="num">${cust?`<input type="number" min="0" step="0.1" value="${d?d.W:0}" onchange="pkCustSet(${i},'W',this.value)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.W):'-')}</td>
-      <td class="num">${cust?`<input type="number" min="0" step="0.1" value="${d?d.H:0}" onchange="pkCustSet(${i},'H',this.value)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.H):'-')}</td>
-      <td class="num">${cust?`<input type="number" min="1" step="1" value="${d?d.pcs:1}" onchange="pkCustSet(${i},'pcs',this.value)" style="width:60px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmtNum(d.pcs):'-')}</td>
+      <td>${editDims?`<input type="text" value="${(d?d.desc:'').replace(/"/g,'&quot;')}" onchange="pkCustSet(${i},'desc',this.value)" placeholder="ชื่อสินค้า (กรอกเอง)" style="min-width:150px;width:100%;box-sizing:border-box;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?d.desc:'<span class="muted">—</span>')}</td>
+      <td class="num">${editDims?`<input type="number" min="0" step="0.1" value="${d?d.L:0}" onchange="pkCustSet(${i},'L',this.value)" title="กว้าง×ยาว×สูง (ซม.)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.L):'-')}</td>
+      <td class="num">${editDims?`<input type="number" min="0" step="0.1" value="${d?d.W:0}" onchange="pkCustSet(${i},'W',this.value)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.W):'-')}</td>
+      <td class="num">${editDims?`<input type="number" min="0" step="0.1" value="${d?d.H:0}" onchange="pkCustSet(${i},'H',this.value)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.H):'-')}</td>
+      <td class="num">${editDims?`<input type="number" min="1" step="1" value="${d?d.pcs:1}" onchange="pkCustSet(${i},'pcs',this.value)" style="width:60px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmtNum(d.pcs):'-')}</td>
       <td>${costSel}${capNote}</td>
       <td class="num" id="pk-rmb-${i}">${rc.rmb==null?'<span class="muted">-</span>':('¥'+pkYuan(rc.rmb))}</td>
       <td class="num" id="pk-thb-${i}">${rc.thb==null?'<span class="muted">-</span>':('฿'+rc.thb.toLocaleString('en-US',{maximumFractionDigits:2}))}</td>
@@ -8153,6 +8167,8 @@ function pkLoadRound(idx){
   window.packingRows  = s.rows.map(r=>{
     let lm=(r.lotMax==null?null:r.lotMax);
     if(r.custom){ window.pkCustomDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1), desc:r.desc||'', rmb:(r.rmb==null?'':r.rmb)}; return {item:r.item, custom:true, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:null, lotMax:null}; }
+    // สินค้าผูก PO แต่ไม่มีมิติกล่องในระบบ → กู้มิติที่กรอกไว้กลับมาใน overlay
+    if(r.item && !(window.BC_PACKING&&window.BC_PACKING[r.item])){ window.pkCustomDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1), desc:r.desc||'', rmb:(window.pkCustomDims[r.item]&&window.pkCustomDims[r.item].rmb)||''}; }
     if(s.mode==='released' && r.po){ const cp=pkPackCap(r.po,r.item); if(cp.cap!=null){ let others=0; (window.pkLog||[]).forEach((ss,i)=>{ if(i===idx) return; (ss.rows||[]).forEach(rr=>{ if(rr.po===r.po && rr.item===r.item) others+=(rr.pcs||0); }); }); lm=Math.max(0,cp.cap-others); } }   // เหลือจัดได้ = จำนวนสั่งผลิต/ค้างรับ − ที่จัดในรอบอื่น
     return {item:r.item, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:(r.costIdx==null?null:r.costIdx), lotMax:lm};
   });
