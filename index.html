@@ -2053,6 +2053,7 @@ window.BC_ILE = {
 };
 </script>
 <script src="bc-ile.js" onerror="void 0"></script>
+<script src="bc-onhand.js" onerror="void 0"></script>
 
 <script>
 /* ===== Purchase Orders ค้างรับ (incoming) 164 รายการ ฝังในไฟล์ ===== */
@@ -6427,6 +6428,37 @@ function mergeILE(){
   return matched;
 }
 
+/* --- On-hand สด via Power Automate (bc-onhand.js) — ทับยอดคงเหลือ+รายคลังของ BC_ILE ก่อน mergeILE
+   รูปแบบไฟล์ (array เหมือน BC_ITEMS): [{Item_No, Location_Code, OnHand}] · asof อาจอยู่ในคอมเมนต์/ฟิลด์ AsOf
+   ยอดขาย/อัตราขาย ยังใช้จาก Item Ledger (bc-ile.js) ตามเดิม — ทำให้ "สต๊อกสด + ความเร็วขายนิ่ง" --- */
+const ONHAND_ALLOW_WH = {"HO689":1,"WH155":1,"WH1-B1":1,"WH1-B2":1,"WH-RESERVE":1,"QWH":1};
+function applyFreshOnHand(){
+  const A = (typeof window!=='undefined') ? window.BC_ONHAND : null;
+  if(!A) return 0;
+  const rows = Array.isArray(A) ? A : (A.value||[]);
+  const agg = {}; let asof = window.BC_ONHAND_ASOF || '';
+  rows.forEach(r=>{
+    const it = r.Item_No || r.itemNo || r.No; if(!it) return;
+    const lc = r.Location_Code || r.location || r.Location || '';
+    if(!ONHAND_ALLOW_WH[lc]) return;                                   // เฉพาะ 6 คลัง เหมือนเดิม
+    const q = Math.round(+(r.OnHand!=null ? r.OnHand : (r.Quantity!=null ? r.Quantity : r.Inventory)) || 0);
+    const a = (agg[it] = agg[it] || {oh:0, loc:{}});
+    a.oh += q; if(q) a.loc[lc] = (a.loc[lc]||0) + q;
+    const d = r.AsOf || r.Posting_Date || r.asof; if(d && String(d)>asof) asof = String(d).slice(0,10);
+  });
+  window.BC_ILE = window.BC_ILE || {};
+  let n=0;
+  for(const it in agg){
+    const e = window.BC_ILE[it] = window.BC_ILE[it] || {oh:0,ld:'',s90:0,s180:0,s365:0,p90:0,p180:0,mon:[],loc:{}};
+    e.oh = agg[it].oh;           // ทับยอดรวมด้วยค่าสด
+    e.loc = agg[it].loc;         // ทับรายคลังด้วยค่าสด
+    n++;
+  }
+  window.BC_ONHAND_ASOF = asof;
+  window.STOCK_LIVE = true;      // ให้ป้ายมุมขวาบนรู้ว่าสต๊อกสดแล้ว
+  return n;
+}
+
 /* --- รวม Purchase Orders ค้างรับ (incoming) เข้ากับสินค้า --- */
 function mergePO(){
   const D = (typeof window!=='undefined') ? window.BC_PO : null;
@@ -6493,8 +6525,11 @@ function renderDataRefresh(){
   const el=document.getElementById('data-refresh'); if(!el) return;
   let maxLd=''; const D=window.BC_ILE||{}; for(const k in D){ const d=D[k]&&D[k].ld; if(d&&d>maxLd) maxLd=d; }
   const isPA=(window.BC_ITEMS||[]).some(x=>x.No==='500022');   // ไฟล์เต็มจาก Power Automate จะมีรายการ non-ENRICH เช่น 500022
-  el.innerHTML =
-    `<div title="สรุปจากไฟล์ Item Ledger Entries ที่อัปโหลดล่าสุด — ครอบคลุมการเคลื่อนไหวถึงวันที่นี้ · ไม่ใช่เรียลไทม์">📦 <b>สต๊อก/ยอดขาย ณ ${fmtThaiDate(maxLd)}</b> <span style="opacity:.75;">(ไฟล์ Item Ledger · ไม่เรียลไทม์)</span></div>`
+  const stockLine = window.STOCK_LIVE
+    ? `<div title="ยอดคงเหลือ+รายคลัง ดึงอัตโนมัติผ่าน Power Automate (bc-onhand.js)">📦 <b>สต๊อก (คงเหลือ/รายคลัง): สด · อัตโนมัติ</b>${window.BC_ONHAND_ASOF?` · ${fmtThaiDate(window.BC_ONHAND_ASOF)}`:''} <span style="opacity:.7;">(Power Automate)</span></div>`
+      + `<div title="ยอดขาย/อัตราขาย สรุปจากไฟล์ Item Ledger Entries">📈 ยอดขาย/อัตราขาย ณ <b>${fmtThaiDate(maxLd)}</b> <span style="opacity:.7;">(Item Ledger)</span></div>`
+    : `<div title="สรุปจากไฟล์ Item Ledger Entries ที่อัปโหลดล่าสุด — ครอบคลุมการเคลื่อนไหวถึงวันที่นี้ · ไม่ใช่เรียลไทม์">📦 <b>สต๊อก/ยอดขาย ณ ${fmtThaiDate(maxLd)}</b> <span style="opacity:.75;">(ไฟล์ Item Ledger · ไม่เรียลไทม์)</span></div>`;
+  el.innerHTML = stockLine
     + `<div title="รายการสินค้า (Item Card) ดึงอัตโนมัติผ่าน Power Automate">🏷️ รายการสินค้า: <b>${isPA?'อัปเดตอัตโนมัติ (Power Automate)':'ฝังในไฟล์ (snapshot)'}</b></div>`;
 }
 
@@ -9169,6 +9204,7 @@ function init(){
     ITEMS.length = 0; ITEMS.push(...live);
     VENDORS.length = 0;   // ใช้ Vendor/Factory จากไฟล์ Lead Time แทน
     const ltMatched = mergeLeadTime();   // รวม Lead Time (โรงงาน+เรือ) + Vendor/Factory + รหัสลูกค้า
+    const freshOH = applyFreshOnHand();  // ทับยอดคงเหลือ+รายคลังด้วยค่าสดจาก Power Automate (ถ้ามี bc-onhand.js)
     const ileMatched = mergeILE();       // รวม on-hand จริง + อัตราขายจริง จาก Item Ledger Entries
     const poMatched = mergePO();         // รวม PO ค้างรับจริง
     mergeCust();                          // รวม Top ลูกค้าต่อสินค้า
