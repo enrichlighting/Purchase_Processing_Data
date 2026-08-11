@@ -222,7 +222,10 @@
       <h1>ระบบวิเคราะห์สต๊อก &amp; วางแผนสั่งซื้อ</h1>
       <div class="sub">RICHEST SUPP CO., LTD · ข้อมูลจาก Item Ledger Entries + Purchase Orders</div>
     </div>
-    <div class="datasrc" id="datasrc">แหล่งข้อมูล: <b>ตัวอย่าง (Demo)</b> · พร้อมต่อ Business Central OData</div>
+    <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+      <div class="datasrc" id="datasrc" style="margin-left:0;">แหล่งข้อมูล: <b>ตัวอย่าง (Demo)</b> · พร้อมต่อ Business Central OData</div>
+      <div id="data-refresh" style="font-size:11px;color:var(--muted);text-align:right;line-height:1.55;"></div>
+    </div>
   </header>
 
   <div class="tabs">
@@ -6484,6 +6487,17 @@ async function loadFromBusinessCentral(){
 const vendorName = no => (VENDORS.find(v=>v.no===no)||{}).name || no || '-';
 const getItem    = no => ITEMS.find(i=>i.no===no);
 
+// วันที่ข้อมูลล่าสุด (มุมขวาบน) — สต๊อก/ยอดขายมาจากไฟล์ Item Ledger (ไม่เรียลไทม์) · รายการสินค้ามาจาก Power Automate
+function fmtThaiDate(iso){ if(!iso) return '-'; const M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; const p=String(iso).split('-'); if(p.length<3) return iso; return (+p[2])+' '+M[(+p[1])-1]+' '+p[0]; }
+function renderDataRefresh(){
+  const el=document.getElementById('data-refresh'); if(!el) return;
+  let maxLd=''; const D=window.BC_ILE||{}; for(const k in D){ const d=D[k]&&D[k].ld; if(d&&d>maxLd) maxLd=d; }
+  const isPA=(window.BC_ITEMS||[]).some(x=>x.No==='500022');   // ไฟล์เต็มจาก Power Automate จะมีรายการ non-ENRICH เช่น 500022
+  el.innerHTML =
+    `<div title="สรุปจากไฟล์ Item Ledger Entries ที่อัปโหลดล่าสุด — ครอบคลุมการเคลื่อนไหวถึงวันที่นี้ · ไม่ใช่เรียลไทม์">📦 <b>สต๊อก/ยอดขาย ณ ${fmtThaiDate(maxLd)}</b> <span style="opacity:.75;">(ไฟล์ Item Ledger · ไม่เรียลไทม์)</span></div>`
+    + `<div title="รายการสินค้า (Item Card) ดึงอัตโนมัติผ่าน Power Automate">🏷️ รายการสินค้า: <b>${isPA?'อัปเดตอัตโนมัติ (Power Automate)':'ฝังในไฟล์ (snapshot)'}</b></div>`;
+}
+
 function stockOnHand(itemNo, location){
   const it = getItem(itemNo);
   if(!location && it && it.ileReal) return it.ileOnHand;   // ยอดคงเหลือจริงจาก ledger
@@ -9167,6 +9181,7 @@ function init(){
     setBadge('แหล่งข้อมูล: <b>ตัวอย่าง (Demo)</b> · วาง bc-items.js เพื่อดึง Item Card จริง', 'demo');
   }
   fillSelects();
+  renderDataRefresh();   // แสดงวันที่ข้อมูลล่าสุด มุมขวาบน
   // เรนเดอร์เฉพาะแท็บที่เปิดอยู่ (lazy) — แท็บอื่นเรนเดอร์เมื่อคลิกครั้งแรก
   const active = (document.querySelector('.tab.active')||{}).dataset ? document.querySelector('.tab.active').dataset.tab : 'leadtime';
   renderTab(active);
