@@ -247,7 +247,7 @@
         #flow-hbar::-webkit-scrollbar-track{background:var(--bg);}
       </style>
       <h2>🗺️ Flowchart — ภาพรวมรายสินค้า</h2>
-      <p class="hint">ตารางภาพรวมทุกสินค้าในหน้าเดียว · แยกหมวดตาม Subtype (เรียงจากยอดขายสูงสุด) · เห็นครบ: ราคาตั้ง · สถานะ · <b>3 หมวดการคำนวณ</b> (①คลัง−จอง ②+จัดตู้ ③+PO+ผลิต) · คลัง → PO/DIY/ผลิต → ตู้ → ควรสั่ง · ยอดขายเป็นตัวเลขแยกปี (กางดูรายเดือนได้) · <span style="color:#2563eb;font-weight:700;">น้ำเงิน=PO</span> · <span style="color:#7c3aed;font-weight:700;">ม่วง=ตู้</span> · คลังแยกสี</p>
+      <p class="hint">ตารางภาพรวมทุกสินค้าในหน้าเดียว · แยกหมวดตาม Subtype (เรียงจากยอดขายสูงสุด) · เห็นครบ: ราคาตั้ง · สถานะ · <b>3 หมวดการคำนวณ</b> (①คลัง−จอง ②+จัดตู้ ③+PO+ผลิต) · คลัง → PO/DIY/ผลิต → ตู้ → ควรสั่ง · ยอดขายเป็นคอลัมน์เดือน-ปีเรียงไปทางขวา (ย่อ=รายปี/ขยาย=รายเดือน) · <span style="color:#2563eb;font-weight:700;">น้ำเงิน=PO</span> · <span style="color:#7c3aed;font-weight:700;">ม่วง=ตู้</span> · คลังแยกสี</p>
       <div style="margin-bottom:12px;"><input id="flow-search" type="search" autocomplete="off" placeholder="🔍 ค้นหาชื่อ/รหัสสินค้า" oninput="flowSearch(this.value)" style="width:100%;max-width:420px;box-sizing:border-box;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;"></div>
       <div id="flow-body"></div>
     </div>
@@ -9003,6 +9003,9 @@ function flowCollapseAll(){ (window.flowAllSubs||[]).forEach(s=>window.flowState
 function flowBindScroll(){
   const bar=document.getElementById('flow-hbar'); if(!bar) return;
   const tabs=[...document.querySelectorAll('#flow-body .flow-tscroll')]; if(!tabs.length) return;
+  // ตั้งความกว้างแถบเลื่อนส่วนกลาง = ความกว้างจริงของตารางที่กว้างสุด (ให้เลื่อนถึงคอลัมน์สุดท้าย)
+  let maxW=0; tabs.forEach(t=>{ const tbl=t.querySelector('table'); const w=tbl?tbl.scrollWidth:t.scrollWidth; if(w>maxW) maxW=w; });
+  const inner=bar.firstElementChild; if(inner) inner.style.width=Math.max(maxW,1)+'px';
   let lock=false;
   const setAll=x=>tabs.forEach(t=>{ if(Math.abs(t.scrollLeft-x)>1) t.scrollLeft=x; });
   bar.onscroll=()=>{ if(lock)return; lock=true; setAll(bar.scrollLeft); lock=false; };
@@ -9024,20 +9027,24 @@ function flowSales(it){
   const ytot=Object.values(qmap).reduce((s,q)=>s+q,0);
   return `<div style="margin:6px 0 10px;"><div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:6px;"><span style="font-size:11.5px;font-weight:700;">📊 ยอดขายรายเดือน</span> ${yBtns} <span class="muted" style="font-size:10.5px;">รวมปี ${selY}: ${fmtNum(ytot)} ${it.uom}</span></div><div style="display:flex;align-items:flex-end;gap:2px;height:74px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;">${bars}</div></div>`;
 }
-// ยอดขายเป็น "ตัวเลข" แยกปี · กางดูรายเดือนได้ทีเดียวทุกรายการ (window.flowMonExpand)
+// ยอดขายเป็น "คอลัมน์เดือน-ปี" เรียงไปทางขวา · ย่อ=รวมรายปี / ขยาย=รายเดือน (window.flowMonExpand)
 function flowToggleMon(){ window.flowMonExpand=!window.flowMonExpand; renderFlowchart(); }
-function flowSalesNum(it){
-  const mon=it.monthly||[]; if(!mon.length) return '<span class="muted" style="font-size:10px;">—</span>';
-  const MN=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-  const byY={}; mon.forEach(m=>{ const y=m[0].slice(0,4); (byY[y]=byY[y]||{})[+m[0].slice(5,7)]=m[1]; });
-  const years=Object.keys(byY).sort().reverse();
-  const exp=!!window.flowMonExpand; let h='';
-  years.forEach(y=>{
-    const tot=Object.values(byY[y]).reduce((s,q)=>s+q,0);
-    h+=`<div style="${exp?'margin-bottom:5px;':'white-space:nowrap;'}"><span style="display:inline-block;min-width:24px;font-size:10.5px;color:var(--muted);">'${y.slice(2)}</span> <b style="font-size:11.5px;color:#ea580c;">${fmtNum(tot)}</b>`;
-    if(exp){ const parts=[]; for(let m=1;m<=12;m++){ const qq=byY[y][m]; if(qq) parts.push(`<span style="font-size:9px;color:#94a3b8;">${MN[m-1]}</span> <b style="font-size:10px;color:#334155;">${fmtNum(qq)}</b>`); }
-      h+=`<div style="margin:2px 0 0;line-height:1.75;white-space:normal;max-width:250px;">${parts.join(' &nbsp; ')}</div>`; }
-    h+=`</div>`;
+const FLOW_MN=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+function flowSalesCols(items){
+  const set=new Set(); items.forEach(it=>(it.monthly||[]).forEach(m=>set.add(m[0])));
+  const yms=[...set].sort();
+  if(window.flowMonExpand) return yms.map(k=>({t:'m',k}));                 // ขยาย = 1 คอลัมน์/เดือน
+  const years=[...new Set(yms.map(s=>s.slice(0,4)))].sort();
+  return years.map(k=>({t:'y',k}));                                       // ย่อ = 1 คอลัมน์/ปี (รวม)
+}
+function flowSalesHead(c){ return c.t==='y' ? ("รวม '"+c.k.slice(2,4)) : (FLOW_MN[(+c.k.slice(5,7))-1]+"-"+c.k.slice(2,4)); }
+function flowSalesCellsHtml(it, salesCols){
+  const smap = it._monMap || (it._monMap=Object.fromEntries((it.monthly||[]).map(m=>[m[0],m[1]])));
+  let h='';
+  (salesCols||[]).forEach(c=>{
+    let v; if(c.t==='y'){ v=0; (it.monthly||[]).forEach(m=>{ if(m[0].slice(0,4)===c.k) v+=m[1]; }); } else v=smap[c.k]||0;
+    const yr=c.t==='y';
+    h+=`<td style="padding:6px 9px;text-align:right;white-space:nowrap;font-size:${yr?'11.5px':'11px'};background:#fff9f3;border-left:1px solid #fde6cf;${v?(yr?'color:#c2410c;font-weight:800;':'color:#ea580c;'):'color:#e2e8f0;'}">${v?fmtNum(v):'·'}</td>`;
   });
   return h;
 }
@@ -9047,7 +9054,7 @@ function flowCatCell(num, mo, hiStyle){
   return `<td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;"><b style="font-size:13px;">${fmtNum(num)}</b><div style="margin-top:3px;"><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;${hiStyle}">${moTxt}</span></div></td>`;
 }
 // หนึ่งแถวสินค้า = คอลัมน์เรียงข้าง (เห็นทุกอย่างโดยไม่ต้องคลิก) · คลิกเพื่อกางกราฟยอดขายเต็ม
-function flowItemRow(it, basis, grp){
+function flowItemRow(it, basis, grp, salesCols){
   const rc=(typeof reorderCalc==='function')?reorderCalc(it, basis, grp):{statusKey:'noneed',suggestQty:0,cov3mo:Infinity,onHand:0,incoming:0,packed:0,production:0,poDiy:0,c1:0,c2:0,c3:0,dos1:Infinity,dos2:Infinity};
   const st=FLOW_ST[rc.statusKey]||FLOW_ST.noneed;
   const iOpen=!!window.flowState.item[it.no];
@@ -9062,8 +9069,9 @@ function flowItemRow(it, basis, grp){
   const poChips=pos.map(p=>flowChip(p[0]+' ค้าง '+fmtNum(p[1]), '#eaf1ff', '#2563eb', (p[3]||'')+(p[2]?' · ETA '+p[2]:''))).join('')||(rc.incoming>0?'':'<span class="muted" style="font-size:10px;">—</span>');
   let tuArr=[]; (window.pkLog||[]).forEach(s=>{ if(s.mode!=='released')return; (s.rows||[]).forEach(r=>{ if(r.item!==it.no)return; (r.per||[]).forEach((per,ci)=>{ if(per&&per.pcs>0){ const ct=(s.containers||[])[ci]||{}; tuArr.push(flowChip((ct.name||'ตู้')+' '+fmtNum(per.pcs), '#ede9fe', '#7c3aed', 'จัดตู้ '+(ct.name||''))); } }); }); });
   const tuChips=tuArr.join('')||'<span class="muted" style="font-size:10px;">—</span>';
+  const stickyBg = iOpen?'#f3f6fb':'var(--card)';   // ตรึงคอลัมน์ชื่อสินค้าไว้ซ้าย (ต้องมีพื้นทึบ)
   const tr=`<tr onclick="flowToggleItem('${it.no}')" style="cursor:pointer;border-top:1px solid var(--line);${iOpen?'background:var(--bg);':''}">
-    <td style="padding:7px 10px;white-space:nowrap;vertical-align:top;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st.c};margin-right:6px;"></span><b style="font-size:12px;">${flowShort(it.no)}</b> <span class="muted" style="font-size:9px;">${iOpen?'▼':'▶'}</span></td>
+    <td style="padding:7px 10px;white-space:nowrap;vertical-align:top;position:sticky;left:0;z-index:2;background:${stickyBg};box-shadow:2px 0 4px -2px rgba(0,0,0,.18);min-width:150px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st.c};margin-right:6px;"></span><b style="font-size:12px;">${flowShort(it.no)}</b> <span class="muted" style="font-size:9px;">${iOpen?'▼':'▶'}</span></td>
     <td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;font-size:12px;">${priceTxt}</td>
     <td style="padding:7px 8px;vertical-align:top;"><span style="font-size:10.5px;font-weight:700;color:${st.c};background:${st.bg};padding:2px 7px;border-radius:5px;white-space:nowrap;">${st.t}</span></td>
     ${flowCatCell(rc.c1, mo1, 'color:var(--muted);')}
@@ -9074,10 +9082,11 @@ function flowItemRow(it, basis, grp){
     <td style="padding:7px 8px;font-size:10px;white-space:nowrap;vertical-align:top;line-height:1.7;">🎁 <b style="color:#d97706">${fmtNum(rc.poDiy)}</b><br>🔧 <b>${fmtNum(rc.production)}</b><br>📦 <b>${fmtNum(rc.packed)}</b></td>
     <td style="padding:7px 10px;vertical-align:top;">${tuChips}</td>
     <td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;"><b style="font-size:16px;color:${rc.suggestQty>0?'var(--brand)':'var(--good)'}">${fmtNum(rc.suggestQty)}</b> <span class="muted" style="font-size:9px;">${it.uom}</span></td>
-    <td style="padding:7px 10px;vertical-align:top;min-width:110px;">${flowSalesNum(it)}</td>
+    ${flowSalesCellsHtml(it, salesCols)}
   </tr>`;
   if(!iOpen) return tr;
-  const detail=`<tr><td colspan="12" style="padding:4px 16px 14px;background:var(--bg);border-top:1px dashed var(--line);">${flowSales(it)}<div style="text-align:right;margin-top:4px;"><a href="#" onclick="event.stopPropagation();openLeadtime('${it.no}');return false;" style="font-size:11.5px;color:var(--brand);font-weight:700;">→ เปิดหน้าวางแผนสั่งซื้อ</a></div></td></tr>`;
+  const totalCols = 11 + ((salesCols&&salesCols.length)||0);
+  const detail=`<tr><td colspan="${totalCols}" style="padding:4px 16px 14px;background:var(--bg);border-top:1px dashed var(--line);">${flowSales(it)}<div style="text-align:right;margin-top:4px;"><a href="#" onclick="event.stopPropagation();openLeadtime('${it.no}');return false;" style="font-size:11.5px;color:var(--brand);font-weight:700;">→ เปิดหน้าวางแผนสั่งซื้อ</a></div></td></tr>`;
   return tr+detail;
 }
 function renderFlowchart(){
@@ -9090,17 +9099,21 @@ function renderFlowchart(){
   // เรียงหมวดจากยอดขายรวม 1 ปี (s365) มาก→น้อย
   const gsalesOf=arr=>arr.reduce((s,i)=>s+(i.s365||0),0);
   const gkeys=Object.keys(groups).sort((a,b)=> gsalesOf(groups[b])-gsalesOf(groups[a]) || (a<b?-1:1));
-  // 12 คอลัมน์ · จัดชิดขวา: ราคาตั้ง(1) หมวด①②③(3,4,5) ควรสั่ง(10)
-  const TH=['สินค้า','ราคาตั้ง','สถานะ','หมวด① คลัง−จอง','หมวด② +จัดตู้','หมวด③ +PO+ผลิต','คงเหลือ (แยกคลัง)','PO ค้างรับ','DIY/ผลิต/ตู้แล้ว','ตู้ (Container)','ควรสั่งเพิ่ม','ยอดขาย (ปี/เดือน)'];
+  // 11 คอลัมน์คงที่ + คอลัมน์ยอดขาย (เดือน-ปี) เรียงไปทางขวา · จัดชิดขวา: ราคาตั้ง(1) หมวด①②③(3,4,5) ควรสั่ง(10)
+  const salesCols = flowSalesCols(items);
+  const TH=['สินค้า','ราคาตั้ง','สถานะ','หมวด① คลัง−จอง','หมวด② +จัดตู้','หมวด③ +PO+ผลิต','คงเหลือ (แยกคลัง)','PO ค้างรับ','DIY/ผลิต/ตู้แล้ว','ตู้ (Container)','ควรสั่งเพิ่ม'];
   const RIGHT={1:1,3:1,4:1,5:1,10:1};
+  const fixedTh = TH.map((h,i)=>`<th style="padding:7px 10px;text-align:${RIGHT[i]?'right':'left'};font-size:10.5px;color:var(--muted);white-space:nowrap;border-bottom:2px solid var(--line);${i===0?'position:sticky;left:0;z-index:3;background:var(--bg);box-shadow:2px 0 4px -2px rgba(0,0,0,.18);min-width:150px;':''}">${h}</th>`).join('');
+  const salesTh = salesCols.map(c=>`<th style="padding:7px 9px;text-align:right;font-size:10px;color:#c2410c;white-space:nowrap;border-bottom:2px solid var(--line);border-left:1px solid #fde6cf;background:#fff4ea;">${flowSalesHead(c)}</th>`).join('');
+  const theadHtml = `<thead><tr style="background:var(--bg);">${fixedTh}${salesTh}</tr></thead>`;
   window.flowAllSubs = gkeys.slice();   // สำหรับปุ่มย่อ/ขยายทุกหมวด
   let html='', anyOpen=false;
   html+=`<div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
     <button onclick="flowExpandAll()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--brand);background:var(--card);color:var(--brand);">▼ ขยายทุกหมวด</button>
     <button onclick="flowCollapseAll()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--muted);">▶ ย่อทุกหมวด</button>
     <span style="width:1px;height:20px;background:var(--line);"></span>
-    <button onclick="flowToggleMon()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--brand);background:${window.flowMonExpand?'var(--brand)':'var(--card)'};color:${window.flowMonExpand?'#fff':'var(--brand)'};">${window.flowMonExpand?'🔽 ซ่อนยอดขายรายเดือน':'▶️ กางยอดขายรายเดือน'}</button>
-    <span class="muted" style="font-size:11px;">คอลัมน์ "ยอดขาย" แสดงเป็นตัวเลขแยกปี · กางดูรายเดือนพร้อมกันทุกรายการ</span>
+    <button onclick="flowToggleMon()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #ea580c;background:${window.flowMonExpand?'#ea580c':'var(--card)'};color:${window.flowMonExpand?'#fff':'#ea580c'};">${window.flowMonExpand?'🔽 ย่อยอดขายเป็นรายปี':'▶️ กางยอดขายรายเดือน (คอลัมน์)'}</button>
+    <span class="muted" style="font-size:11px;">ยอดขายเป็นคอลัมน์เดือน-ปีเรียงไปทางขวา · เลื่อน scrollbar ล่างเพื่อดู · ชื่อสินค้าตรึงซ้ายไว้</span>
   </div>`;
   gkeys.forEach(sub=>{
     const arr=groups[sub].sort((a,b)=>(b.s365||0)-(a.s365||0) || (a.no<b.no?-1:1));
@@ -9111,8 +9124,8 @@ function renderFlowchart(){
       <div onclick="flowToggleSub(this)" data-sub="${encodeURIComponent(sub)}" style="cursor:pointer;padding:11px 16px;background:var(--brand-soft);font-weight:800;font-size:13.5px;user-select:none;">${sOpen?'▼':'▶'} 🏷️ ${sub} <span class="muted" style="font-weight:400;font-size:11px;">(${arr.length} รายการ · ขาย 1 ปี ${fmtNum(gsales)})</span></div>`;
     if(sOpen){
       html+=`<div class="flow-tscroll"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1180px;">
-        <thead><tr style="background:var(--bg);">${TH.map((h,i)=>`<th style="padding:7px 10px;text-align:${RIGHT[i]?'right':'left'};font-size:10.5px;color:var(--muted);white-space:nowrap;border-bottom:2px solid var(--line);">${h}</th>`).join('')}</tr></thead>
-        <tbody>${arr.map(it=>flowItemRow(it, basis, grp)).join('')}</tbody></table></div>`;
+        ${theadHtml}
+        <tbody>${arr.map(it=>flowItemRow(it, basis, grp, salesCols)).join('')}</tbody></table></div>`;
     }
     html+='</div>';
   });
