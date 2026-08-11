@@ -236,7 +236,7 @@
   <div class="page active" id="page-flowchart">
     <div class="card">
       <h2>🗺️ Flowchart — ภาพรวมรายสินค้า</h2>
-      <p class="hint">รายการสินค้าแยกตาม Subtype · กดขยายเพื่อดูยอดขายรายเดือน–ปี และเส้นทาง: คลัง → PO/DIY/ผลิต → ตู้ → สถานะควรสั่ง · <span style="color:#2563eb;font-weight:700;">น้ำเงิน=PO</span> · <span style="color:#7c3aed;font-weight:700;">ม่วง=ตู้</span> · คลังแยกสี</p>
+      <p class="hint">ตารางภาพรวมทุกสินค้าในหน้าเดียว · แยกหมวดตาม Subtype (เรียงจากยอดขายสูงสุด) · แต่ละแถวเห็นครบ: สถานะ · อยู่ได้ · คลัง → PO/DIY/ผลิต → ตู้ → ควรสั่ง + มินิกราฟยอดขาย · คลิกแถวเพื่อกางกราฟรายเดือนเต็ม · <span style="color:#2563eb;font-weight:700;">น้ำเงิน=PO</span> · <span style="color:#7c3aed;font-weight:700;">ม่วง=ตู้</span> · คลังแยกสี</p>
       <div style="margin-bottom:12px;"><input id="flow-search" type="search" autocomplete="off" placeholder="🔍 ค้นหาชื่อ/รหัสสินค้า" oninput="flowSearch(this.value)" style="width:100%;max-width:420px;box-sizing:border-box;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;"></div>
       <div id="flow-body"></div>
     </div>
@@ -8938,7 +8938,7 @@ function flowWhColor(w){ return FLOW_WH_COLORS[w]||'#64748b'; }
 const FLOW_ST={red:{t:'🔴 ควรสั่งซื้อ',c:'#dc2626',bg:'#fdeaea'},warn:{t:'⏰ ใกล้ถึงจุดสั่ง',c:'#b45309',bg:'#fdf1e0'},watch:{t:'👀 เฝ้าระวัง',c:'#a16207',bg:'#fef9c3'},noneed:{t:'🟢 ยังไม่ต้องสั่ง',c:'#16a34a',bg:'#e7f6ec'}};
 function flowShort(no){ if(typeof pkDisplayName==='function'){ const s=pkDisplayName(no); if(s && s!==no) return s; } const g=(typeof getItem==='function')?getItem(no):null; return g?(typeof pkShortName==='function'?pkShortName(g.desc, (window.BC_PACKING&&window.BC_PACKING[no]||{}).model):g.desc):no; }
 function flowSearch(v){ window.flowQuery=String(v||''); renderFlowchart(); }
-function flowToggleSub(el){ const s=decodeURIComponent(el.getAttribute('data-sub')); window.flowState.sub[s]=!window.flowState.sub[s]; renderFlowchart(); }
+function flowToggleSub(el){ const s=decodeURIComponent(el.getAttribute('data-sub')); const open=window.flowState.sub[s]!==false; window.flowState.sub[s]=!open; renderFlowchart(); }
 function flowToggleItem(c){ window.flowState.item[c]=!window.flowState.item[c]; renderFlowchart(); }
 function flowSetYear(c,y){ window.flowState.year[c]=y; renderFlowchart(); }
 function flowChip(txt,bg,fg,title){ return `<span title="${(title||'').replace(/"/g,'&quot;')}" style="display:inline-block;background:${bg};color:${fg};border:1px solid ${fg}44;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700;margin:2px 3px 2px 0;white-space:nowrap;">${txt}</span>`; }
@@ -8955,51 +8955,46 @@ function flowSales(it){
   const ytot=Object.values(qmap).reduce((s,q)=>s+q,0);
   return `<div style="margin:6px 0 10px;"><div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:6px;"><span style="font-size:11.5px;font-weight:700;">📊 ยอดขายรายเดือน</span> ${yBtns} <span class="muted" style="font-size:10.5px;">รวมปี ${selY}: ${fmtNum(ytot)} ${it.uom}</span></div><div style="display:flex;align-items:flex-end;gap:2px;height:74px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;">${bars}</div></div>`;
 }
-function flowItemHtml(it, basis, grp){
+// มินิกราฟยอดขายปีล่าสุด (แสดงในคอลัมน์ ไม่ต้องคลิก)
+function flowSpark(it){
+  const mon=it.monthly||[]; if(!mon.length) return '<span class="muted" style="font-size:10px;">—</span>';
+  const years=[...new Set(mon.map(m=>m[0].slice(0,4)))].sort(); const selY=years[years.length-1];
+  const MN=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const qmap={}; mon.forEach(m=>{ if(m[0].slice(0,4)===selY) qmap[+m[0].slice(5,7)]=m[1]; });
+  const mx=Math.max(1,...Object.values(qmap)); let bars='';
+  for(let m=1;m<=12;m++){ const q=qmap[m]||0; const h=q?Math.max(2,Math.round(q/mx*22)):1;
+    bars+=`<div title="${MN[m-1]} ${selY}: ${fmtNum(q)}" style="width:5px;height:${h}px;background:${q?'#ea580c':'var(--line)'};border-radius:1px;"></div>`; }
+  const ytot=Object.values(qmap).reduce((s,q)=>s+q,0);
+  return `<div style="display:flex;align-items:flex-end;gap:1.5px;height:24px;justify-content:flex-end;">${bars}</div><div class="muted" style="font-size:9px;margin-top:2px;text-align:right;white-space:nowrap;">'${selY.slice(2)}: <b>${fmtNum(ytot)}</b></div>`;
+}
+// หนึ่งแถวสินค้า = คอลัมน์เรียงข้าง (เห็นทุกอย่างโดยไม่ต้องคลิก) · คลิกเพื่อกางกราฟยอดขายเต็ม
+function flowItemRow(it, basis, grp){
   const rc=(typeof reorderCalc==='function')?reorderCalc(it, basis, grp):{statusKey:'noneed',suggestQty:0,cov3mo:Infinity,onHand:0,incoming:0,packed:0,production:0,poDiy:0,cat3:0};
   const st=FLOW_ST[rc.statusKey]||FLOW_ST.noneed;
   const iOpen=!!window.flowState.item[it.no];
   const moTxt=isFinite(rc.cov3mo)?fmtMo(rc.cov3mo)+' ด.':'∞';
-  const head=`<div onclick="flowToggleItem('${it.no}')" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:9px 16px;border-top:1px solid var(--line);${iOpen?'background:var(--bg);':''}">
-    <span style="font-size:10px;color:var(--muted);">${iOpen?'▼':'▶'}</span>
-    <span style="width:10px;height:10px;border-radius:50%;background:${st.c};flex:0 0 auto;"></span>
-    <b style="font-size:12.5px;flex:1;min-width:0;">${flowShort(it.no)}</b>
-    <span style="font-size:11px;font-weight:700;color:${st.c};background:${st.bg};padding:2px 8px;border-radius:6px;white-space:nowrap;">${st.t}</span>
-    <span class="muted" style="font-size:11px;white-space:nowrap;">อยู่ได้ ${moTxt}${rc.suggestQty>0?' · ควรสั่ง <b style="color:var(--brand)">'+fmtNum(rc.suggestQty)+'</b>':''}</span>
-  </div>`;
-  if(!iOpen) return head;
-  // ----- รายละเอียด: ยอดขาย + เส้นทาง -----
-  // คลัง + warehouse chips
+  const hi=(typeof pkCoverHi==='function' && isFinite(rc.cov3mo))? pkCoverHi(rc.cov3mo) : 'background:var(--bg);color:var(--muted);';
   const loc=(window.BC_ILE&&window.BC_ILE[it.no]&&window.BC_ILE[it.no].loc)||{};
-  const whChips=Object.keys(loc).sort().map(w=>flowChip(w+' '+fmtNum(loc[w]), flowWhColor(w)+'1a', flowWhColor(w), 'คลัง '+w)).join('')||'<span class="muted" style="font-size:11px;">—</span>';
-  // PO chips (น้ำเงิน)
+  const whChips=Object.keys(loc).sort().map(w=>flowChip(w+' '+fmtNum(loc[w]), flowWhColor(w)+'1a', flowWhColor(w), 'คลัง '+w)).join('')||'';
   const pos=((window.BC_PO&&window.BC_PO[it.no])||{}).pos||[];
-  const poChips=pos.map(p=>flowChip(p[0]+' · ค้าง '+fmtNum(p[1]), '#eaf1ff', '#2563eb', (p[3]||'')+(p[2]?' · ETA '+p[2]:''))).join('')||'<span class="muted" style="font-size:11px;">— ไม่มี PO ค้างรับ</span>';
-  // ตู้ chips (ม่วง) — จาก pkLog
-  let tuChips='<span class="muted" style="font-size:11px;">— ยังไม่จัดตู้</span>';
-  if(typeof itemShipStatus==='function'){ const conts=[]; (window.pkLog||[]).forEach(s=>{ if(s.mode!=='released')return; (s.rows||[]).forEach(r=>{ if(r.item!==it.no)return; (r.per||[]).forEach((per,ci)=>{ if(per&&per.pcs>0){ const ct=(s.containers||[])[ci]||{}; const key=(ct.name||'ตู้')+'|'+per.pcs; conts.push(flowChip((ct.name||'ตู้')+' · '+fmtNum(per.pcs), '#ede9fe', '#7c3aed', 'จัดตู้ '+(ct.name||''))); } }); }); });
-    if(conts.length) tuChips=conts.join(''); }
-  const flow=`<div style="padding:2px 16px 14px;">
-    ${flowSales(it)}
-    <table class="flow-table" style="width:100%;border-collapse:collapse;font-size:12.5px;">
-      <colgroup><col style="width:150px;"><col></colgroup>
-      ${flowRow('#f1f5f9','#334155','📦 คลัง (สต๊อก)',
-        '<b style="font-size:15px;">'+fmtNum(rc.onHand)+'</b> '+it.uom+' &nbsp;<span class="muted" style="font-size:11px;">แยกตามคลัง:</span><div style="margin-top:4px;">'+whChips+'</div>')}
-      ${flowRow('#eff6ff','#1e40af','🏭 PO / DIY / ผลิต',
-        '<span class="muted" style="font-size:11px;">PO ค้างรับ</span> <b style="font-size:15px;color:#2563eb;">'+fmtNum(rc.incoming)+'</b><div style="margin-top:4px;">'+poChips+'</div><div style="margin-top:6px;font-size:11.5px;border-top:1px dashed #cbd5e1;padding-top:5px;">🎁 PO DIY: <b style="color:#d97706">'+fmtNum(rc.poDiy)+'</b> &nbsp;·&nbsp; 🔧 สั่งผลิต: <b>'+fmtNum(rc.production)+'</b> &nbsp;·&nbsp; จัดตู้แล้ว: <b>'+fmtNum(rc.packed)+'</b></div>')}
-      ${flowRow('#f5f3ff','#6d28d9','🚢 ตู้ (Container)', tuChips)}
-      ${flowRow(st.bg, st.c, '🎯 สถานะ / ควรสั่ง',
-        '<span style="color:'+st.c+';font-weight:800;font-size:13px;">'+st.t+'</span> &nbsp;<span class="muted" style="font-size:11.5px;">ของรวม(หมวด3) <b>'+fmtNum(isFinite(rc.cat3)?rc.cat3:(rc.onHand||0))+'</b> · อยู่ได้ <b>'+moTxt+'</b></span><div style="margin-top:4px;font-size:13px;">ควรสั่งเพิ่ม: <b style="color:'+(rc.suggestQty>0?'var(--brand)':'var(--good)')+';font-size:17px;">'+fmtNum(rc.suggestQty)+'</b> '+it.uom+'</div>')}
-    </table>
-    <div style="text-align:right;margin-top:8px;"><a href="#" onclick="event.stopPropagation();openLeadtime('${it.no}');return false;" style="font-size:11.5px;color:var(--brand);font-weight:700;">→ เปิดหน้าวางแผนสั่งซื้อ</a></div>
-  </div>`;
-  return head+flow;
+  const poChips=pos.map(p=>flowChip(p[0]+' ค้าง '+fmtNum(p[1]), '#eaf1ff', '#2563eb', (p[3]||'')+(p[2]?' · ETA '+p[2]:''))).join('')||(rc.incoming>0?'':'<span class="muted" style="font-size:10px;">—</span>');
+  let tuArr=[]; (window.pkLog||[]).forEach(s=>{ if(s.mode!=='released')return; (s.rows||[]).forEach(r=>{ if(r.item!==it.no)return; (r.per||[]).forEach((per,ci)=>{ if(per&&per.pcs>0){ const ct=(s.containers||[])[ci]||{}; tuArr.push(flowChip((ct.name||'ตู้')+' '+fmtNum(per.pcs), '#ede9fe', '#7c3aed', 'จัดตู้ '+(ct.name||''))); } }); }); });
+  const tuChips=tuArr.join('')||'<span class="muted" style="font-size:10px;">—</span>';
+  const tr=`<tr onclick="flowToggleItem('${it.no}')" style="cursor:pointer;border-top:1px solid var(--line);${iOpen?'background:var(--bg);':''}">
+    <td style="padding:7px 10px;white-space:nowrap;vertical-align:top;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st.c};margin-right:6px;"></span><b style="font-size:12px;">${flowShort(it.no)}</b> <span class="muted" style="font-size:9px;">${iOpen?'▼':'▶'}</span></td>
+    <td style="padding:7px 8px;vertical-align:top;"><span style="font-size:10.5px;font-weight:700;color:${st.c};background:${st.bg};padding:2px 7px;border-radius:5px;white-space:nowrap;">${st.t}</span></td>
+    <td style="padding:7px 8px;text-align:center;white-space:nowrap;vertical-align:top;"><span style="font-size:12px;font-weight:800;padding:2px 8px;border-radius:6px;${hi}">${moTxt}</span></td>
+    <td style="padding:7px 10px;vertical-align:top;"><b style="font-size:13px;">${fmtNum(rc.onHand)}</b> <span class="muted" style="font-size:10px;">${it.uom}</span><div style="margin-top:2px;">${whChips}</div></td>
+    <td style="padding:7px 10px;vertical-align:top;"><b style="font-size:13px;color:#2563eb;">${fmtNum(rc.incoming)}</b><div style="margin-top:2px;">${poChips}</div></td>
+    <td style="padding:7px 8px;font-size:10px;white-space:nowrap;vertical-align:top;line-height:1.7;">🎁 <b style="color:#d97706">${fmtNum(rc.poDiy)}</b><br>🔧 <b>${fmtNum(rc.production)}</b><br>📦 <b>${fmtNum(rc.packed)}</b></td>
+    <td style="padding:7px 10px;vertical-align:top;">${tuChips}</td>
+    <td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;"><b style="font-size:16px;color:${rc.suggestQty>0?'var(--brand)':'var(--good)'}">${fmtNum(rc.suggestQty)}</b> <span class="muted" style="font-size:9px;">${it.uom}</span></td>
+    <td style="padding:7px 10px;vertical-align:top;min-width:96px;">${flowSpark(it)}</td>
+  </tr>`;
+  if(!iOpen) return tr;
+  const detail=`<tr><td colspan="9" style="padding:4px 16px 14px;background:var(--bg);border-top:1px dashed var(--line);">${flowSales(it)}<div style="text-align:right;margin-top:4px;"><a href="#" onclick="event.stopPropagation();openLeadtime('${it.no}');return false;" style="font-size:11.5px;color:var(--brand);font-weight:700;">→ เปิดหน้าวางแผนสั่งซื้อ</a></div></td></tr>`;
+  return tr+detail;
 }
-function flowRow(bg, fg, title, body){ return `<tr>
-  <td style="background:${bg};color:${fg};font-weight:800;font-size:11.5px;padding:9px 10px;border:1px solid ${fg}33;border-left:4px solid ${fg};vertical-align:top;white-space:nowrap;">${title}</td>
-  <td style="padding:9px 12px;border:1px solid var(--line);vertical-align:top;line-height:1.55;color:#334155;">${body}</td>
-</tr>`; }
-function flowBox(title, body, bg, fg){ return flowRow(bg,fg,title,body); }
 function renderFlowchart(){
   const el=document.getElementById('flow-body'); if(!el) return;
   const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180), grp=window.RGROUP||'all';
@@ -9007,13 +9002,22 @@ function renderFlowchart(){
   let items=ITEMS.filter(i=> i.ileReal || (typeof itemHasReleasedPO==='function' && itemHasReleasedPO(i)));
   if(q) items=items.filter(i=> (i.no+' '+(i.desc||'')+' '+flowShort(i.no)).toLowerCase().indexOf(q)>=0);
   const groups={}; items.forEach(i=>{ const s=(i.subType||'').trim()||'(ไม่ระบุ Subtype)'; (groups[s]=groups[s]||[]).push(i); });
+  // เรียงหมวดจากยอดขายรวม 1 ปี (s365) มาก→น้อย
+  const gsalesOf=arr=>arr.reduce((s,i)=>s+(i.s365||0),0);
+  const gkeys=Object.keys(groups).sort((a,b)=> gsalesOf(groups[b])-gsalesOf(groups[a]) || (a<b?-1:1));
+  const TH=['สินค้า','สถานะ','อยู่ได้','คงเหลือ (แยกคลัง)','PO ค้างรับ','DIY/ผลิต/ตู้แล้ว','ตู้ (Container)','ควรสั่งเพิ่ม','ยอดขาย'];
   let html='';
-  Object.keys(groups).sort().forEach(sub=>{
-    const arr=groups[sub].sort((a,b)=>a.no<b.no?-1:1);
-    const sOpen = q ? true : !!window.flowState.sub[sub];
+  gkeys.forEach(sub=>{
+    const arr=groups[sub].sort((a,b)=>(b.s365||0)-(a.s365||0) || (a.no<b.no?-1:1));
+    const gsales=gsalesOf(arr);
+    const sOpen = q ? true : (window.flowState.sub[sub]!==false);   // ค่าเริ่มต้น = เปิด (เห็นภาพรวมทันที)
     html+=`<div class="card" style="padding:0;margin-bottom:10px;overflow:hidden;">
-      <div onclick="flowToggleSub(this)" data-sub="${encodeURIComponent(sub)}" style="cursor:pointer;padding:12px 16px;background:var(--brand-soft);font-weight:800;font-size:13.5px;user-select:none;">${sOpen?'▼':'▶'} 🏷️ ${sub} <span class="muted" style="font-weight:400;font-size:11px;">(${arr.length} รายการ)</span></div>`;
-    if(sOpen) arr.forEach(it=>{ html+=flowItemHtml(it, basis, grp); });
+      <div onclick="flowToggleSub(this)" data-sub="${encodeURIComponent(sub)}" style="cursor:pointer;padding:11px 16px;background:var(--brand-soft);font-weight:800;font-size:13.5px;user-select:none;">${sOpen?'▼':'▶'} 🏷️ ${sub} <span class="muted" style="font-weight:400;font-size:11px;">(${arr.length} รายการ · ขาย 1 ปี ${fmtNum(gsales)})</span></div>`;
+    if(sOpen){
+      html+=`<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:920px;">
+        <thead><tr style="background:var(--bg);">${TH.map((h,i)=>`<th style="padding:7px 10px;text-align:${i===7||i===8?'right':(i===2?'center':'left')};font-size:10.5px;color:var(--muted);white-space:nowrap;border-bottom:2px solid var(--line);">${h}</th>`).join('')}</tr></thead>
+        <tbody>${arr.map(it=>flowItemRow(it, basis, grp)).join('')}</tbody></table></div>`;
+    }
     html+='</div>';
   });
   el.innerHTML = html || '<div class="empty">ไม่พบสินค้า</div>';
