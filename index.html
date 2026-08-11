@@ -8481,7 +8481,11 @@ function poFI(po,item){ let f=window.poFollow[po]; if(!f||!f.items){ f=window.po
 window.poSelected = window.poSelected || '';
 function poSelectPO(po){ window.poSelected=po; renderPoFollow(); }
 // ผู้ขายของ PO (จาก BC_PO) + toggle กลุ่ม Vendor ในลิสท์พร้อมจัดตู้ / รายการ Lead Time
-function poVendorOf(po){ if(!window._poVendCache){ const m={}; if(window.BC_PO){ for(const it in window.BC_PO){ (window.BC_PO[it].pos||[]).forEach(p=>{ if(!m[p[0]]) m[p[0]]=p[3]||''; }); } } window._poVendCache=m; } return window._poVendCache[po]||'(ไม่ระบุผู้ขาย)'; }
+function poVendorOf(po){
+  if(!window._poVendCache){ const m={}; if(window.BC_PO){ for(const it in window.BC_PO){ (window.BC_PO[it].pos||[]).forEach(p=>{ const k=p[0]; if(!(k in m)) m[k]=''; if(!m[k] && (p[3]||'').trim()) m[k]=p[3]; }); } } window._poVendCache=m; }
+  if(!(po in window._poVendCache)) return '✅ PO ปิด/รับของแล้ว';   // ไม่อยู่ใน BC_PO = ปิด/รับของเข้าไปแล้ว
+  return window._poVendCache[po] || '(ไม่ระบุผู้ขาย)';
+}
 function poReadyToggleVend(el){ const v=decodeURIComponent(el.getAttribute('data-v')); window.poReadyVendOpen=window.poReadyVendOpen||{}; window.poReadyVendOpen[v]=!window.poReadyVendOpen[v]; renderPoFollow(); }
 function poTrkToggleVend(el){ const v=decodeURIComponent(el.getAttribute('data-v')); window.poTrkVendOpen=window.poTrkVendOpen||{}; window.poTrkVendOpen[v]=!window.poTrkVendOpen[v]; const c=document.getElementById('po-trk-rows'); if(c) c.innerHTML=poTrkRowsHtml(); }
 function poToggleVendorIdx(i){ const v=(window._poVendList||[])[i]; if(v==null) return; window.poVendorExpanded=(window.poVendorExpanded===v)?null:v; renderPoFollow(); }
