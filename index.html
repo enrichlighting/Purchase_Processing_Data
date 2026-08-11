@@ -7584,7 +7584,7 @@ function renderUrgent(){
       const xBtn=(row.mkey==='red'||row.mkey==='warn'||row.mkey==='watch') ? ` <a href="#" title="ระงับการสั่งซื้อสินค้านี้" style="color:var(--bad);font-weight:800;text-decoration:none;font-size:15px;" onclick="event.stopPropagation();urgentSuspend('${it.no}');return false;">✕</a>` : '';
       const statusCell = (row.mkey==='prep')
         ? `<span class="tag" style="background:#ede9fe;color:#6d28d9;">🗂️ เตรียมเปิด PO</span> <a href="#" title="นำออกจากลิสท์เตรียมเปิด PO" style="color:var(--bad);text-decoration:none;font-size:12px;" onclick="event.stopPropagation();planUnprep('${it.no}');return false;">✕ นำออก</a>`
-        : `${itemMergedStatusTag(it.no, tagOf(row.status))}${xBtn}${(function(){ const si=itemShipStatus(it.no); return si?`<div style="margin-top:6px;border-top:1px dashed var(--line);padding-top:5px;"><span style="font-size:10px;font-weight:700;color:var(--muted);">🚚 ${si.contName} · การขนส่ง</span>${pkShipStatusHtml(si.dates)}</div>`:''; })()}`;
+        : `${itemMergedStatusTag(it.no, tagOf(row.status))}${xBtn}${(function(){ const rr=itemRecentReceive(it.no); return rr?`<div style="margin-top:4px;font-size:10.5px;font-weight:700;color:#059669;" title="คลังรับของเข้าครบแล้ว (PO ไม่มีค้างรับ) · ข้อความนี้จะหายเองหลัง 7 วัน">📥 รับของเข้าล่าสุด ${fmtDate(new Date(rr.date))}</div>`:''; })()}${(function(){ const si=itemShipStatus(it.no); return si?`<div style="margin-top:6px;border-top:1px dashed var(--line);padding-top:5px;"><span style="font-size:10px;font-weight:700;color:var(--muted);">🚚 ${si.contName} · การขนส่ง</span>${pkShipStatusHtml(si.dates)}</div>`:''; })()}`;
       html += `<tr style="cursor:pointer" onclick="openLeadtime('${it.no}')">
         <td><b>${idx+1}</b></td>
         <td style="min-width:150px;">${statusCell}</td>
@@ -7730,19 +7730,48 @@ function pkSetItem(i, v){
 }
 function pkSetFx(){ renderPacking(); }
 /* ===== dropdown แบบพิมพ์ค้นหาได้ (datalist) สำหรับ Item + LOT ในหน้า Packing ===== */
+// ชื่อสินค้าเต็มของรหัส (จาก BC_PACKING หรือ ITEMS)
+function pkFullDesc(code){ const d=pkItem(code); let desc=d?(d.desc||''):''; if(!desc && typeof getItem==='function'){ const g=getItem(code); if(g) desc=g.desc||''; } return desc; }
+// ย่อชื่อสินค้า -> ชื่อรุ่น + จำนวนw + แสง + ขนาด
+function pkShortName(desc){
+  if(!desc) return '';
+  let s=String(desc).replace(/\s+/g,' ').trim().replace(/^ENRICH\s*/i,'');
+  const parts=[];
+  let m=s.match(/รุ่น\s+([A-Za-z0-9฀-๿\+\-\.\s]*?)(?=\s*\d+(?:\.\d+)?\s*[wW]\b|\s*แสง|\s*ขนาด|\s*\d+\s*[x*×]|,|\(|$)/);
+  let model = m ? m[1].trim() : '';
+  if(!model){ const stop=/^(LED|PANEL|BULB|TUBE|DRIVER|LIFUD|STAINLESS|STEEL|SCREW|HIGH|BAY|HIGHBAY|FLOOD|FLOODLIGHT|DOWN|DOWNLIGHT|LIGHT|SMD|COB|SPOT|TRACK|CEILING|ENRICH|AC|DC|IP|CDL|WW|DL|NW|CW|CCT|RGB)$/i; const toks=s.match(/\b[A-Z][A-Za-z]{2,}\b/g)||[]; const mm=toks.find(t=>!stop.test(t)); if(mm) model=mm; }
+  if(model) parts.push(model);
+  const w=s.match(/(\d+(?:\.\d+)?)\s*[wW]\b/); if(w) parts.push(w[1]+'w');
+  const light=s.match(/แสง\S+/) || s.match(/(\d{3,4})\s*[kK]\b/) || s.match(/\b(CDL|WW|DL|NW|CW)\b/);
+  if(light) parts.push((light[1]?light[1]+'K':light[0]).replace(/\s+/g,''));
+  const size=s.match(/(\d+\s*[x*×]\s*\d+(?:\s*[x*×]\s*\d+)?\s*(?:cm|มม\.?|ซม\.?)?)/i);
+  if(size) parts.push(size[1].replace(/\s+/g,''));
+  return parts.filter(Boolean).join(' ').trim() || s;
+}
+function pkDisplayName(code){ return pkShortName(pkFullDesc(code)) || code; }
 function pkItemDatalist(){
   const set=new Set(Object.keys(window.BC_PACKING||{}));
-  // โหมด Released: รวมสินค้าที่มี PO Released ด้วย (แม้ยังไม่มีมิติกล่องในระบบ)
   if(window.pkMode==='released' && window.BC_PO){ for(const it in window.BC_PO){ if((window.BC_PO[it].pos||[]).some(p=>p[4]==='Released')) set.add(it); } }
   const keys=[...set].sort();
-  return '<datalist id="pk-itemdl">'+keys.map(k=>{ const d=window.BC_PACKING&&window.BC_PACKING[k]; const nm=d?(d.desc||''):(((typeof getItem==='function')&&getItem(k))?(getItem(k).desc||''):''); return `<option value="${(k+' — '+nm).replace(/"/g,'&quot;')}"></option>`; }).join('')+'</datalist>';
+  const nc={}; const opts=[];
+  keys.forEach(k=>{ let nm=pkDisplayName(k)||k; let key=nm.toLowerCase();
+    if(nc[key]!=null && nc[key]!==k){ let n=2; while(nc[(nm+' ·'+n).toLowerCase()]!=null) n++; nm=nm+' ·'+n; key=nm.toLowerCase(); }
+    nc[key]=k; opts.push(`<option value="${nm.replace(/"/g,'&quot;')}"></option>`);
+  });
+  window.pkNameCode=nc;
+  return '<datalist id="pk-itemdl">'+opts.join('')+'</datalist>';
 }
-function pkItemLabel(code){ if(!code) return ''; const d=pkItem(code); let desc=d?(d.desc||''):''; if(!desc && typeof getItem==='function'){ const g=getItem(code); if(g) desc=g.desc||''; } return code+(desc?(' — '+desc):''); }
-function pkPickItem(i, v){ v=String(v||'').trim(); const code=v.split(' — ')[0].trim(); if(!code){ pkSetItem(i,''); return; }
+function pkItemLabel(code){ return code? pkDisplayName(code) : ''; }   // แสดงชื่อย่อ ไม่โชว์รหัส
+function pkPickItem(i, v){ v=String(v||'').trim(); if(!v){ pkSetItem(i,''); return; }
+  const nc=window.pkNameCode||{}; const q=v.toLowerCase(); let code=null;
+  if(nc[q]!=null) code=nc[q];
+  if(!code && / — /.test(v)){ const c=v.split(' — ')[0].trim(); if(window.BC_PACKING&&window.BC_PACKING[c]) code=c; }   // เผื่อรูปแบบเก่า
+  if(!code && window.BC_PACKING && window.BC_PACKING[v]) code=v;   // พิมพ์รหัสตรงๆ
+  if(!code){ const cands=Object.keys(nc).filter(key=>key.indexOf(q)>=0); if(cands.length) code=nc[cands[0]]; }
+  if(!code){ pkToast('ไม่พบสินค้า — เลือกจากรายการที่ระบบแนะนำ','bad'); return; }
   if(window.BC_PACKING && window.BC_PACKING[code]){ pkSetItem(i, code); return; }
-  // ไม่มีมิติกล่องในระบบ แต่มี PO Released → อนุญาต (กรอกมิติเอง) · ผูกกับ PO/Lot ปกติ
   if(itemHasReleasedPO(code)){ pkEnsureDims(code); pkSetItem(i, code); return; }
-  pkToast('ไม่พบสินค้า — เลือกจากรายการที่ระบบแนะนำ','bad');
+  pkToast('ไม่พบสินค้า','bad');
 }
 function pkLotLabelOf(e){ return (window.pkMode==='released') ? `${e.po} · ${e.lot} · ค้าง ${fmtNum(e.out)} · ¥${e.rmb}` : `${e.lot} · ¥${e.rmb}`; }
 function pkPickLot(i, v){
@@ -7817,7 +7846,7 @@ function renderContainers(){
   let boxes='';
   window.pkContainers.forEach((ct,c)=>{
     let used=0, parts=[];
-    window.packingRows.forEach((r,i)=>{ const cc=pkCell(r.item, (r.loads||[])[c]); if(cc.cbm>0){ const d=pkItem(r.item); const cellLot=(window.pkMode==='released')?(pkRowCost(r).lot||''):((r.lots||[])[c]||''); parts.push({i,cbm:cc.cbm,code:r.item||('แถว '+(i+1)),name:d?d.desc:('แถว '+(i+1)),lot:cellLot}); used+=cc.cbm; } });
+    window.packingRows.forEach((r,i)=>{ const cc=pkCell(r.item, (r.loads||[])[c]); if(cc.cbm>0){ const d=pkItem(r.item); const cellLot=(window.pkMode==='released')?(pkRowCost(r).lot||''):((r.lots||[])[c]||''); parts.push({i,cbm:cc.cbm,code:(pkDisplayName(r.item)||('แถว '+(i+1))),name:d?d.desc:('แถว '+(i+1)),lot:cellLot}); used+=cc.cbm; } });
     grand+=used;
     const pct=Math.round(used/CAP*100), over=used>CAP+1e-9;
     // สเกล: โหมด cap เทียบความจุตู้ (เห็นว่าเต็มแค่ไหน) · โหมด fill เทียบยอดที่โหลด (เห็นสัดส่วนสินค้าชัดแม้ CBM น้อย)
@@ -8418,6 +8447,19 @@ function itemShipStatus(itemNo){
 }
 // คีย์สถานะขนส่งของสินค้า (สำหรับปุ่มกรองหมวดขนส่ง) — null ถ้ายังไม่จัดตู้
 function itemShipKey(itemNo){ const si=itemShipStatus(itemNo); if(!si) return null; const st=pkShipStage(si.dates); return st<0?'ship_wait':(['ship_load','ship_cls','ship_sail','ship_th','ship_wh'][st]||null); }
+// รับของเข้าคลังล่าสุด: ตู้ที่ "ถึงคลังแล้ว" (arrWh) + PO นั้นไม่มีค้างรับแล้ว (รับเข้าครบ) · คืนวันที่ถ้ายังอยู่ในกรอบ 7 วัน
+function itemRecentReceive(itemNo){
+  const L=window.pkLog||[]; let latest=null;
+  L.forEach(s=>{ if(s.mode!=='released') return; (s.rows||[]).forEach(r=>{ if(r.item!==itemNo || !r.po) return;
+    const rel=(window.BC_POREL&&window.BC_POREL[itemNo])||[]; const stillOut=rel.some(e=>e[0]===r.po && (+e[3]||0)>0);
+    if(stillOut) return;   // PO ยังมีค้างรับ = ยังไม่รับเข้าครบ
+    (s.containers||[]).forEach((ct,ci)=>{ const per=(r.per||[])[ci]; if(!per||!(per.pcs>0)) return; const wh=ct.dates&&ct.dates.arrWh; if(wh && (!latest||wh>latest)) latest=wh; });
+  }); });
+  if(!latest) return null;
+  const days=Math.floor((new Date(poToday())-new Date(latest))/DAY);
+  if(days<0 || days>7) return null;   // ปรากฏ 0–7 วันหลังรับ แล้วหายอัตโนมัติ
+  return {date:latest, days};
+}
 // แถบความคืบหน้าสถานะ PO (ผลิต → จัดตู้) + ต่อด้วยสถานะขนส่งถ้าจัดตู้แล้ว
 const PO_STAGES=[
   {label:'Lead Time', color:'#64748b'},
