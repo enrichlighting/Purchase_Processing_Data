@@ -7534,7 +7534,7 @@ function renderUrgent(){
     return sort.dir==='asc' ? d : -d;
   });
   const cols = [
-    {label:'อันดับ'}, {label:'สถานะ'}, {label:'รหัส · Subtype'},
+    {label:'อันดับ'}, {label:'สถานะ'}, {label:'รหัส · ชื่อสินค้า'},
     {key:'onHand',label:'คงเหลือ'}, {key:'paidDaily',label:'ขายจริง (วัน · เดือน)'}, {key:'dosPaid',label:'อยู่ได้ (วัน · เดือน)'},
     {key:'incoming',label:'PO เข้า'}, {key:'suggestQty',label:'ควรสั่ง'}, {label:'ควรสั่ง → อยู่ได้ (วัน · เดือน)'}
   ];
@@ -7556,7 +7556,7 @@ function renderUrgent(){
         html += `<tr style="cursor:pointer;background:var(--bg);" onclick="openLeadtime('${it.no}')">
           <td><b>${idx+1}</b></td>
           <td style="min-width:150px;"><span class="tag" style="background:#e5e7eb;color:#374151;">⛔ ระงับการสั่งซื้อ</span><br><a href="#" style="font-size:11px;" onclick="event.stopPropagation();urgentUnsuspend('${it.no}');return false;">↩ นำกลับมาคำนวณ</a></td>
-          <td style="white-space:normal;min-width:180px;"><b>${it.no}</b> <span class="muted">${it.subType||'-'}</span></td>
+          <td style="white-space:normal;min-width:180px;"><b>${it.no}</b> <span class="muted">${it.desc}</span></td>
           <td class="num"><b>${fmtNum(r.onHand)}</b> <span class="muted" style="font-size:10px;">${it.uom||''}</span></td>
           <td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">—</td>
         </tr>`;
@@ -7577,7 +7577,7 @@ function renderUrgent(){
       html += `<tr style="cursor:pointer" onclick="openLeadtime('${it.no}')">
         <td><b>${idx+1}</b></td>
         <td style="min-width:150px;">${statusCell}</td>
-        <td style="white-space:normal;min-width:180px;"><b>${it.no}</b> <span class="muted">${it.subType||'-'}</span></td>
+        <td style="white-space:normal;min-width:180px;"><b>${it.no}</b> <span class="muted">${it.desc}</span></td>
         <td class="num">${(r.poDiy>0||r.draftDiy>0)
           ? `<div style="line-height:1.35;">
                <div title="คงเหลือในคลังจริง">${fmtNum(r.onHand)}</div>
@@ -8027,7 +8027,7 @@ function renderPacking(){
     rows += `<tr>
       <td style="white-space:nowrap;"><input type="checkbox" ${(window.pkRowSel&&window.pkRowSel.has(i))?'checked':''} onchange="pkToggleRow(${i},this.checked)" title="เลือกเพื่อลบหลายแถว" style="vertical-align:middle;margin-right:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${pkColor(i)};vertical-align:middle;"></span> <b>${i+1}</b></td>
       <td>${cust?`<span class="tag" style="background:#ecfeff;color:#0e7490;font-size:11px;white-space:nowrap;">✎ กรอกเอง (นอก PO)</span>`:`<input list="pk-itemdl" value="${pkItemLabel(r.item).replace(/"/g,'&quot;')}" onchange="pkPickItem(${i},this.value)" onfocus="this.select()" placeholder="🔍 พิมพ์ค้นหาสินค้า" autocomplete="off" style="min-width:220px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`}</td>
-      <td>${editDims?`<input type="text" value="${(d?d.desc:'').replace(/"/g,'&quot;')}" onchange="pkCustSet(${i},'desc',this.value)" placeholder="ชื่อสินค้า (กรอกเอง)" style="min-width:150px;width:100%;box-sizing:border-box;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?d.desc:'<span class="muted">—</span>')}</td>
+      <td>${editDims?`<input type="text" value="${(d?d.desc:'').replace(/"/g,'&quot;')}" onchange="pkCustSet(${i},'desc',this.value)" placeholder="ชื่อสินค้า (กรอกเอง)" style="min-width:150px;width:100%;box-sizing:border-box;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(r.item?`<span class="muted" title="${(d?d.desc:'').replace(/"/g,'&quot;')}">${((typeof getItem==='function'&&getItem(r.item))||{}).subType||'-'}</span>`:'<span class="muted">—</span>')}</td>
       <td class="num">${editDims?`<input type="number" min="0" step="0.1" value="${d?d.L:0}" onchange="pkCustSet(${i},'L',this.value)" title="กว้าง×ยาว×สูง (ซม.)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.L):'-')}</td>
       <td class="num">${editDims?`<input type="number" min="0" step="0.1" value="${d?d.W:0}" onchange="pkCustSet(${i},'W',this.value)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.W):'-')}</td>
       <td class="num">${editDims?`<input type="number" min="0" step="0.1" value="${d?d.H:0}" onchange="pkCustSet(${i},'H',this.value)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.H):'-')}</td>
@@ -8055,7 +8055,7 @@ function renderPacking(){
   });
   let gp=0,gb=0,gc=0,gvr=0,gvt=0; window.packingRows.forEach(r=>{ const s=pkRowSum(r); gp+=s.pcs;gb+=s.box;gc+=s.cbm;gvr+=s.valRmb;gvt+=s.valThb; });
   const html = pkItemDatalist() + `<table>
-    <tr><th>#</th><th>Item (เลือก)</th><th>ชื่อสินค้า</th><th class="num">L</th><th class="num">W</th><th class="num">H</th><th class="num">ชิ้น/กล่อง</th><th>Lot (ต้นทุน)</th><th class="num">RMB Cost</th><th class="num">THB Cost</th>${contTh}<th class="num">รวมชิ้น</th><th class="num">รวมกล่อง</th><th class="num">รวม CBM</th><th class="num">มูลค่ารวม ¥</th><th class="num">มูลค่ารวม ฿</th><th></th></tr>
+    <tr><th>#</th><th>Item (เลือก)</th><th>Subtype</th><th class="num">L</th><th class="num">W</th><th class="num">H</th><th class="num">ชิ้น/กล่อง</th><th>Lot (ต้นทุน)</th><th class="num">RMB Cost</th><th class="num">THB Cost</th>${contTh}<th class="num">รวมชิ้น</th><th class="num">รวมกล่อง</th><th class="num">รวม CBM</th><th class="num">มูลค่ารวม ¥</th><th class="num">มูลค่ารวม ฿</th><th></th></tr>
     ${rows}
     <tr style="border-top:2px solid var(--line)"><td colspan="10" class="num"><b>รวม CBM ต่อตู้ →</b></td>${footCbm}<td class="num" id="pk-gpcs"><b>${fmtNum(gp)}</b></td><td class="num" id="pk-gbox"><b>${fmt1(gb)}</b></td><td class="num" id="pk-gcbm"><b>${gc.toFixed(3)}</b></td><td class="num" id="pk-gvr"><b>¥${pkYuan(gvr)}</b></td><td class="num" id="pk-gvt"><b>฿${pkMoney(gvt)}</b></td><td></td></tr>
     <tr><td colspan="10" class="num"><b>มูลค่าต่อตู้ (¥) →</b></td>${footVr}<td class="num" colspan="6"></td></tr>
@@ -8963,7 +8963,7 @@ function flowItemHtml(it, basis, grp){
   const head=`<div onclick="flowToggleItem('${it.no}')" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:9px 16px;border-top:1px solid var(--line);${iOpen?'background:var(--bg);':''}">
     <span style="font-size:10px;color:var(--muted);">${iOpen?'▼':'▶'}</span>
     <span style="width:10px;height:10px;border-radius:50%;background:${st.c};flex:0 0 auto;"></span>
-    <b style="font-size:12.5px;flex:1;min-width:0;">${flowShort(it.no)} <span class="muted" style="font-weight:400;font-size:10.5px;">${it.no}</span></b>
+    <b style="font-size:12.5px;flex:1;min-width:0;">${flowShort(it.no)}</b>
     <span style="font-size:11px;font-weight:700;color:${st.c};background:${st.bg};padding:2px 8px;border-radius:6px;white-space:nowrap;">${st.t}</span>
     <span class="muted" style="font-size:11px;white-space:nowrap;">อยู่ได้ ${moTxt}${rc.suggestQty>0?' · ควรสั่ง <b style="color:var(--brand)">'+fmtNum(rc.suggestQty)+'</b>':''}</span>
   </div>`;
