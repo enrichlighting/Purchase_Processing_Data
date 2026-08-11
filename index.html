@@ -7717,17 +7717,23 @@ function pkShortName(desc, model){
   const s=String(desc||'').replace(/\s+/g,' ').trim().replace(/^ENRICH\s*/i,'');
   const parts=[];
   let mdl=(model||'').trim();
-  if(mdl){ mdl=pkTitleCase(mdl); }   // Model จากข้อมูล (เช่น "ECO LIFE" -> "Eco Life")
+  if(mdl){ mdl=pkTitleCase(mdl); }   // Model จากข้อมูล (Sheet2) เช่น "ECO LIFE" -> "Eco Life"
   else {
+    // 1) "รุ่น X ..."
     let m=s.match(/รุ่น\s+([A-Za-z0-9฀-๿\+\-\.\s]*?)(?=\s*\d+(?:\.\d+)?\s*[wW]\b|\s*แสง|\s*ขนาด|\s*\d+\s*[x*×]|,|\(|$)/);
     mdl = m ? m[1].trim() : '';
-    if(!mdl){ const stop=/^(LED|PANEL|BULB|TUBE|DRIVER|LIFUD|STAINLESS|STEEL|SCREW|HIGH|BAY|HIGHBAY|FLOOD|FLOODLIGHT|DOWN|DOWNLIGHT|LIGHT|SMD|COB|SPOT|TRACK|CEILING|ENRICH|AC|DC|IP|CDL|WW|DL|NW|CW|CCT|RGB)$/i; const toks=s.match(/\b[A-Z][A-Za-z]{2,}\b/g)||[]; const mm=toks.find(t=>!stop.test(t)); if(mm) mdl=mm; }
+    // 2) ชื่อรุ่นที่อยู่ "ท้าย" หลังจำนวนวัตต์ (เช่น "200W AIR Surge", "150W AIR SLIM")
+    if(!mdl){ const wm=s.match(/\d+(?:\.\d+)?\s*[wW]\b\s+([A-Za-z][A-Za-z0-9\-\s]*?)(?=\s*[,(]|\s+DLK?\b|\s+WW\b|\s+NW\b|\s+CW\b|\s+CDL\b|\s+\d{3,4}\s*[kK]\b|\s+\d+\s*lm|\s+\d+\s*degree|\s+DRIVER\b|\s+MEANWELL\b|\s+LIFUD\b|\s+NORMAL\b|\s+STAINLESS\b|\s+HAVING\b|\s+แสง|$)/i);
+      if(wm){ const t=wm[1].trim(); if(t && /[A-Za-z]/.test(t) && t.length<=22 && !/^(DL|DLK|WW|NW|CW|CDL|DRIVER|NORMAL|MEANWELL|LIFUD|SLIM|SERIES|FORCE)$/i.test(t)) mdl=pkTitleCase(t); } }
+    // 3) คำเด่นก่อนจำนวนวัตต์ (ตัดคำประเภทโคมนำหน้าออก)
+    if(!mdl){ const stop=/^(LED|PANEL|BULB|TUBE|DRIVER|LIFUD|STAINLESS|STEEL|SCREW|HIGH|BAY|HIGHBAY|FLOOD|FLOODLIGHT|STREET|STREETLIGHT|DOWN|DOWNLIGHT|LIGHT|SMD|COB|SPOT|SPOTLIGHT|TRACK|CEILING|SOLAR|REFLECTOR|GARDEN|SPACE|UFO|ENRICH|AC|DC|IP|CDL|WW|DL|DLK|NW|CW|CCT|RGB|FOR|SET|COMPLETE)$/i; const pre=s.split(/\d+(?:\.\d+)?\s*[wW]\b/)[0]||s; const toks=pre.match(/[A-Z][A-Za-z0-9\-]{1,}/g)||[]; const mm=toks.find(t=>!stop.test(t)); if(mm) mdl=mm; }
   }
   if(mdl) parts.push(mdl);
   const w=s.match(/(\d+(?:\.\d+)?)\s*[wW]\b/); if(w) parts.push(w[1]+'w');
   const size=s.match(/(\d+(?:\.\d+)?\s*[x*×]\s*\d+(?:\.\d+)?(?:\s*[x*×]\s*\d+(?:\.\d+)?)?\s*(?:cm|มม\.?|ซม\.?|m|เมตร)?)/i); if(size) parts.push(size[1].replace(/\s+/g,''));
-  const light=s.match(/แสง\S+/) || s.match(/(\d{3,4})\s*[kK]\b/) || s.match(/\b(CDL|WW|DL|NW|CW)\b/);
-  if(light) parts.push((light[1]?light[1]+'K':light[0]).replace(/\s+/g,''));
+  let lightTxt=''; const lm1=s.match(/แสง\S+/), lm2=s.match(/(\d{3,4})\s*[kK]\b/), lm3=s.match(/\b(CDL|WW|DL|NW|CW)\b/);
+  if(lm1) lightTxt=lm1[0]; else if(lm2) lightTxt=lm2[1]+'K'; else if(lm3) lightTxt=lm3[1];
+  if(lightTxt) parts.push(lightTxt.replace(/\s+/g,''));
   return parts.filter(Boolean).join(' ').trim() || mdl || s;
 }
 function pkDisplayName(code){ const d=pkItem(code)||{}; const desc=d.desc||pkFullDesc(code); return pkShortName(desc, d.model) || code; }
