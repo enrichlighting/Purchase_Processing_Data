@@ -9053,6 +9053,45 @@ function flowCatCell(num, mo, hiStyle){
   const moTxt=isFinite(mo)?fmtMo(mo)+' ด.':'∞';
   return `<td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;"><b style="font-size:13px;">${fmtNum(num)}</b><div style="margin-top:3px;"><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;${hiStyle}">${moTxt}</span></div></td>`;
 }
+// ---- Sort ตาราง Flowchart (คลิกหัวคอลัมน์ · default = ควรสั่งก่อน แล้วยอดขายมาก→น้อย) ----
+const FLOW_ST_RANK={red:0,warn:1,watch:2,noneed:3};
+const FLOW_FIXED_KEYS=['name','price','status','c1','c2','c3','onhand','po','prod','container','suggest'];
+function flowMonMap(it){ return it._monMap || (it._monMap=Object.fromEntries((it.monthly||[]).map(m=>[m[0],m[1]]))); }
+function flowSalesYear(it,y){ let s=0; (it.monthly||[]).forEach(m=>{ if(m[0].slice(0,4)===y) s+=m[1]; }); return s; }
+function flowRC(it,basis,grp){ const c=window._flowRcCache||(window._flowRcCache={}); if(c[it.no]) return c[it.no];
+  const rc=(typeof reorderCalc==='function')?reorderCalc(it,basis,grp):{statusKey:'noneed',suggestQty:0,cov3mo:Infinity,onHand:0,incoming:0,packed:0,production:0,poDiy:0,c1:0,c2:0,c3:0};
+  return c[it.no]=rc; }
+const FLOW_SORTVAL={
+  price:(it,rc)=>it.unitPrice||0,
+  status:(it,rc)=>(FLOW_ST_RANK[rc.statusKey]!=null?FLOW_ST_RANK[rc.statusKey]:9),
+  c1:(it,rc)=>rc.c1||0, c2:(it,rc)=>rc.c2||0, c3:(it,rc)=>rc.c3||0,
+  onhand:(it,rc)=>rc.onHand||0, po:(it,rc)=>rc.incoming||0,
+  prod:(it,rc)=>(rc.poDiy||0)+(rc.production||0)+(rc.packed||0),
+  container:(it,rc)=>rc.packed||0, suggest:(it,rc)=>rc.suggestQty||0
+};
+function flowSort(key){ const S=window.flowSort||{key:'default',dir:'desc'};
+  if(key==='default'){ window.flowSort={key:'default',dir:'desc'}; renderFlowchart(); return; }
+  if(S.key===key) S.dir=(S.dir==='asc'?'desc':'asc');
+  else { S.key=key; S.dir=(key==='name'?'asc':'desc'); }        // ตัวเลข = เริ่มมาก→น้อย · ชื่อ = ก→ฮ
+  window.flowSort=S; renderFlowchart();
+}
+function flowSortArrow(key){ const S=window.flowSort||{key:'default'}; if(S.key!==key) return '<span style="opacity:.28;">↕</span>'; return S.dir==='asc'?'▲':'▼'; }
+function flowCmp(a,b,basis,grp){
+  const S=window.flowSort||{key:'default',dir:'desc'};
+  const key=S.key||'default';
+  const ra=flowRC(a,basis,grp), rb=flowRC(b,basis,grp);
+  if(key==='default'){                                           // ควรสั่ง(แดง)→ใกล้→เฝ้าระวัง→ยังไม่ต้อง · แล้วยอดขายมาก→น้อย
+    const rk=((FLOW_ST_RANK[ra.statusKey]!=null?FLOW_ST_RANK[ra.statusKey]:9)-(FLOW_ST_RANK[rb.statusKey]!=null?FLOW_ST_RANK[rb.statusKey]:9));
+    if(rk) return rk;
+    return (b.s365||0)-(a.s365||0);
+  }
+  if(key==='name'){ const c=flowShort(a.no).localeCompare(flowShort(b.no),'th'); return S.dir==='asc'?c:-c; }
+  let va,vb;
+  if(key.slice(0,3)==='sm:'){ const ym=key.slice(3); va=flowMonMap(a)[ym]||0; vb=flowMonMap(b)[ym]||0; }
+  else if(key.slice(0,3)==='sy:'){ const y=key.slice(3); va=flowSalesYear(a,y); vb=flowSalesYear(b,y); }
+  else { const f=FLOW_SORTVAL[key]; va=f?f(a,ra):0; vb=f?f(b,rb):0; }
+  const d=(va||0)-(vb||0); return S.dir==='asc'? d : -d;
+}
 // หนึ่งแถวสินค้า = คอลัมน์เรียงข้าง (เห็นทุกอย่างโดยไม่ต้องคลิก) · คลิกเพื่อกางกราฟยอดขายเต็ม
 function flowItemRow(it, basis, grp, salesCols){
   const rc=(typeof reorderCalc==='function')?reorderCalc(it, basis, grp):{statusKey:'noneed',suggestQty:0,cov3mo:Infinity,onHand:0,incoming:0,packed:0,production:0,poDiy:0,c1:0,c2:0,c3:0,dos1:Infinity,dos2:Infinity};
@@ -9100,29 +9139,33 @@ function renderFlowchart(){
   const gsalesOf=arr=>arr.reduce((s,i)=>s+(i.s365||0),0);
   const gkeys=Object.keys(groups).sort((a,b)=> gsalesOf(groups[b])-gsalesOf(groups[a]) || (a<b?-1:1));
   // 11 คอลัมน์คงที่ + คอลัมน์ยอดขาย (เดือน-ปี) เรียงไปทางขวา · จัดชิดขวา: ราคาตั้ง(1) หมวด①②③(3,4,5) ควรสั่ง(10)
+  window._flowRcCache = {};                                 // รีเซ็ต cache ของ reorderCalc ทุกครั้งที่เรนเดอร์
   const salesCols = flowSalesCols(items);
   const TH=['สินค้า','ราคาตั้ง','สถานะ','หมวด① คลัง−จอง','หมวด② +จัดตู้','หมวด③ +PO+ผลิต','คงเหลือ (แยกคลัง)','PO ค้างรับ','DIY/ผลิต/ตู้แล้ว','ตู้ (Container)','ควรสั่งเพิ่ม'];
   const RIGHT={1:1,3:1,4:1,5:1,10:1};
-  const fixedTh = TH.map((h,i)=>`<th style="padding:7px 10px;text-align:${RIGHT[i]?'right':'left'};font-size:10.5px;color:var(--muted);white-space:nowrap;border-bottom:2px solid var(--line);${i===0?'position:sticky;left:0;z-index:3;background:var(--bg);box-shadow:2px 0 4px -2px rgba(0,0,0,.18);min-width:150px;':''}">${h}</th>`).join('');
-  const salesTh = salesCols.map(c=>`<th style="padding:7px 9px;text-align:right;font-size:10px;color:#c2410c;white-space:nowrap;border-bottom:2px solid var(--line);border-left:1px solid #fde6cf;background:#fff4ea;">${flowSalesHead(c)}</th>`).join('');
+  const fixedTh = TH.map((h,i)=>{ const key=FLOW_FIXED_KEYS[i]; return `<th onclick="flowSort('${key}')" title="คลิกเพื่อเรียง" style="cursor:pointer;user-select:none;padding:7px 10px;text-align:${RIGHT[i]?'right':'left'};font-size:10.5px;color:var(--muted);white-space:nowrap;border-bottom:2px solid var(--line);${i===0?'position:sticky;left:0;z-index:3;background:var(--bg);box-shadow:2px 0 4px -2px rgba(0,0,0,.18);min-width:150px;':''}">${h} ${flowSortArrow(key)}</th>`; }).join('');
+  const salesTh = salesCols.map(c=>{ const key=(c.t==='y'?'sy:':'sm:')+c.k; return `<th onclick="flowSort('${key}')" title="คลิกเพื่อเรียงตามยอดขายเดือนนี้" style="cursor:pointer;user-select:none;padding:7px 9px;text-align:right;font-size:10px;color:#c2410c;white-space:nowrap;border-bottom:2px solid var(--line);border-left:1px solid #fde6cf;background:#fff4ea;">${flowSalesHead(c)} ${flowSortArrow(key)}</th>`; }).join('');
   const theadHtml = `<thead><tr style="background:var(--bg);">${fixedTh}${salesTh}</tr></thead>`;
   window.flowAllSubs = gkeys.slice();   // สำหรับปุ่มย่อ/ขยายทุกหมวด
+  const isDefaultSort = !window.flowSort || window.flowSort.key==='default';
   let html='', anyOpen=false;
   html+=`<div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
     <button onclick="flowExpandAll()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--brand);background:var(--card);color:var(--brand);">▼ ขยายทุกหมวด</button>
     <button onclick="flowCollapseAll()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--muted);">▶ ย่อทุกหมวด</button>
     <span style="width:1px;height:20px;background:var(--line);"></span>
+    <button onclick="flowSort('default')" title="เรียง: ควรสั่งซื้อขึ้นก่อน แล้วยอดขายมาก→น้อย" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--brand);background:${isDefaultSort?'var(--brand)':'var(--card)'};color:${isDefaultSort?'#fff':'var(--brand)'};">🎯 เรียงตามความจำเป็น</button>
     <button onclick="flowToggleMon()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #ea580c;background:${window.flowMonExpand?'#ea580c':'var(--card)'};color:${window.flowMonExpand?'#fff':'#ea580c'};">${window.flowMonExpand?'🔽 ย่อยอดขายเป็นรายปี':'▶️ กางยอดขายรายเดือน (คอลัมน์)'}</button>
-    <span class="muted" style="font-size:11px;">ยอดขายเป็นคอลัมน์เดือน-ปีเรียงไปทางขวา · เลื่อน scrollbar ล่างเพื่อดู · ชื่อสินค้าตรึงซ้ายไว้</span>
+    <span class="muted" style="font-size:11px;">คลิกหัวคอลัมน์เพื่อเรียงมาก↔น้อย · ค่าเริ่มต้น: ควรสั่งซื้อขึ้นก่อน แล้วยอดขายมากสุดในหมวด</span>
   </div>`;
   gkeys.forEach(sub=>{
-    const arr=groups[sub].sort((a,b)=>(b.s365||0)-(a.s365||0) || (a.no<b.no?-1:1));
+    const arr=groups[sub];
     const gsales=gsalesOf(arr);
     const sOpen = q ? true : !!window.flowState.sub[sub];   // ค่าเริ่มต้น = ย่อ (collapsed)
     if(sOpen) anyOpen=true;
     html+=`<div class="card" style="padding:0;margin-bottom:10px;overflow:hidden;">
       <div onclick="flowToggleSub(this)" data-sub="${encodeURIComponent(sub)}" style="cursor:pointer;padding:11px 16px;background:var(--brand-soft);font-weight:800;font-size:13.5px;user-select:none;">${sOpen?'▼':'▶'} 🏷️ ${sub} <span class="muted" style="font-weight:400;font-size:11px;">(${arr.length} รายการ · ขาย 1 ปี ${fmtNum(gsales)})</span></div>`;
     if(sOpen){
+      arr.sort((a,b)=>flowCmp(a,b,basis,grp) || (a.no<b.no?-1:1));   // เรียงในหมวดตาม flowSort (default = ควรสั่ง→ยอดขาย)
       html+=`<div class="flow-tscroll"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:1180px;">
         ${theadHtml}
         <tbody>${arr.map(it=>flowItemRow(it, basis, grp, salesCols)).join('')}</tbody></table></div>`;
