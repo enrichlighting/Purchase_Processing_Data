@@ -226,10 +226,10 @@
   </header>
 
   <div class="tabs">
-    <div class="tab active" data-tab="flowchart" title="Flowchart — ภาพรวมรายสินค้า">🗺️</div>
+    <div class="tab active" data-tab="flowchart" title="Flowchart — ภาพรวมรายสินค้า">🗺️ Flowchart</div>
     <div class="tab" data-tab="leadtime" title="ต้องรีบสั่ง &amp; วางแผน Lead Time">🚨</div>
     <div class="tab" data-tab="search" title="ค้นหาสต๊อก &amp; รายการสินค้า">🔎</div>
-    <div class="tab" data-tab="packing" title="Packing List">📦</div>
+    <div class="tab" data-tab="packing" title="Packing List">📦 Packing List</div>
   </div>
 
   <!-- ============ PAGE: FLOWCHART ============ -->
@@ -8981,17 +8981,25 @@ function flowItemHtml(it, basis, grp){
     if(conts.length) tuChips=conts.join(''); }
   const flow=`<div style="padding:2px 16px 14px;">
     ${flowSales(it)}
-    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;">
-      ${flowBox('📦 คลัง (สต๊อก)', '<b>'+fmtNum(rc.onHand)+'</b> '+it.uom+'<div style="margin-top:4px;">'+whChips+'</div>', '#f1f5f9','#334155')}
-      ${flowBox('🏭 PO / DIY / ผลิต', 'PO ค้างรับ: <b>'+fmtNum(rc.incoming)+'</b><div style="margin-top:3px;">'+poChips+'</div><div style="margin-top:5px;font-size:11px;">🎁 PO DIY: <b style="color:#d97706">'+fmtNum(rc.poDiy)+'</b> · 🔧 สั่งผลิต: <b>'+fmtNum(rc.production)+'</b> · จัดตู้แล้ว: <b>'+fmtNum(rc.packed)+'</b></div>', '#eff6ff','#1e40af')}
-      ${flowBox('🚢 ตู้ (Container)', tuChips, '#f5f3ff','#6d28d9')}
-      ${flowBox('🎯 สถานะ / ควรสั่ง', '<span style="color:'+st.c+';font-weight:800;">'+st.t+'</span><div style="margin-top:4px;font-size:12px;">ของรวม(หมวด3) <b>'+fmtNum(rc.cat3)+'</b> · อยู่ได้ <b>'+moTxt+'</b></div><div style="margin-top:3px;font-size:13px;">ควรสั่งเพิ่ม: <b style="color:'+(rc.suggestQty>0?'var(--brand)':'var(--good)')+';font-size:16px;">'+fmtNum(rc.suggestQty)+'</b> '+it.uom+'</div>', st.bg, st.c)}
-    </div>
+    <table class="flow-table" style="width:100%;border-collapse:collapse;font-size:12.5px;">
+      <colgroup><col style="width:150px;"><col></colgroup>
+      ${flowRow('#f1f5f9','#334155','📦 คลัง (สต๊อก)',
+        '<b style="font-size:15px;">'+fmtNum(rc.onHand)+'</b> '+it.uom+' &nbsp;<span class="muted" style="font-size:11px;">แยกตามคลัง:</span><div style="margin-top:4px;">'+whChips+'</div>')}
+      ${flowRow('#eff6ff','#1e40af','🏭 PO / DIY / ผลิต',
+        '<span class="muted" style="font-size:11px;">PO ค้างรับ</span> <b style="font-size:15px;color:#2563eb;">'+fmtNum(rc.incoming)+'</b><div style="margin-top:4px;">'+poChips+'</div><div style="margin-top:6px;font-size:11.5px;border-top:1px dashed #cbd5e1;padding-top:5px;">🎁 PO DIY: <b style="color:#d97706">'+fmtNum(rc.poDiy)+'</b> &nbsp;·&nbsp; 🔧 สั่งผลิต: <b>'+fmtNum(rc.production)+'</b> &nbsp;·&nbsp; จัดตู้แล้ว: <b>'+fmtNum(rc.packed)+'</b></div>')}
+      ${flowRow('#f5f3ff','#6d28d9','🚢 ตู้ (Container)', tuChips)}
+      ${flowRow(st.bg, st.c, '🎯 สถานะ / ควรสั่ง',
+        '<span style="color:'+st.c+';font-weight:800;font-size:13px;">'+st.t+'</span> &nbsp;<span class="muted" style="font-size:11.5px;">ของรวม(หมวด3) <b>'+fmtNum(isFinite(rc.cat3)?rc.cat3:(rc.onHand||0))+'</b> · อยู่ได้ <b>'+moTxt+'</b></span><div style="margin-top:4px;font-size:13px;">ควรสั่งเพิ่ม: <b style="color:'+(rc.suggestQty>0?'var(--brand)':'var(--good)')+';font-size:17px;">'+fmtNum(rc.suggestQty)+'</b> '+it.uom+'</div>')}
+    </table>
     <div style="text-align:right;margin-top:8px;"><a href="#" onclick="event.stopPropagation();openLeadtime('${it.no}');return false;" style="font-size:11.5px;color:var(--brand);font-weight:700;">→ เปิดหน้าวางแผนสั่งซื้อ</a></div>
   </div>`;
   return head+flow;
 }
-function flowBox(title, body, bg, fg){ return `<div style="flex:1 1 200px;min-width:180px;background:${bg};border:1px solid ${fg}33;border-radius:10px;padding:10px 12px;"><div style="font-size:11px;font-weight:800;color:${fg};margin-bottom:5px;">${title}</div><div style="font-size:12.5px;line-height:1.5;color:#334155;">${body}</div></div>`; }
+function flowRow(bg, fg, title, body){ return `<tr>
+  <td style="background:${bg};color:${fg};font-weight:800;font-size:11.5px;padding:9px 10px;border:1px solid ${fg}33;border-left:4px solid ${fg};vertical-align:top;white-space:nowrap;">${title}</td>
+  <td style="padding:9px 12px;border:1px solid var(--line);vertical-align:top;line-height:1.55;color:#334155;">${body}</td>
+</tr>`; }
+function flowBox(title, body, bg, fg){ return flowRow(bg,fg,title,body); }
 function renderFlowchart(){
   const el=document.getElementById('flow-body'); if(!el) return;
   const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180), grp=window.RGROUP||'all';
