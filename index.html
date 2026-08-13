@@ -8371,16 +8371,20 @@ function pkSaveRound(asNew){
     window.pkContainers.forEach((ct,c)=>{ if(pkContSum(c).pcs>0){ if(PK_DATEF.some(f=>!(ct.dates&&ct.dates[f.k]))) incomplete=true; } });
     if(incomplete){ pkToast('โปรดระบุวันที่ตู้ให้ครบ (LOAD · CLS · ETD · ETA ถึงไทย · ETA ถึงคลัง) ทุกตู้ที่มีสินค้า','bad'); if(document.getElementById('pk-ship')) document.getElementById('pk-ship').scrollIntoView({behavior:'smooth',block:'center'}); return; }
   }
-  // ป้องกันจัดตู้เกินจำนวนสั่งผลิต / ค้างรับใน PO (นับรวมทุกรอบที่บันทึกไว้)
+  // เตือน (ไม่บล็อก) เมื่อจัดตู้เกินจำนวนสั่งผลิต · ค้างรับใน PO เทียบเฉพาะรอบนี้ (ค้างรับหักรอบก่อนไปแล้ว จึงไม่บวก "รอบอื่น")
   if(snap.mode==='released'){
     const thisRound={}; snap.rows.forEach(r=>{ if(r.po){ const k=r.po+'|'+r.item; thisRound[k]=(thisRound[k]||0)+(r.pcs||0); } });
     const others={}; (window.pkLog||[]).forEach((s,idx)=>{ if(editIdx!=null && idx===editIdx) return; (s.rows||[]).forEach(r=>{ if(r.po){ const k=r.po+'|'+r.item; others[k]=(others[k]||0)+(r.pcs||0); } }); });
+    const overWarn=[];
     for(const k in thisRound){
       const sep=k.indexOf('|'), po=k.slice(0,sep), item=k.slice(sep+1), cp=pkPackCap(po,item);
-      if(cp.cap!=null){ const total=(others[k]||0)+thisRound[k];
-        if(total>cp.cap){ pkToast('⛔ จัดตู้เกิน'+cp.kind+'!\n'+po+' · '+item+'\n'+cp.kind+': '+cp.cap.toLocaleString()+' · จัดรอบอื่น '+(others[k]||0).toLocaleString()+' + รอบนี้ '+thisRound[k].toLocaleString()+' = '+total.toLocaleString()+' (เกิน '+(total-cp.cap).toLocaleString()+')\nรอบนี้ต้องไม่เกิน '+Math.max(0,cp.cap-(others[k]||0)).toLocaleString()+' ชิ้น','bad'); return; }
+      if(cp.cap!=null){
+        const prod=cp.kind==='จำนวนสั่งผลิต';
+        const total=prod?((others[k]||0)+thisRound[k]):thisRound[k];   // สั่งผลิต=นับสะสมทุกรอบ · ค้างรับ=เฉพาะรอบนี้
+        if(total>cp.cap) overWarn.push(item+' — จัด '+total.toLocaleString()+' เกิน'+cp.kind+' '+cp.cap.toLocaleString()+' (เกิน '+(total-cp.cap).toLocaleString()+')');
       }
     }
+    if(overWarn.length) pkToast('⚠️ บันทึกแล้ว · มีรายการจัดตู้เกินจำนวน\n'+overWarn.slice(0,5).join('\n'),'warn');
   }
   let savedIdx=0;
   if(editIdx!=null && window.pkLog[editIdx]){
@@ -8401,9 +8405,9 @@ function pkEditRound(idx){ pkLoadRound(idx); window.pkEditIdx=idx; pkUpdateSaveB
 function pkToast(msg, kind){
   let t=document.getElementById('pk-toast');
   if(!t){ t=document.createElement('div'); t.id='pk-toast'; t.style.cssText='position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:100001;max-width:92%;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 10px 34px rgba(0,0,0,.28);white-space:pre-line;text-align:center;color:#fff;'; document.body.appendChild(t); }
-  t.style.background = kind==='bad'?'#dc2626':(kind==='good'?'#16a34a':'#334155');
+  t.style.background = kind==='bad'?'#dc2626':(kind==='good'?'#16a34a':(kind==='warn'?'#ea580c':'#334155'));
   t.textContent=msg; t.style.display='block';
-  clearTimeout(window._pkToastT); window._pkToastT=setTimeout(()=>{ if(t) t.style.display='none'; }, kind==='bad'?6500:2500);
+  clearTimeout(window._pkToastT); window._pkToastT=setTimeout(()=>{ if(t) t.style.display='none'; }, (kind==='bad'||kind==='warn')?6500:2500);
 }
 // กล่องยืนยันในหน้า (แทน confirm() ที่ถูกบล็อกในลิงก์ Artifact)
 function pkConfirm(msg, onYes, onNo){
