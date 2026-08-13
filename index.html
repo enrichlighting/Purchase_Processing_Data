@@ -9101,34 +9101,37 @@ function flowSalesDIY(it){
   Object.keys(ship).forEach(k=>yset.add(k.slice(0,4)));
   const years=[...yset].sort(); if(!years.length) return '<div class="muted" style="font-size:11px;">— ไม่มีข้อมูล Mr.DIY</div>';
   const selY=window.flowState.year[it.no]||years[years.length-1];
-  const selM=((window.flowState.month||{})[it.no])||0;   // 0 = ทั้งปี · 1-12 = เลือกเดือน
+  const p=m=>String(m).padStart(2,'0');
   const MN=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   const yBtns=years.map(y=>`<span onclick="event.stopPropagation();flowSetYear('${it.no}','${y}')" style="cursor:pointer;padding:2px 9px;border-radius:6px;font-size:11px;font-weight:700;margin-right:5px;${y===selY?'background:var(--brand);color:#fff;':'background:var(--bg);color:var(--muted);border:1px solid var(--line);'}">${y}</span>`).join('');
-  const mBtn=(m,lbl)=>`<span onclick="event.stopPropagation();flowSetMonth('${it.no}',${m})" style="cursor:pointer;padding:1px 7px;border-radius:5px;font-size:10px;font-weight:700;margin:0 3px 3px 0;${selM===m?'background:#ea580c;color:#fff;':'background:var(--bg);color:var(--muted);border:1px solid var(--line);'}">${lbl}</span>`;
-  const mBtns=mBtn(0,'ทั้งปี')+MN.map((n,i)=>mBtn(i+1,n)).join('');
-  const A=[],B=[],C=[];
-  for(let m=1;m<=12;m++){ const ym=selY+'-'+String(m).padStart(2,'0'); A.push(ship[ym]||0); B.push(sMon[ym]||0); C.push(kMon[ym]||0); }
-  const mx=Math.max(1,...A,...B,...C);   // สเกลเดียวกันทั้ง 3 เส้น (จำนวนชิ้น เทียบกันได้)
-  let groups='';
-  for(let i=0;i<12;i++){
-    const active=!selM||(i+1)===selM, on=(i+1)===selM;
-    const bar=(v,col,lbl)=>`<div title="${MN[i]} ${selY} · ${lbl}: ${fmtNum(v)} ชิ้น" style="width:6px;height:${Math.round(v/mx*52)}px;min-height:${v?3:0}px;background:${col};opacity:${active?1:0.22};border-radius:2px 2px 0 0;"></div>`;
-    groups+=`<div onclick="event.stopPropagation();flowSetMonth('${it.no}',${on?0:(i+1)})" title="คลิกดู ${MN[i]}" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:0;cursor:pointer;padding:2px 0;${on?'background:#fff3e6;border-radius:6px;':''}"><div style="display:flex;align-items:flex-end;gap:3px;height:56px;">${bar(A[i],'#ea580c','ยอดขายเรา→DIY')}${bar(B[i],'#2563eb','ยอดขายหน้าร้าน')}${bar(C[i],'#7c3aed','สต๊อกหน้าร้าน')}</div><div style="font-size:9px;color:${on?'#ea580c':'var(--muted)'};font-weight:${on?'800':'400'};margin-top:3px;">${MN[i]}</div></div>`;
-  }
-  const sumA=A.reduce((s,v)=>s+v,0), sumB=B.reduce((s,v)=>s+v,0), avgC=Math.round(C.reduce((s,v)=>s+v,0)/12);
-  const detail=selM?`<div style="font-size:11.5px;font-weight:700;margin-bottom:6px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:4px 9px;">${MN[selM-1]} ${selY} → <span style="color:#ea580c;">เรา→DIY ${fmtNum(A[selM-1])}</span> · <span style="color:#2563eb;">หน้าร้าน ${fmtNum(B[selM-1])}</span> · <span style="color:#7c3aed;">สต๊อก ${fmtNum(C[selM-1])}</span> <span class="muted" style="font-weight:400;">ชิ้น</span></div>`:'';
+  const rows=[];
+  for(let m=1;m<=12;m++){ const ym=selY+'-'+p(m); const si=ship[ym]||0, st=kMon[ym]||0, so=sMon[ym]||0; if(si||st||so) rows.push({m,si,st,so,to:st>0?so/st*100:0}); }
+  if(!rows.length) return `<div style="margin:6px 0;"><span style="font-size:11.5px;font-weight:700;">🛒 Mr.DIY (PLU ${sale.plu||'-'})</span> ${yBtns}<div class="muted" style="font-size:11px;margin-top:5px;">— ปี ${selY} ไม่มีข้อมูล</div></div>`;
+  const n=rows.length;
+  const maxV=Math.max(1,...rows.flatMap(r=>[r.si,r.st,r.so]));
+  const maxT=Math.max(1,...rows.map(r=>r.to));
+  const fmtK=v=> v>=1000?(v/1000).toFixed(1)+'K':String(Math.round(v));
+  const gw=Math.max(112,Math.min(150,780/n));
+  const L=14,R=14,TOP=30,PH=148,XL=20, W=Math.round(L+R+n*gw), H=TOP+PH+XL, y0=TOP+PH, bw=gw*0.17;
+  const COL={si:'#e991c4',st:'#3f4b5b',so:'#8ed29c'}, LBG={si:'#fbe4f1',st:'#e4e8ee',so:'#dcf5e2'}, LTX={si:'#a12e75',st:'#334155',so:'#1a7a3f'};
+  const chip=(cx,cy,txt,bg,tx)=>{ const w=txt.length*5.7+8; return `<g transform="translate(${(cx-w/2).toFixed(1)},${(cy-13).toFixed(1)})"><rect width="${w.toFixed(1)}" height="13" rx="4" fill="${bg}"/><text x="${(w/2).toFixed(1)}" y="9.4" font-size="9" font-weight="700" fill="${tx}" text-anchor="middle">${txt}</text></g>`; };
+  let bars='',labels='',xlab='',tolab='',pts=[];
+  const offs=[0.27,0.47,0.67];
+  rows.forEach((r,i)=>{ const gx=L+i*gw, cx=gx+gw/2;
+    [['si',r.si],['st',r.st],['so',r.so]].forEach(([k,v],j)=>{ const bx=gx+gw*offs[j]-bw/2, h=v/maxV*PH, by=y0-h;
+      bars+=`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,h).toFixed(1)}" rx="2.5" fill="${COL[k]}"/>`;
+      if(v>0) labels+=chip(bx+bw/2,by-1,fmtK(v),LBG[k],LTX[k]); });
+    const ty=TOP+PH*(1-r.to/(maxT*1.45)); pts.push([cx,ty]);
+    if(r.to>0) tolab+=chip(cx,ty-1,r.to.toFixed(1)+'%','#fde3cf','#c2410c');
+    xlab+=`<text x="${cx.toFixed(1)}" y="${(y0+15).toFixed(1)}" font-size="10" fill="#64748b" text-anchor="middle">${MN[r.m-1]} ${selY.slice(2)}</text>`;
+  });
+  const line=`<polyline points="${pts.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ')}" fill="none" stroke="#f39a5f" stroke-width="2.5"/>`+pts.map(q=>`<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="3.5" fill="#f39a5f"/>`).join('');
+  const svg=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="font-family:inherit;display:block;">${bars}${line}${labels}${tolab}<line x1="${L}" y1="${y0}" x2="${W-R}" y2="${y0}" stroke="#cbd5e1" stroke-width="1"/>${xlab}</svg>`;
+  const lg=(c,t)=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;"><span style="width:11px;height:11px;border-radius:2px;background:${c};"></span>${t}</span>`;
   return `<div style="margin:6px 0 10px;">
     <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:6px;"><span style="font-size:11.5px;font-weight:700;">🛒 Mr.DIY รายเดือน (PLU ${sale.plu||'-'})</span> ${yBtns}</div>
-    <div style="margin-bottom:6px;display:flex;flex-wrap:wrap;align-items:center;">${mBtns}</div>
-    ${detail}
-    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:10px;margin-bottom:5px;">
-      <span><span style="display:inline-block;width:9px;height:9px;background:#ea580c;border-radius:2px;vertical-align:middle;"></span> ยอดขายเรา→DIY (ชิ้น) · รวมปี ${fmtNum(sumA)}</span>
-      <span><span style="display:inline-block;width:9px;height:9px;background:#2563eb;border-radius:2px;vertical-align:middle;"></span> ยอดขายหน้าร้าน (ชิ้น) · รวมปี ${fmtNum(sumB)}</span>
-      <span><span style="display:inline-block;width:9px;height:9px;background:#7c3aed;border-radius:2px;vertical-align:middle;"></span> สต๊อกหน้าร้าน (ชิ้น) · เฉลี่ย ${fmtNum(avgC)}/ด.</span>
-    </div>
-    <div style="position:relative;"><div style="position:absolute;top:2px;right:6px;font-size:8.5px;color:var(--muted);">สูงสุด ${fmtNum(mx)} ชิ้น</div>
-    <div style="display:flex;align-items:flex-end;gap:4px;height:82px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;">${groups}</div></div>
-    <div class="muted" style="font-size:9.5px;margin-top:3px;">* ทั้ง 3 เส้นเป็น "จำนวนชิ้น" สเกลเดียวกัน เทียบกันได้ · ชี้เมาส์หรือคลิกที่เดือนเพื่อดูตัวเลข</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px;">${lg(COL.si,'ยอดส่ง DIY (Sales In)')}${lg(COL.st,'สต๊อกหน้าร้าน (Stock)')}${lg(COL.so,'ยอดขายหน้าร้าน (Sales Out)')}<span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;"><span style="width:15px;height:3px;border-radius:2px;background:#f39a5f;"></span>% Turnover (ขายออก÷สต๊อก)</span></div>
+    <div style="overflow-x:auto;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 4px 2px;">${svg}</div>
   </div>`;
 }
 function flowSales(it){
