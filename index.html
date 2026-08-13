@@ -9162,8 +9162,9 @@ function flowCoverCell(it, rc){
   const fmt=m=>isFinite(m)?fmtMo(m)+' ด.':'∞';
   const hi=m=>(typeof pkCoverHi==='function'&&isFinite(m))?pkCoverHi(m):'color:var(--muted);';
   return `<td style="padding:6px 10px;text-align:right;white-space:nowrap;vertical-align:top;">
-    <div style="border-bottom:1px dashed var(--line);padding-bottom:3px;margin-bottom:3px;" title="Cover Stock (เทียบ 3 เดือน) = หมวด③ ${fmtNum(q)} ÷ เฉลี่ย ${fmtNum(Math.round(a3))}/ด. → อยู่ได้ ${fmt(c3m)}"><span style="font-size:12px;font-weight:800;padding:1px 6px;border-radius:5px;${hi(c3m)}">${fmt(c3m)}</span><div class="muted" style="font-size:8.5px;">÷เฉลี่ย3ด.</div></div>
-    <div title="Cover Stock (เทียบ 6 เดือน) = หมวด③ ${fmtNum(q)} ÷ เฉลี่ย ${fmtNum(Math.round(a6))}/ด. → อยู่ได้ ${fmt(c6m)}"><span style="font-size:12px;font-weight:800;padding:1px 6px;border-radius:5px;${hi(c6m)}">${fmt(c6m)}</span><div class="muted" style="font-size:8.5px;">÷เฉลี่ย6ด.</div></div>
+    <div style="border-bottom:1px solid var(--line);padding-bottom:3px;margin-bottom:3px;" title="จำนวนหมวด③ = คลัง+PO+จัดตู้+ผลิต (ตัวตั้งที่นำไปหาร)"><b style="font-size:13px;">${fmtNum(q)}</b> <span class="muted" style="font-size:9px;">ชิ้น (หมวด③)</span></div>
+    <div style="border-bottom:1px dashed var(--line);padding-bottom:3px;margin-bottom:3px;" title="หมวด③ ${fmtNum(q)} ÷ เฉลี่ย 3ด. ${fmtNum(Math.round(a3))}/ด. → อยู่ได้ ${fmt(c3m)}"><span style="font-size:12px;font-weight:800;padding:1px 6px;border-radius:5px;${hi(c3m)}">${fmt(c3m)}</span> <span class="muted" style="font-size:8.5px;">÷เฉลี่ย3ด.</span></div>
+    <div title="หมวด③ ${fmtNum(q)} ÷ เฉลี่ย 6ด. ${fmtNum(Math.round(a6))}/ด. → อยู่ได้ ${fmt(c6m)}"><span style="font-size:12px;font-weight:800;padding:1px 6px;border-radius:5px;${hi(c6m)}">${fmt(c6m)}</span> <span class="muted" style="font-size:8.5px;">÷เฉลี่ย6ด.</span></div>
   </td>`;
 }
 function flowAvgCell(it){
