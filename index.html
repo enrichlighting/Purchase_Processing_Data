@@ -9212,7 +9212,7 @@ function flowItemRow(it, basis, grp, salesCols){
   const hi3=(typeof pkCoverHi==='function' && isFinite(mo3))? pkCoverHi(mo3) : 'color:var(--muted);';
   const priceTxt = (it.unitPrice>0) ? '฿'+it.unitPrice.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '<span class="muted" style="font-size:10px;">—</span>';
   const loc=(window.BC_ILE&&window.BC_ILE[it.no]&&window.BC_ILE[it.no].loc)||{};
-  const whChips=Object.keys(loc).sort().map(w=>flowChip(w+' '+fmtNum(loc[w]), flowWhColor(w)+'1a', flowWhColor(w), 'คลัง '+w)).join('')||'';
+  const whChips=Object.keys(loc).filter(w=>ONHAND_ALLOW_WH[w]).sort().map(w=>flowChip(w+' '+fmtNum(loc[w]), flowWhColor(w)+'1a', flowWhColor(w), 'คลัง '+w)).join('')||'';   // เฉพาะ 6 คลังที่กำหนด
   const pos=((window.BC_PO&&window.BC_PO[it.no])||{}).pos||[];
   const poChips=pos.map(p=>flowChip(p[0]+' ค้าง '+fmtNum(p[1]), '#eaf1ff', '#2563eb', (p[3]||'')+(p[2]?' · ETA '+p[2]:''))).join('')||(rc.incoming>0?'':'<span class="muted" style="font-size:10px;">—</span>');
   let tuArr=[]; (window.pkLog||[]).forEach(s=>{ if(s.mode!=='released')return; (s.rows||[]).forEach(r=>{ if(r.item!==it.no)return; (r.per||[]).forEach((per,ci)=>{ if(per&&per.pcs>0){ const ct=(s.containers||[])[ci]||{}; tuArr.push(flowChip((ct.name||'ตู้')+' '+fmtNum(per.pcs), '#ede9fe', '#7c3aed', 'จัดตู้ '+(ct.name||''))); } }); }); });
