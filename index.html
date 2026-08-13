@@ -9159,12 +9159,11 @@ function flowAvg6(it){ const map=flowMonMap(it); return flowMonthsBack(6).reduce
 function flowCoverCell(it, rc){
   const q=rc.c3||0, a3=flowAvg3(it), a6=flowAvg6(it);
   const c3m=a3>0?q/a3:Infinity, c6m=a6>0?q/a6:Infinity;
-  const fmt=m=>isFinite(m)?fmtMo(m)+' ด.':'∞';
   const hi=m=>(typeof pkCoverHi==='function'&&isFinite(m))?pkCoverHi(m):'color:var(--muted);';
+  const line=(m,lbl,tip)=>`<span style="font-size:12.5px;font-weight:800;padding:2px 8px;border-radius:6px;${hi(m)}" title="${tip}">อยู่ได้ ${isFinite(m)?fmtMo(m):'∞'} ด.</span><div class="muted" style="font-size:8.5px;">${lbl}</div>`;
   return `<td style="padding:6px 10px;text-align:right;white-space:nowrap;vertical-align:top;">
-    <div style="border-bottom:1px solid var(--line);padding-bottom:3px;margin-bottom:3px;" title="จำนวนหมวด③ = คลัง+PO+จัดตู้+ผลิต (ตัวตั้งที่นำไปหาร)"><b style="font-size:13px;">${fmtNum(q)}</b> <span class="muted" style="font-size:9px;">ชิ้น (หมวด③)</span></div>
-    <div style="border-bottom:1px dashed var(--line);padding-bottom:3px;margin-bottom:3px;" title="หมวด③ ${fmtNum(q)} ÷ เฉลี่ย 3ด. ${fmtNum(Math.round(a3))}/ด. → อยู่ได้ ${fmt(c3m)}"><span style="font-size:12px;font-weight:800;padding:1px 6px;border-radius:5px;${hi(c3m)}">${fmt(c3m)}</span> <span class="muted" style="font-size:8.5px;">÷เฉลี่ย3ด.</span></div>
-    <div title="หมวด③ ${fmtNum(q)} ÷ เฉลี่ย 6ด. ${fmtNum(Math.round(a6))}/ด. → อยู่ได้ ${fmt(c6m)}"><span style="font-size:12px;font-weight:800;padding:1px 6px;border-radius:5px;${hi(c6m)}">${fmt(c6m)}</span> <span class="muted" style="font-size:8.5px;">÷เฉลี่ย6ด.</span></div>
+    <div style="border-bottom:1px dashed var(--line);padding-bottom:3px;margin-bottom:3px;">${line(c3m,'หมวด③ ÷ เฉลี่ย 3ด.', 'หมวด③ '+fmtNum(q)+' ÷ ยอดขายเฉลี่ย 3 เดือน '+fmtNum(Math.round(a3))+'/ด.')}</div>
+    <div>${line(c6m,'หมวด③ ÷ เฉลี่ย 6ด.', 'หมวด③ '+fmtNum(q)+' ÷ ยอดขายเฉลี่ย 6 เดือน '+fmtNum(Math.round(a6))+'/ด.')}</div>
   </td>`;
 }
 function flowAvgCell(it){
