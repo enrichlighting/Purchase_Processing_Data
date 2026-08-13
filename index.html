@@ -7857,7 +7857,7 @@ function pkSetMode(m){
   window.pkMode = m;
   const rb=document.querySelector('input[name="pk-mode"][value="'+m+'"]'); if(rb) rb.checked=true;
   // รีเซ็ตการเลือก Lot ของทุกแถว (คนละชุดข้อมูลระหว่างโหมด)
-  window.packingRows.forEach(r=>{ const list=pkLotList(r.item); r.costIdx = list.length?0:null; r.lotMax = (window.pkMode==='released'&&list.length&&list[0].out!=null)?list[0].out:null; if(window.pkMode==='released'&&list.length&&list[0].out!=null){ r.loads=[list[0].out]; r.lots=[]; } });
+  window.packingRows.forEach(r=>{ const list=pkLotList(r.item); r.costIdx = list.length?0:null; r.lotMax = (window.pkMode==='released'&&list.length&&list[0].out!=null)?list[0].out:null; if(window.pkMode==='released'&&list.length){ r.loads=[pkDefaultLoad(r)]; r.lots=[]; } });
   renderPacking();
 }
 function pkSetCostLot(i, v){
@@ -7866,7 +7866,7 @@ function pkSetCostLot(i, v){
   if(window.pkMode==='released'){
     const rc=pkRowCost(r);
     r.lotMax = (rc.out!=null)? rc.out : null;
-    if(rc.out!=null){ r.loads=[rc.out]; }   // ดึงจำนวนค้างรับมาใส่ตู้แรก (แก้ได้)
+    r.loads=[pkDefaultLoad(r)];   // ดึงจำนวนสั่งผลิตมาใส่ตู้แรก (แก้ได้) · ถ้ายังไม่กรอกสั่งผลิต = เว้นว่าง
   } else { r.lotMax=null; }
   renderPacking();
 }
@@ -7875,7 +7875,7 @@ function pkSetItem(i, v){
   const list=pkLotList(v);
   r.costIdx = list.length? 0 : null;
   r.lotMax = (window.pkMode==='released'&&list.length&&list[0].out!=null)? list[0].out : null;
-  if(window.pkMode==='released'&&list.length&&list[0].out!=null){ r.loads[0]=list[0].out; }   // default จำนวนลงตู้แรก
+  if(window.pkMode==='released'&&list.length){ r.loads[0]=pkDefaultLoad(r); }   // default = จำนวนสั่งผลิต
   renderPacking();
 }
 function pkSetFx(){ renderPacking(); }
@@ -7969,6 +7969,7 @@ function pkSetCell(i, c, v){
   if(e=document.getElementById('pk-rcbm-'+i)) e.innerHTML='<b>'+rs.cbm.toFixed(3)+'</b>';
   if(e=document.getElementById('pk-rvr-'+i)) e.innerHTML=(rs.valRmb>0?'<b>¥'+pkYuan(rs.valRmb)+'</b>':'<span class="muted">-</span>');
   if(e=document.getElementById('pk-rvt-'+i)) e.innerHTML=(rs.valThb>0?'<b>฿'+pkMoney(rs.valThb)+'</b>':'<span class="muted">-</span>');
+  const wn=document.getElementById('pk-warn-'+i); if(wn) wn.innerHTML=pkRowWarn(i);   // อัปเดตแจ้งเตือนสั่งผลิตแบบสด
   pkFootCont(c); pkGrand(); renderContainers();
 }
 function pkSetLot(i, c, v){
@@ -8193,7 +8194,7 @@ function renderPacking(){
       const lotDl='<datalist id="pk-lotdl-'+i+'">'+lotList.map(e=>`<option value="${pkLotLabelOf(e).replace(/"/g,'&quot;')}"></option>`).join('')+'</datalist>';
       const curLot=(r.costIdx!=null && lotList[r.costIdx])? pkLotLabelOf(lotList[r.costIdx]) : '';
       costSel=`<input list="pk-lotdl-${i}" value="${curLot.replace(/"/g,'&quot;')}" onchange="pkPickLot(${i},this.value)" onfocus="this.select()" placeholder="🔍 ค้นหา Lot" autocomplete="off" title="เลือก Lot No" style="max-width:230px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`+lotDl;
-      if(window.pkMode==='released' && r.lotMax!=null) capNote=`<div class="muted" style="font-size:10px;margin-top:2px;">รวมได้สูงสุด ${fmtNum(r.lotMax)} ชิ้น</div>`;
+      if(window.pkMode==='released') capNote=`<div id="pk-warn-${i}">${pkRowWarn(i)}</div>`;
     }
     rows += `<tr>
       <td style="white-space:nowrap;"><input type="checkbox" ${(window.pkRowSel&&window.pkRowSel.has(i))?'checked':''} onchange="pkToggleRow(${i},this.checked)" title="เลือกเพื่อลบหลายแถว" style="vertical-align:middle;margin-right:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${pkColor(i)};vertical-align:middle;"></span> <b>${i+1}</b></td>
@@ -8338,6 +8339,25 @@ function pkPackCap(po,item){
   const oq=(o && o.orderQty!=='' && o.orderQty!=null)? (+o.orderQty) : null;
   if(oq!=null) return {cap:oq, kind:'จำนวนสั่งผลิต'};
   return {cap: pkOutstandingFor(po,item), kind:'ค้างรับใน PO'};
+}
+// ข้อมูลจำนวนสั่งผลิตต่อแถว (โหมด Released) — ใช้เป็นฐานการจัดตู้แทนค้างรับ
+function pkRowProd(r){
+  if(window.pkMode!=='released' || !r || !r.item) return {po:'', prodEntered:true, prod:null, out:null};
+  const rc=pkRowCost(r); const po=rc.po||'';
+  if(!po) return {po:'', prodEntered:true, prod:null, out:(rc.out!=null?rc.out:null)};
+  const items=((window.poFollow||{})[po]||{}).items||{}; const o=items[r.item];
+  const entered=!!(o && o.orderQty!=='' && o.orderQty!=null);
+  return {po, prodEntered:entered, prod: entered?(+o.orderQty||0):null, out:(rc.out!=null?rc.out:null)};
+}
+function pkDefaultLoad(r){ const pr=pkRowProd(r); return (pr.prodEntered && pr.prod!=null) ? pr.prod : ''; }   // เติมตู้แรก = จำนวนสั่งผลิต (ถ้ากรอก) · ไม่กรอก = เว้นว่าง
+function pkRowWarn(i){
+  const r=window.packingRows[i]; if(!r||!r.item||window.pkMode!=='released') return '';
+  const pr=pkRowProd(r); if(!pr.po) return '';
+  const total=(r.loads||[]).reduce((s,x)=>s+(+x||0),0);
+  if(!pr.prodEntered) return `<div style="font-size:10.5px;margin-top:2px;color:#dc2626;font-weight:700;">⚠️ คุณยังไม่ได้กรอกสั่งผลิต<br><span style="font-weight:400;">ไปกรอก "จำนวนสั่งผลิต" ที่การ์ด PO หน้า 🚨 วางแผน Lead Time</span></div>`;
+  if(total>pr.prod){ const usedC=[]; (r.loads||[]).forEach((x,c)=>{ if((+x||0)>0) usedC.push(((window.pkContainers[c]||{}).name)||('ตู้ '+(c+1))); });
+    return `<div style="font-size:10.5px;margin-top:2px;color:#dc2626;font-weight:700;">⚠️ คุณกรอกเกินจำนวนสั่งผลิต · สั่งผลิต ${fmtNum(pr.prod)} · จัด ${fmtNum(total)} (เกิน ${fmtNum(total-pr.prod)})<br><span style="font-weight:400;">ตู้ที่กรอกไปแล้ว: ${usedC.join(', ')||'-'}</span></div>`; }
+  return `<div class="muted" style="font-size:10px;margin-top:2px;">สั่งผลิต ${fmtNum(pr.prod)} ชิ้น · จัดแล้ว ${fmtNum(total)}${pr.out!=null?' · ค้างรับ '+fmtNum(pr.out):''}</div>`;
 }
 function pkSaveRound(asNew){
   const editIdx = asNew ? null : window.pkEditIdx;   // asNew = บันทึกเป็นรอบใหม่ ไม่ทับของเดิม
