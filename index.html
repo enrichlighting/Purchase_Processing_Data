@@ -9111,10 +9111,9 @@ function flowSalesDIY(it){
   const mx=Math.max(1,...A,...B,...C);   // สเกลเดียวกันทั้ง 3 เส้น (จำนวนชิ้น เทียบกันได้)
   let groups='';
   for(let i=0;i<12;i++){
-    const active=!selM||(i+1)===selM, showNum=(i+1)===selM;
-    const bar=(v,col,lbl)=>`<div title="${MN[i]} ${selY} · ${lbl}: ${fmtNum(v)} ชิ้น" style="width:4px;height:${Math.round(v/mx*40)}px;min-height:${v?2:0}px;background:${col};opacity:${active?1:0.28};border-radius:1px 1px 0 0;"></div>`;
-    const nums=showNum?`<div style="font-size:8px;line-height:1.15;margin-bottom:1px;white-space:nowrap;text-align:center;"><b style="color:#ea580c;">${fmtNum(A[i])}</b><br><b style="color:#2563eb;">${fmtNum(B[i])}</b><br><b style="color:#7c3aed;">${fmtNum(C[i])}</b></div>`:'';
-    groups+=`<div onclick="event.stopPropagation();flowSetMonth('${it.no}',${(i+1)===selM?0:(i+1)})" title="คลิกดู ${MN[i]}" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:0;cursor:pointer;">${nums}<div style="display:flex;align-items:flex-end;gap:2px;height:42px;">${bar(A[i],'#ea580c','ยอดขายเรา→DIY')}${bar(B[i],'#2563eb','ยอดขายหน้าร้าน')}${bar(C[i],'#7c3aed','สต๊อกหน้าร้าน')}</div><div style="font-size:8.5px;color:${(i+1)===selM?'#ea580c':'var(--muted)'};font-weight:${(i+1)===selM?'800':'400'};margin-top:2px;">${MN[i]}</div></div>`;
+    const active=!selM||(i+1)===selM, on=(i+1)===selM;
+    const bar=(v,col,lbl)=>`<div title="${MN[i]} ${selY} · ${lbl}: ${fmtNum(v)} ชิ้น" style="width:6px;height:${Math.round(v/mx*52)}px;min-height:${v?3:0}px;background:${col};opacity:${active?1:0.22};border-radius:2px 2px 0 0;"></div>`;
+    groups+=`<div onclick="event.stopPropagation();flowSetMonth('${it.no}',${on?0:(i+1)})" title="คลิกดู ${MN[i]}" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:0;cursor:pointer;padding:2px 0;${on?'background:#fff3e6;border-radius:6px;':''}"><div style="display:flex;align-items:flex-end;gap:3px;height:56px;">${bar(A[i],'#ea580c','ยอดขายเรา→DIY')}${bar(B[i],'#2563eb','ยอดขายหน้าร้าน')}${bar(C[i],'#7c3aed','สต๊อกหน้าร้าน')}</div><div style="font-size:9px;color:${on?'#ea580c':'var(--muted)'};font-weight:${on?'800':'400'};margin-top:3px;">${MN[i]}</div></div>`;
   }
   const sumA=A.reduce((s,v)=>s+v,0), sumB=B.reduce((s,v)=>s+v,0), avgC=Math.round(C.reduce((s,v)=>s+v,0)/12);
   const detail=selM?`<div style="font-size:11.5px;font-weight:700;margin-bottom:6px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:4px 9px;">${MN[selM-1]} ${selY} → <span style="color:#ea580c;">เรา→DIY ${fmtNum(A[selM-1])}</span> · <span style="color:#2563eb;">หน้าร้าน ${fmtNum(B[selM-1])}</span> · <span style="color:#7c3aed;">สต๊อก ${fmtNum(C[selM-1])}</span> <span class="muted" style="font-weight:400;">ชิ้น</span></div>`:'';
@@ -9127,8 +9126,9 @@ function flowSalesDIY(it){
       <span><span style="display:inline-block;width:9px;height:9px;background:#2563eb;border-radius:2px;vertical-align:middle;"></span> ยอดขายหน้าร้าน (ชิ้น) · รวมปี ${fmtNum(sumB)}</span>
       <span><span style="display:inline-block;width:9px;height:9px;background:#7c3aed;border-radius:2px;vertical-align:middle;"></span> สต๊อกหน้าร้าน (ชิ้น) · เฉลี่ย ${fmtNum(avgC)}/ด.</span>
     </div>
-    <div style="display:flex;align-items:flex-end;gap:3px;height:70px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;">${groups}</div>
-    <div class="muted" style="font-size:9.5px;margin-top:3px;">* ทั้ง 3 เส้นเป็น "จำนวนชิ้น" สเกลเดียวกัน เทียบกันได้ · คลิกที่เดือนเพื่อดูตัวเลข</div>
+    <div style="position:relative;"><div style="position:absolute;top:2px;right:6px;font-size:8.5px;color:var(--muted);">สูงสุด ${fmtNum(mx)} ชิ้น</div>
+    <div style="display:flex;align-items:flex-end;gap:4px;height:82px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;">${groups}</div></div>
+    <div class="muted" style="font-size:9.5px;margin-top:3px;">* ทั้ง 3 เส้นเป็น "จำนวนชิ้น" สเกลเดียวกัน เทียบกันได้ · ชี้เมาส์หรือคลิกที่เดือนเพื่อดูตัวเลข</div>
   </div>`;
 }
 function flowSales(it){
