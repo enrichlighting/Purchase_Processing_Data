@@ -308,6 +308,7 @@
       <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:10px;">
         <span style="font-size:12px;font-weight:700;">🗄️ สำรอง/กู้คืนข้อมูล (ย้ายข้ามเครื่อง/เบราว์เซอร์):</span>
         <button class="go" id="pk-export" style="background:var(--brand);">⬇️ สำรองข้อมูล (Export)</button>
+        <button class="go" id="pk-dimexport" style="background:#ea580c;" title="ส่งออกเฉพาะ L/W/H/ชิ้นต่อกล่อง ที่แก้ไข เพื่ออัปเดตไฟล์กลางถาวร">📤 ส่งขนาดที่แก้</button>
         <button class="go" id="pk-import" style="background:var(--warn);">⬆️ โหลดข้อมูลกลับ (Import)</button>
         <input type="file" id="pk-importfile" accept="application/json,.json" style="display:none;">
         <span class="muted" id="pk-backupstatus" style="font-size:12px;">รวมทุก Packing รอบ + สถานะติดตาม PO ไว้ในไฟล์เดียว</span>
@@ -7769,7 +7770,36 @@ function pkCoverInfo(itemCode){
 function pkCoverColor(m){ return m<=2 ? '#ea580c' : (m<3 ? '#ca8a04' : '#16a34a'); }   // ≤2 ส้ม · 2–2.9 เหลือง · ≥3 เขียว
 function pkCoverHi(m){ return m<=2 ? 'background:#fb923c;color:#7c2d12;' : (m<3 ? 'background:#fde047;color:#713f12;' : 'background:#86efac;color:#14532d;'); }   // ไฮไลท์พื้นหลัง
 window.pkCustomDims = window.pkCustomDims || {};   // มิติสินค้ากรอกเอง (นอก PO) · key = รหัสสังเคราะห์ CUSTOM-*
-function pkItem(code){ if(window.BC_PACKING && window.BC_PACKING[code]) return window.BC_PACKING[code]; return (window.pkCustomDims && window.pkCustomDims[code]) ? window.pkCustomDims[code] : null; }
+function pkItem(code){
+  const base=(window.BC_PACKING && window.BC_PACKING[code]) ? window.BC_PACKING[code] : null;
+  if(base){ const ov=window.pkDimEdit && window.pkDimEdit[code]; return ov ? Object.assign({}, base, ov) : base; }   // ทับด้วยขนาดที่แก้ (ถ้ามี)
+  return (window.pkCustomDims && window.pkCustomDims[code]) ? window.pkCustomDims[code] : null;
+}
+// ----- แก้ไขขนาด L/W/H/pcs ของสินค้าในระบบ · เก็บทับในเครื่อง (localStorage) + ส่งออกไปอัปเดตไฟล์กลาง -----
+function pkDimEditLoad(){ try{ const s=localStorage.getItem('pkDimEditV1'); window.pkDimEdit=s?JSON.parse(s):{}; }catch(e){ window.pkDimEdit={}; } }
+function pkDimEditSave(){ try{ localStorage.setItem('pkDimEditV1', JSON.stringify(window.pkDimEdit||{})); }catch(e){} }
+function pkHasDimEdit(code){ return !!(window.pkDimEdit && window.pkDimEdit[code]); }
+function pkDimEditCount(){ return window.pkDimEdit ? Object.keys(window.pkDimEdit).length : 0; }
+function pkDimSet(i, field, val){
+  const r=window.packingRows[i]; if(!r||!r.item) return;
+  const base=(window.BC_PACKING && window.BC_PACKING[r.item]);
+  if(!base){ pkCustSet(i,field,val); return; }               // สินค้ากรอกเอง/ไม่มีมิติในระบบ → ใช้ของเดิม
+  if(!window.pkDimEdit) pkDimEditLoad();
+  const ov = window.pkDimEdit[r.item] || (window.pkDimEdit[r.item]={});
+  let v=Math.max(0,+val||0); if(field==='pcs' && !(v>0)) v=1;
+  ov[field]=v;
+  if(['L','W','H','pcs'].every(f=> (ov[f]!=null?ov[f]:base[f])===base[f])) delete window.pkDimEdit[r.item];   // กลับค่าเดิมครบ → ลบ override
+  pkDimEditSave(); renderPacking();
+}
+function pkDimReset(i){ const r=window.packingRows[i]; if(!r||!r.item||!window.pkDimEdit) return; delete window.pkDimEdit[r.item]; pkDimEditSave(); renderPacking(); if(typeof pkToast==='function') pkToast('คืนค่าขนาดเดิมแล้ว','good'); }
+function pkDimEditExport(){
+  const o=window.pkDimEdit||{}; const keys=Object.keys(o);
+  if(!keys.length){ if(typeof pkToast==='function') pkToast('ยังไม่มีการแก้ขนาด','muted'); return; }
+  const body='window.PK_DIM_EDIT = {\n'+keys.map(k=>`${JSON.stringify(k)}:${JSON.stringify(o[k])}`).join(',\n')+'\n};\n';
+  try{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([body],{type:'text/javascript'})); a.download='pk-dim-edit.js'; a.click(); }catch(e){}
+  try{ if(navigator.clipboard) navigator.clipboard.writeText(body); }catch(e){}
+  if(typeof pkToast==='function') pkToast('ส่งออกขนาดที่แก้ '+keys.length+' รายการ (ดาวน์โหลด+คัดลอกแล้ว)\nส่งไฟล์ pk-dim-edit.js ให้อัปเดตไฟล์กลาง','good');
+}
 function pkIsCustom(code){ return !!(code && window.pkCustomDims && window.pkCustomDims[code]); }
 // เพิ่มแถวสินค้ากรอกเอง (นอก PO) — มิติ/ชื่อ/RMB กรอกเอง · ใช้ได้ทั้ง Forecast และ Released
 function pkAddCustomRow(){
@@ -8169,10 +8199,10 @@ function renderPacking(){
       <td style="white-space:nowrap;"><input type="checkbox" ${(window.pkRowSel&&window.pkRowSel.has(i))?'checked':''} onchange="pkToggleRow(${i},this.checked)" title="เลือกเพื่อลบหลายแถว" style="vertical-align:middle;margin-right:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${pkColor(i)};vertical-align:middle;"></span> <b>${i+1}</b></td>
       <td>${cust?`<span class="tag" style="background:#ecfeff;color:#0e7490;font-size:11px;white-space:nowrap;">✎ กรอกเอง (นอก PO)</span>`:`<input list="pk-itemdl" value="${pkItemLabel(r.item).replace(/"/g,'&quot;')}" onchange="pkPickItem(${i},this.value)" onfocus="this.select()" placeholder="🔍 พิมพ์ค้นหาสินค้า" autocomplete="off" style="min-width:220px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`}</td>
       <td>${editDims?`<input type="text" value="${(d?d.desc:'').replace(/"/g,'&quot;')}" onchange="pkCustSet(${i},'desc',this.value)" placeholder="ชื่อสินค้า (กรอกเอง)" style="min-width:150px;width:100%;box-sizing:border-box;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(r.item?`<span class="muted" title="${(d?d.desc:'').replace(/"/g,'&quot;')}">${((typeof getItem==='function'&&getItem(r.item))||{}).subType||'-'}</span>`:'<span class="muted">—</span>')}</td>
-      <td class="num">${editDims?`<input type="number" min="0" step="0.1" value="${d?d.L:0}" onchange="pkCustSet(${i},'L',this.value)" title="กว้าง×ยาว×สูง (ซม.)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.L):'-')}</td>
-      <td class="num">${editDims?`<input type="number" min="0" step="0.1" value="${d?d.W:0}" onchange="pkCustSet(${i},'W',this.value)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.W):'-')}</td>
-      <td class="num">${editDims?`<input type="number" min="0" step="0.1" value="${d?d.H:0}" onchange="pkCustSet(${i},'H',this.value)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmt1(d.H):'-')}</td>
-      <td class="num">${editDims?`<input type="number" min="1" step="1" value="${d?d.pcs:1}" onchange="pkCustSet(${i},'pcs',this.value)" style="width:60px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(d?fmtNum(d.pcs):'-')}</td>
+      <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.L:0}" onchange="pkDimSet(${i},'L',this.value)" title="กว้าง (ซม.) · แก้ไขได้ · เซฟทับอัตโนมัติ" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
+      <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.W:0}" onchange="pkDimSet(${i},'W',this.value)" title="ยาว (ซม.)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
+      <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.H:0}" onchange="pkDimSet(${i},'H',this.value)" title="สูง (ซม.)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
+      <td class="num" style="white-space:nowrap;">${r.item?`<input type="number" min="1" step="1" value="${d?d.pcs:1}" onchange="pkDimSet(${i},'pcs',this.value)" title="ชิ้น/กล่อง" style="width:56px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}${(r.item&&pkHasDimEdit(r.item))?` <a href="#" onclick="pkDimReset(${i});return false;" title="คืนค่าขนาดเดิม" style="font-size:11px;color:var(--muted);text-decoration:none;">↩︎</a>`:''}</td>
       <td>${costSel}${capNote}</td>
       <td class="num" id="pk-rmb-${i}">${rc.rmb==null?'<span class="muted">-</span>':('¥'+pkYuan(rc.rmb))}</td>
       <td class="num" id="pk-thb-${i}">${rc.thb==null?'<span class="muted">-</span>':('฿'+rc.thb.toLocaleString('en-US',{maximumFractionDigits:2}))}</td>
@@ -9383,9 +9413,10 @@ document.getElementById('pk-savenew').onclick = ()=>pkSaveRound(true);
 document.getElementById('pk-savedraft').onclick = ()=>pkSaveDraft(false);
 document.getElementById('pk-setdir').onclick = pkSetDir;
 document.getElementById('pk-export').onclick = pkExportBackup;
+document.getElementById('pk-dimexport').onclick = pkDimEditExport;
 document.getElementById('pk-import').onclick = ()=>document.getElementById('pk-importfile').click();
 document.getElementById('pk-importfile').onchange = function(){ pkImportBackup(this.files[0]); this.value=''; };
-pkLoadLog(); pkLoadDraft(); pkRestoreDir();   // กู้แบบร่างการจัดตู้ที่ค้างไว้ (ถ้ามี)
+pkLoadLog(); pkLoadDraft(); pkRestoreDir(); pkDimEditLoad();   // กู้แบบร่างการจัดตู้ + ขนาดที่แก้ไว้ (ถ้ามี)
 document.getElementById('s-type').onchange = ()=>{ populateSearchItems(); renderSearch(); };
 document.getElementById('s-subtype').onchange = ()=>{ populateSearchItems(); renderSearch(); };
 document.getElementById('s-vendor').onchange = ()=>{ populateSearchItems(); renderSearch(); };
