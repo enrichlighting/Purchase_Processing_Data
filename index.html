@@ -9105,7 +9105,7 @@ function flowSalesDIY(it){
   </div>`;
 }
 function flowSales(it){
-  if(it.mrdiySell) return flowSalesDIY(it);   // สินค้ามี PLU → กราฟ Mr.DIY (ยอดขายเรา + หน้าร้าน + สต๊อก)
+  if(it.mrdiySell && window.flowVersion==='diy') return flowSalesDIY(it);   // กราฟ Mr.DIY เฉพาะเวอร์ชัน Mr.DIY เท่านั้น
   const mon=it.monthly||[]; if(!mon.length) return '<div class="muted" style="font-size:11px;">— ไม่มีข้อมูลยอดขาย</div>';
   const years=[...new Set(mon.map(m=>m[0].slice(0,4)))].sort();
   const selY=window.flowState.year[it.no]||years[years.length-1];
