@@ -7746,7 +7746,7 @@ function pkCoverInfo(itemCode){
   const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180);
   const rc=(typeof reorderCalc==='function')?reorderCalc(it, basis, window.RGROUP||'all'):null;
   if(!rc || !(rc.paidDaily>0)) return null;
-  return {stock:rc.onHand, mo:rc.paidDaily*30};
+  return {stock:rc.onHand, mo:rc.paidDaily*30, base:rc.c3};   // base = หมวด③ (คลัง+PO+จัดตู้+ผลิต) ให้ตรงกับหน้า Flowchart
 }
 function pkCoverColor(m){ return m<=2 ? '#ea580c' : (m<3 ? '#ca8a04' : '#16a34a'); }   // ≤2 ส้ม · 2–2.9 เหลือง · ≥3 เขียว
 function pkCoverHi(m){ return m<=2 ? 'background:#fb923c;color:#7c2d12;' : (m<3 ? 'background:#fde047;color:#713f12;' : 'background:#86efac;color:#14532d;'); }   // ไฮไลท์พื้นหลัง
@@ -8121,8 +8121,8 @@ function renderPacking(){
         lotPart=`<input type="text" value="${lot}" oninput="pkSetLot(${i},${c},this.value)" placeholder="Lot No" title="Lot No (กรอกเอง)" style="width:90px;text-align:right;font-size:11px;margin-top:3px;padding:2px 4px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--muted)">`;
       }
       let covLine='';
-      if(_cov){ const tu=+((r.loads||[])[c])||0; const m1=(_cov.stock/3)/_cov.mo, m2=((_cov.stock+tu)/3)/_cov.mo; const mmR=Math.round((tu>0?m2:m1)*10)/10;
-        covLine=`<div style="margin-top:4px;text-align:right;white-space:nowrap;"><span style="display:inline-block;font-size:12.5px;font-weight:800;padding:2px 9px;border-radius:6px;${pkCoverHi(mmR)}" title="อยู่ได้ = (สต๊อก ${fmtNum(_cov.stock)}${tu>0?' + ตู้ '+fmtNum(tu):''} ÷ 3) ÷ ยอดขายเฉลี่ย ${fmtNum(Math.round(_cov.mo))}/เดือน${tu>0?'':' · ยังไม่กรอกจำนวนตู้ = คิดจากสต๊อกอย่างเดียว'}">อยู่ได้ ${fmtMo(mmR)} ด.${tu>0?'':' (สต๊อก)'}</span></div>`; }
+      if(_cov){ const tu=+((r.loads||[])[c])||0; const coverQty=(_cov.base||0)+tu; const mmR=Math.round(coverQty/_cov.mo*10)/10;
+        covLine=`<div style="margin-top:4px;text-align:right;white-space:nowrap;"><span style="display:inline-block;font-size:12.5px;font-weight:800;padding:2px 9px;border-radius:6px;${pkCoverHi(mmR)}" title="อยู่ได้ = (หมวด③ คลัง+PO+จัดตู้+ผลิต ${fmtNum(_cov.base)}${tu>0?' + ตู้นี้ '+fmtNum(tu):''}) ÷ ยอดขายเฉลี่ย ${fmtNum(Math.round(_cov.mo))}/เดือน · ตรงกับหน้า Flowchart${tu>0?' (รวมตู้ที่กำลังจัด)':''}">อยู่ได้ ${fmtMo(mmR)} ด.</span></div>`; }
       cells+=`<td class="num" style="vertical-align:top">${pieceInput}<br>${lotPart}${covLine}</td>`;
     });
     const cust=!!r.custom;
