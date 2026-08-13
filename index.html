@@ -7943,6 +7943,22 @@ function pkPickItem(i, v){ v=String(v||'').trim(); if(!v){ pkSetItem(i,''); retu
   if(itemHasReleasedPO(code)){ pkEnsureDims(code); pkSetItem(i, code); return; }
   pkToast('ไม่พบสินค้า','bad');
 }
+// เลือกสินค้าด้วย "Item No." (รหัส) แยกจากช่องชื่อย่อ
+function pkItemNoDatalist(){
+  const set=new Set(Object.keys(window.BC_PACKING||{}));
+  if(window.pkMode==='released' && window.BC_PO){ for(const it in window.BC_PO){ if((window.BC_PO[it].pos||[]).some(p=>p[4]==='Released')) set.add(it); } }
+  return '<datalist id="pk-itemno-dl">'+[...set].sort().map(k=>`<option value="${k}">${(pkDisplayName(k)||'').replace(/"/g,'&quot;')}</option>`).join('')+'</datalist>';
+}
+function pkPickItemByNo(i, v){ v=String(v||'').trim().toUpperCase(); if(!v){ pkSetItem(i,''); return; }
+  let code=null;
+  if(window.BC_PACKING && window.BC_PACKING[v]) code=v;
+  if(!code && typeof itemHasReleasedPO==='function' && itemHasReleasedPO(v)) code=v;
+  if(!code){ const all=Object.keys(window.BC_PACKING||{}); code=all.find(k=>k.toUpperCase()===v) || all.find(k=>k.toUpperCase().indexOf(v)>=0) || null; }
+  if(!code){ pkToast('ไม่พบรหัสสินค้า — พิมพ์/เลือกรหัส R-ENR-...','bad'); return; }
+  if(window.BC_PACKING && window.BC_PACKING[code]){ pkSetItem(i, code); return; }
+  if(itemHasReleasedPO(code)){ pkEnsureDims(code); pkSetItem(i, code); return; }
+  pkToast('ไม่พบรหัสสินค้า','bad');
+}
 function pkLotLabelOf(e){ return (window.pkMode==='released') ? `${e.po} · ${e.lot} · ค้าง ${fmtNum(e.out)} · ¥${e.rmb}` : `${e.lot} · ¥${e.rmb}`; }
 function pkPickLot(i, v){
   const r=window.packingRows[i]; if(!r) return; v=String(v||'').trim();
@@ -8198,7 +8214,7 @@ function renderPacking(){
     }
     rows += `<tr>
       <td style="white-space:nowrap;"><input type="checkbox" ${(window.pkRowSel&&window.pkRowSel.has(i))?'checked':''} onchange="pkToggleRow(${i},this.checked)" title="เลือกเพื่อลบหลายแถว" style="vertical-align:middle;margin-right:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${pkColor(i)};vertical-align:middle;"></span> <b>${i+1}</b></td>
-      <td>${cust?`<span class="tag" style="background:#ecfeff;color:#0e7490;font-size:11px;white-space:nowrap;">✎ กรอกเอง (นอก PO)</span>`:`<input list="pk-itemdl" value="${pkItemLabel(r.item).replace(/"/g,'&quot;')}" onchange="pkPickItem(${i},this.value)" onfocus="this.select()" placeholder="🔍 พิมพ์ค้นหาสินค้า" autocomplete="off" style="min-width:220px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`}</td>
+      <td>${cust?`<span class="tag" style="background:#ecfeff;color:#0e7490;font-size:11px;white-space:nowrap;">✎ กรอกเอง (นอก PO)</span>`:`<div style="min-width:230px;"><input list="pk-itemdl" value="${pkItemLabel(r.item).replace(/"/g,'&quot;')}" onchange="pkPickItem(${i},this.value)" onfocus="this.select()" placeholder="🔍 ชื่อย่อ (Item เลือก)" autocomplete="off" style="width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"><input list="pk-itemno-dl" value="${(r.item||'').replace(/"/g,'&quot;')}" onchange="pkPickItemByNo(${i},this.value)" onfocus="this.select()" placeholder="🔢 Item No. (รหัส)" autocomplete="off" style="width:100%;box-sizing:border-box;font-size:11.5px;margin-top:3px;padding:4px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--muted);">${r.item?`<div class="muted" style="font-size:10.5px;margin-top:3px;line-height:1.35;">${(pkFullDesc(r.item)||'').replace(/</g,'&lt;')}</div>`:''}</div>`}</td>
       <td>${editDims?`<input type="text" value="${(d?d.desc:'').replace(/"/g,'&quot;')}" onchange="pkCustSet(${i},'desc',this.value)" placeholder="ชื่อสินค้า (กรอกเอง)" style="min-width:150px;width:100%;box-sizing:border-box;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:(r.item?`<span class="muted" title="${(d?d.desc:'').replace(/"/g,'&quot;')}">${((typeof getItem==='function'&&getItem(r.item))||{}).subType||'-'}</span>`:'<span class="muted">—</span>')}</td>
       <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.L:0}" onchange="pkDimSet(${i},'L',this.value)" title="กว้าง (ซม.) · แก้ไขได้ · เซฟทับอัตโนมัติ" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
       <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.W:0}" onchange="pkDimSet(${i},'W',this.value)" title="ยาว (ซม.)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
@@ -8226,7 +8242,7 @@ function renderPacking(){
     footVt+=`<td class="num" id="pk-cvt-${c}"><b>฿${pkMoney(cs.valThb)}</b></td>`;
   });
   let gp=0,gb=0,gc=0,gvr=0,gvt=0; window.packingRows.forEach(r=>{ const s=pkRowSum(r); gp+=s.pcs;gb+=s.box;gc+=s.cbm;gvr+=s.valRmb;gvt+=s.valThb; });
-  const html = pkItemDatalist() + `<table>
+  const html = pkItemDatalist() + pkItemNoDatalist() + `<table>
     <tr><th>#</th><th>Item (เลือก)</th><th>Subtype</th><th class="num">L</th><th class="num">W</th><th class="num">H</th><th class="num">ชิ้น/กล่อง</th><th>Lot (ต้นทุน)</th><th class="num">RMB Cost</th><th class="num">THB Cost</th>${contTh}<th class="num">รวมชิ้น</th><th class="num">รวมกล่อง</th><th class="num">รวม CBM</th><th class="num">มูลค่ารวม ¥</th><th class="num">มูลค่ารวม ฿</th><th></th></tr>
     ${rows}
     <tr style="border-top:2px solid var(--line)"><td colspan="10" class="num"><b>รวม CBM ต่อตู้ →</b></td>${footCbm}<td class="num" id="pk-gpcs"><b>${fmtNum(gp)}</b></td><td class="num" id="pk-gbox"><b>${fmt1(gb)}</b></td><td class="num" id="pk-gcbm"><b>${gc.toFixed(3)}</b></td><td class="num" id="pk-gvr"><b>¥${pkYuan(gvr)}</b></td><td class="num" id="pk-gvt"><b>฿${pkMoney(gvt)}</b></td><td></td></tr>
@@ -8894,11 +8910,11 @@ function poReadyList(){
   const packed=poPackedMap(), out=[];
   for(const po in window.poFollow){ const items=(window.poFollow[po]||{}).items||{}; for(const item in items){
     const pq=packed[po]?(packed[po].items[item]||0):0; const st=poStatus(po,item,pq);
-    if(st.key!=='due' && st.key!=='partial') continue;
+    if(st.key!=='due' && st.key!=='partial' && st.key!=='loadwait') continue;   // ค้างโหลดตู้ = ให้กลับไปจัดตู้ได้ด้วย
     const rl=poRelLot(po,item), o=items[item];
     const target=(o.orderQty===''||o.orderQty==null)?null:(+o.orderQty);
     const remaining = st.key==='partial' ? st.remaining : (target!=null?target:(rl?rl.out:null));
-    out.push({po,item, remaining, packed:pq, lot:rl?rl.lot:'', outQty:rl?rl.out:null});
+    out.push({po,item, remaining, packed:pq, lot:rl?rl.lot:'', outQty:rl?rl.out:null, loadwait: st.key==='loadwait', overdue: st.overdue||0});
   } }
   return out.sort((a,b)=> a.po<b.po?-1:1);
 }
@@ -9012,16 +9028,23 @@ function renderPoFollow(){
       if(packedQ>0){
         const stp=poStatus(selPo.po,x.item,packedQ);
         const m=poMonthsIncl(x.item,packedQ), mo=m?(m.months===Infinity?'∞':m.months.toFixed(1)):'-';
+        const oP=poFI(selPo.po,x.item);
+        const prodInput=`<div style="margin-top:6px;font-size:12px;font-weight:600;display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span>จำนวนสั่งผลิต:</span><input type="number" min="0" max="${x.out}" step="1" value="${oP.orderQty===''||oP.orderQty==null?x.out:oP.orderQty}" onchange="poSetQty('${selPo.po}','${x.item}',this.value,${x.out})" style="width:80px;text-align:right;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"><span class="muted">/ ${fmtNum(x.out)} ค้างรับ</span></div>`;
+        const oqNow=(oP.orderQty===''||oP.orderQty==null)?null:(+oP.orderQty);
+        const notProduced=(x.out!=null&&oqNow!=null)?Math.max(0,x.out-oqNow):0;
+        const notProdNote=notProduced>0?`<div style="font-size:11.5px;color:#ea580c;font-weight:700;margin-top:3px;">⚠️ ค้างรับที่ยังไม่ได้กรอกสั่งผลิต ${fmtNum(notProduced)} ชิ้น — เพิ่มจำนวนสั่งผลิตด้านบน แล้วจัดตู้ต่อได้</div>`:'';
         if(stp.key==='partial'){
           return `<div style="border:1px solid #ea580c;background:#fff4ec;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
             ${itemHead}
             <div style="font-size:12px;margin-top:3px;color:var(--good);font-weight:700;">✅ จัดตู้แล้ว ${fmtNum(packedQ)} ชิ้น</div>
             <div style="font-size:12px;color:#ea580c;font-weight:700;">🔔 เหลือต้องจัดอีก ${fmtNum(stp.remaining)} ชิ้น <span class="muted" style="font-weight:400;">— เลือกในกล่อง "📦 พร้อมจัดตู้" ด้านบนเพื่อจัดต่อ</span></div>
+            ${prodInput}${notProdNote}
             <div style="font-size:12px;">คงเหลือสต๊อก ${m?fmtNum(m.onHand):'-'} → รวมของจัดตู้แล้วอยู่ได้อีก <b style="color:var(--good)">~${mo} เดือน</b></div>${poShipCardBlock(x.item)}</div>`;
         }
         return `<div style="border:1px solid var(--good);background:var(--good-soft);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
           ${itemHead}
           <div style="font-size:12px;margin-top:3px;color:var(--good);font-weight:700;">✅ จัดตู้เสร็จแล้ว ${fmtNum(packedQ)} ชิ้น</div>
+          ${prodInput}${notProdNote}
           <div style="font-size:12px;">คงเหลือ ${m?fmtNum(m.onHand):'-'} → รวมของจัดตู้แล้วอยู่ได้อีก <b style="color:var(--good)">~${mo} เดือน</b></div>${poShipCardBlock(x.item)}</div>`;
       }
       const o=poFI(selPo.po,x.item), sc=poSchedule(selPo.po,x.item), st=poStatus(selPo.po,x.item,0);
@@ -9078,7 +9101,10 @@ function renderPoFollow(){
     const selCount = ready.filter(r=>window.poPackSel.has(r.po+'|'+r.item)).length;
     const selAllRow = `<label style="display:flex;gap:8px;align-items:center;font-size:12px;font-weight:700;padding:7px 9px;border:1px dashed var(--bad);border-radius:7px;background:#fff;cursor:pointer;margin-bottom:2px;"><input type="checkbox" ${allChecked?'checked':''} onchange="poSelectAllReady(this.checked)"><span>เลือกทั้งหมด (${ready.length} รายการ)${selCount?` <span class="muted" style="font-weight:400;">· เลือกอยู่ ${selCount}</span>`:''}</span></label>`;
     window.poReadyVendOpen = window.poReadyVendOpen || {};
-    const rItemLabel=r=>{ const key=r.po+'|'+r.item; const ck=window.poPackSel.has(key)?'checked':''; const partTag=r.packed>0?` <span class="muted">(จัดแล้ว ${fmtNum(r.packed)} · เหลือ)</span>`:''; const rname=(getItem(r.item)||{}).desc||''; return `<label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:var(--card);cursor:pointer;margin-left:16px;"><input type="checkbox" ${ck} onchange="poTogglePack('${key}',this.checked)" style="margin-top:2px;"><span><b>${r.po}</b> · <b>${r.item}</b> · <b style="color:var(--bad)">${r.remaining!=null?fmtNum(r.remaining):'(ยังไม่กรอกจำนวน)'}</b> ชิ้น${partTag}<br><span class="muted" style="font-size:11px;">${rname}</span></span></label>`; };
+    const rItemLabel=r=>{ const key=r.po+'|'+r.item; const ck=window.poPackSel.has(key)?'checked':''; const partTag=r.packed>0?` <span class="muted">(จัดแล้ว ${fmtNum(r.packed)} · เหลือ)</span>`:''; const rname=(getItem(r.item)||{}).desc||'';
+      const lw = r.loadwait ? ` <span style="display:inline-block;background:#b91c1c;color:#fff;font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:5px;">⛔ ค้างโหลดตู้ · เกิน ${fmtNum(r.overdue)} วัน</span>` : '';
+      const style = r.loadwait ? 'border:1px solid #b91c1c;background:#fef2f2;box-shadow:inset 4px 0 0 #b91c1c;' : 'border:1px solid var(--line);background:var(--card);';
+      return `<label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;padding:6px 9px;${style}border-radius:7px;cursor:pointer;margin-left:16px;"><input type="checkbox" ${ck} onchange="poTogglePack('${key}',this.checked)" style="margin-top:2px;"><span><b>${r.po}</b> · <b>${r.item}</b> · <b style="color:var(--bad)">${r.remaining!=null?fmtNum(r.remaining):'(ยังไม่กรอกจำนวน)'}</b> ชิ้น${partTag}${lw}<br><span class="muted" style="font-size:11px;">${rname}</span></span></label>`; };
     const gvR={}; ready.forEach(r=>{ const v=poVendorOf(r.po); (gvR[v]=gvR[v]||{}); const lot=r.lot||'(ไม่มี Lot)'; (gvR[v][lot]=gvR[v][lot]||[]).push(r); });
     const rrows=Object.keys(gvR).sort().map(v=>{
       const open=window.poReadyVendOpen[v]===true; const cnt=Object.values(gvR[v]).reduce((s,a)=>s+a.length,0);
