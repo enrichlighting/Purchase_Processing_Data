@@ -8934,15 +8934,18 @@ function renderPoFollow(){
   // ===== อันดับค้างรับนานสุด: ปี → เดือน → ผู้ขาย + มูลค่าค้างรับ (Cost RMB × ค้างรับ) =====
   const MON_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   window.poExpY=window.poExpY||{}; window.poExpM=window.poExpM||{}; window.poExpV=window.poExpV||{};
+  const poEtaOf=(poNo,item)=>{ const arr=((window.BC_PO&&window.BC_PO[item])||{}).pos||[]; const f=arr.find(p=>p[0]===poNo); return f&&f[2]?f[2]:null; };  // ETA จาก Purchase Order Line
   const tree={};
   list.forEach(po=>{ const doc=PD[po.po]; if(!doc) return; const y=doc.slice(0,4), ym=doc.slice(0,7); const vn=po.vendor||'(ไม่ระบุผู้ขาย)';
-    let val=0,out=0,lots=[]; po.items.forEach(x=>{ const rl=poRelLot(po.po,x.item)||{}; const o=+x.out||0; out+=o; val+=o*(+rl.rmb||0); if(rl.lot) lots.push(rl.lot); });
+    let val=0,out=0,lots=[],eta=null; po.items.forEach(x=>{ const rl=poRelLot(po.po,x.item)||{}; const o=+x.out||0; out+=o; val+=o*(+rl.rmb||0); if(rl.lot) lots.push(rl.lot); const e=poEtaOf(po.po,x.item); if(e && (!eta||e<eta)) eta=e; });  // eta = ETA เร็วสุดของ PO (ค้างนานสุด)
     const Y=tree[y]||(tree[y]={val:0,out:0,pos:new Set(),months:{}}); Y.val+=val; Y.out+=out; Y.pos.add(po.po);
     const M=Y.months[ym]||(Y.months[ym]={val:0,out:0,pos:new Set(),vendors:{}}); M.val+=val; M.out+=out; M.pos.add(po.po);
-    const V=M.vendors[vn]||(M.vendors[vn]={val:0,out:0,oldest:doc,pos:[]}); V.val+=val; V.out+=out; if(doc<V.oldest)V.oldest=doc;
-    V.pos.push({po:po.po,doc,out,val,lot:[...new Set(lots)].join(', ')}); });
+    const V=M.vendors[vn]||(M.vendors[vn]={val:0,out:0,oldest:doc,oldestEta:null,pos:[]}); V.val+=val; V.out+=out; if(doc<V.oldest)V.oldest=doc; if(eta && (!V.oldestEta||eta<V.oldestEta)) V.oldestEta=eta;
+    V.pos.push({po:po.po,doc,eta,out,val,lot:[...new Set(lots)].join(', ')}); });
   const yuan=n=>'¥'+fmtNum(Math.round(n));
   const daysAgo=d=>Math.round((new Date(today)-new Date(d))/86400000);
+  const etaDays=e=>e?Math.round((new Date(today)-new Date(e))/86400000):null;   // วันค้างนับจาก ETA (บวก=เลยกำหนด)
+  const etaWaitTxt=e=>{ const dd=etaDays(e); if(dd==null) return 'ไม่ระบุ ETA'; return dd>=0?('ค้าง '+fmtNum(dd)+' วัน (เลย ETA)'):('อีก '+fmtNum(-dd)+' วันถึง ETA'); };
   const escq=s=>String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   const yearsSorted=Object.keys(tree).sort();   // เก่าสุด→ใหม่สุด (ค้างนานสุดอยู่บน)
   let rowsT='';
@@ -8952,15 +8955,15 @@ function renderPoFollow(){
     Object.keys(Y.months).sort().forEach(ym=>{ const M=Y.months[ym]; const mOpen=!!window.poExpM[ym]; const mm=MON_TH[+ym.slice(5,7)-1];
       rowsT+=`<tr style="cursor:pointer;background:#fffdf7;" onclick="poToggleM('${ym}')"><td></td><td style="padding-left:10px;">${mOpen?'▼':'▶'} <b style="font-size:11.5px;">${mm} ${y}</b> <span class="muted" style="font-size:10px;">${M.pos.size} PO</span></td><td class="num" style="font-size:11px;">${yuan(M.val)}<br><span class="muted" style="font-size:10px;">ค้าง ${fmtNum(M.out)}</span></td></tr>`;
       if(!mOpen) return;
-      Object.entries(M.vendors).sort((a,b)=>a[1].oldest<b[1].oldest?-1:1).forEach(([vn,V])=>{ const vk=ym+'|'+vn; const vOpen=!!window.poExpV[vk];
-        rowsT+=`<tr style="cursor:pointer;${vOpen?'background:var(--brand-soft);':''}" onclick="poToggleV('${escq(vk)}')"><td></td><td style="padding-left:22px;">${vOpen?'▼':'▶'} <b style="font-size:11px;">${(vn||'').slice(0,22)}</b><br><span class="muted" style="font-size:10px;">ค้าง ${fmtNum(daysAgo(V.oldest))} วัน · ${V.pos.length} PO</span></td><td class="num" style="font-size:11px;"><b>${yuan(V.val)}</b><br><span class="muted" style="font-size:10px;">${fmtNum(V.out)} ชิ้น</span></td></tr>`;
+      Object.entries(M.vendors).sort((a,b)=>{ const ea=a[1].oldestEta,eb=b[1].oldestEta; if(ea&&eb) return ea<eb?-1:1; if(ea) return -1; if(eb) return 1; return a[1].oldest<b[1].oldest?-1:1; }).forEach(([vn,V])=>{ const vk=ym+'|'+vn; const vOpen=!!window.poExpV[vk];
+        rowsT+=`<tr style="cursor:pointer;${vOpen?'background:var(--brand-soft);':''}" onclick="poToggleV('${escq(vk)}')"><td></td><td style="padding-left:22px;">${vOpen?'▼':'▶'} <b style="font-size:11px;">${(vn||'').slice(0,22)}</b><br><span class="muted" style="font-size:10px;">${etaWaitTxt(V.oldestEta)} · ${V.pos.length} PO</span></td><td class="num" style="font-size:11px;"><b>${yuan(V.val)}</b><br><span class="muted" style="font-size:10px;">${fmtNum(V.out)} ชิ้น</span></td></tr>`;
         if(!vOpen) return;
-        V.pos.slice().sort((a,b)=>a.doc<b.doc?-1:1).forEach(p=>{ rowsT+=`<tr style="cursor:pointer;${window.poSelected===p.po?'outline:2px solid var(--brand);':''}" onclick="poSelectPO('${p.po}')" title="เลือก PO นี้"><td></td><td style="padding-left:34px;"><b style="font-size:11px;">${p.po}</b>${p.lot?' <span class="muted" style="font-size:10px;">Lot '+p.lot+'</span>':''}<br><span class="muted" style="font-size:10px;">ค้าง ${fmtNum(p.out)} · ${poThaiShort(p.doc)}</span></td><td class="num" style="font-size:11px;">${yuan(p.val)}</td></tr>`; }); });
+        V.pos.slice().sort((a,b)=>{ const ea=a.eta,eb=b.eta; if(ea&&eb) return ea<eb?-1:1; if(ea) return -1; if(eb) return 1; return a.doc<b.doc?-1:1; }).forEach(p=>{ rowsT+=`<tr style="cursor:pointer;${window.poSelected===p.po?'outline:2px solid var(--brand);':''}" onclick="poSelectPO('${p.po}')" title="เลือก PO นี้"><td></td><td style="padding-left:34px;"><b style="font-size:11px;">${p.po}</b>${p.lot?' <span class="muted" style="font-size:10px;">Lot '+p.lot+'</span>':''}<br><span class="muted" style="font-size:10px;">${fmtNum(p.out)} ชิ้น · ${p.eta?('ETA '+poThaiShort(p.eta)+' · '+etaWaitTxt(p.eta)):'ไม่ระบุ ETA'}</span></td><td class="num" style="font-size:11px;">${yuan(p.val)}</td></tr>`; }); });
     });
   });
   const tbl=`<div style="flex:1 1 300px;min-width:280px;max-width:420px;">
     <div style="font-weight:700;font-size:13px;margin-bottom:3px;">⏳ อันดับค้างรับนานสุด <span class="muted" style="font-weight:400;font-size:11px;">(ปี → เดือน → ผู้ขาย)</span></div>
-    <div class="muted" style="font-size:10.5px;margin-bottom:6px;">มูลค่าค้างรับ = ต้นทุน RMB × จำนวนค้างรับ · คลิกเพื่อกางดูย่อย</div>
+    <div class="muted" style="font-size:10.5px;margin-bottom:6px;">มูลค่าค้างรับ = ต้นทุน RMB × จำนวนค้างรับ · <b>วันค้างนับจาก ETA</b> (Purchase Order Line) · คลิกเพื่อกางดูย่อย</div>
     <div style="overflow-x:auto;"><table style="width:100%;font-size:12px;table-layout:fixed;"><tr><th style="width:18px;"></th><th>ช่วง / ผู้ขาย / PO</th><th class="num" style="width:104px;">มูลค่า ¥ / ค้าง</th></tr>${rowsT}</table></div></div>`;
   // ===== dropdown เลือก PO =====
   const sorted=list.slice().sort((a,b)=>a.po<b.po?-1:1);
