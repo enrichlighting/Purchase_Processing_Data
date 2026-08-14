@@ -7493,7 +7493,18 @@ function draftDiyCommitted(itemNo){ return draftDiyOn()? draftDiyQty(itemNo) : 0
 // จำนวนที่จัดตู้แล้วรวมของสินค้า (ทุก PO · จาก pkLog)
 function itemPackedQty(itemNo){ const m=(typeof poPackedMap==='function')?poPackedMap():{}; let s=0; for(const po in m){ s += (m[po].items[itemNo]||0); } return s; }
 // จำนวนสั่งผลิตที่ "กรอกไว้" รวมของสินค้า (ทุก PO · ช่องว่าง = ไม่นับ) เพื่อกันซ้ำกับ PO ค้างรับ
-function itemProductionQty(itemNo){ let s=0; const pf=window.poFollow||{}; for(const po in pf){ const items=(pf[po]||{}).items||{}; const o=items[itemNo]; if(o && o.orderQty!=='' && o.orderQty!=null) s += (+o.orderQty||0); } return s; }
+// จำนวน "สั่งผลิต" รวมของสินค้า · ดึงจากช่อง "จำนวนสั่งผลิต" ที่กรอกในการ์ด PO หน้าวางแผน Lead Time (poFollow.orderQty)
+// ถ้ายังไม่ได้กรอกจำนวน แต่กรอก Lead Time ไว้แล้ว (= เริ่มกระบวนการสั่งผลิต) → ใช้ยอดค้างรับของ PO นั้นแทน
+function itemProductionQty(itemNo){
+  const pf=window.poFollow||{};
+  let outMap={}; try{ openPOs(itemNo).forEach(p=>{ if(poType(p.docNo).code==='POA') outMap[p.docNo]=(outMap[p.docNo]||0)+p.outstanding; }); }catch(e){}
+  let s=0;
+  for(const po in pf){ const o=((pf[po]||{}).items||{})[itemNo]; if(!o) continue;
+    if(o.orderQty!=='' && o.orderQty!=null) s += (+o.orderQty||0);                         // กรอกจำนวนสั่งผลิตแล้ว
+    else if(o.leadDays!=='' && o.leadDays!=null) s += (outMap[po]||0);                      // มี Lead Time แต่ยังไม่กรอกจำนวน → ค้างรับของ PO
+  }
+  return s;
+}
 // เป้าหมายให้อยู่ได้ (วัน) ตามสูตรที่เลือกทั้งหน้า · m4 = 4 เดือน (120 วัน) · legacy = Lead Time + ช่วงที่เลือก
 function reorderTargetQty(it, basisDays, paidDaily){
   return (window.RTARGET==='legacy') ? (paidDaily*(it.leadTime + basisDays) + (it.safety||0)) : (paidDaily*120);
@@ -7510,7 +7521,8 @@ function reorderCalc(it, basisDays, custGroup){
   const usage = avgDailyUsage(it.no);
   const incoming = openPOs(it.no).filter(p=>poType(p.docNo).code==='POA').reduce((s,p)=>s+p.outstanding,0);  // PO ค้างรับทั้งหมด (POA)
   const packed = (typeof itemPackedQty==='function') ? itemPackedQty(it.no) : 0;          // จัดตู้แล้ว
-  const production = (typeof itemProductionQty==='function') ? itemProductionQty(it.no) : 0; // จำนวนสั่งผลิตที่กรอก
+  const productionRaw = (typeof itemProductionQty==='function') ? itemProductionQty(it.no) : 0; // สั่งผลิต (กรอก/Lead Time)
+  const production = Math.min(productionRaw, Math.max(0, incoming - packed));               // ไม่เกินค้างรับที่ยังไม่จัดตู้ (กันนับซ้ำกับ PO)
   const reserve = 0;                                                    // จองนอกระบบ = กรอกเองในหน้ารายละเอียด (ตารางบน = 0)
   const paidWindow = it.ileReal ? paidWindowFor(it, basisDays, custGroup) : 0;
   const paidDaily = it.ileReal ? paidWindow/basisDays : usage;
@@ -9355,8 +9367,8 @@ function flowSugAll(it, rc){ const basis=(window.RBASIS==='custom')?180:(+window
 function flowCoverSplitCell(q, a3, a6, tipNum){
   const c3m=a3>0?q/a3:Infinity, c6m=a6>0?q/a6:Infinity;
   const hi=m=>(typeof pkCoverHi==='function'&&isFinite(m))?pkCoverHi(m):'color:var(--muted);';
-  const side=(m,win,avg)=>`<div class="muted" style="font-size:8px;margin-bottom:1px;">${win}</div><span style="display:inline-block;font-size:12.5px;font-weight:800;padding:1px 7px;border-radius:6px;${hi(m)}" title="${tipNum} ÷ ยอดขายเฉลี่ย ${win} ${fmtNum(Math.round(avg))}/ด. = อยู่ได้ ${isFinite(m)?fmtMo(m):'∞'} ด.">${isFinite(m)?fmtMo(m):'∞'}</span>`;
-  return `<td style="padding:6px 6px;text-align:center;white-space:nowrap;vertical-align:top;"><div style="display:flex;"><div style="flex:1;border-right:1px dashed var(--line);padding:0 5px;">${side(c3m,'3ด.',a3)}</div><div style="flex:1;padding:0 5px;">${side(c6m,'6ด.',a6)}</div></div></td>`;
+  const side=(m,win,avg)=>`<div class="muted" style="font-size:10px;margin-bottom:2px;">${win}</div><span style="display:inline-block;font-size:16px;font-weight:800;padding:2px 9px;border-radius:7px;${hi(m)}" title="${tipNum} ÷ ยอดขายเฉลี่ย ${win} ${fmtNum(Math.round(avg))}/ด. = อยู่ได้ ${isFinite(m)?fmtMo(m):'∞'} เดือน">${isFinite(m)?fmtMo(m):'∞'}</span>`;
+  return `<td style="padding:6px 8px;text-align:center;white-space:nowrap;vertical-align:top;"><div style="display:flex;"><div style="flex:1;border-right:1px dashed var(--line);padding:0 8px;">${side(c3m,'3 เดือน',a3)}</div><div style="flex:1;padding:0 8px;">${side(c6m,'6 เดือน',a6)}</div></div></td>`;
 }
 // Cover Stock คงเหลือรวมสั่งเพิ่ม = (หมวด③ + ควรสั่งเพิ่ม) ÷ ยอดขายเฉลี่ย
 function flowCoverPlusCell(it, rc){
@@ -9394,14 +9406,27 @@ function flowDiyRiskCell(it){
   if(!r) return '<td style="padding:6px 10px;text-align:center;vertical-align:top;"><span class="muted" style="font-size:10px;">—</span></td>';
   return `<td style="padding:6px 10px;vertical-align:top;" title="${r.sub}"><span style="display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:${r.color};padding:2px 8px;border-radius:6px;white-space:nowrap;">${r.emoji} ${r.label}</span><div class="muted" style="font-size:8.5px;margin-top:2px;max-width:140px;white-space:normal;line-height:1.3;">${r.sub}</div></td>`;
 }
+// ควรสั่งเพิ่ม (Suggestion) · ตัดยอด Mr.DIY ออกก่อน (ใช้ยอดขายเฉลี่ยไม่รวม DIY) แล้วปัดขึ้นให้เต็มลังพอดี
+function flowSugExCarton(it, rc){
+  const exAvg=flowExDiyAvg(it,3);                                   // ยอดขายเฉลี่ย/เดือน (ไม่รวม Mr.DIY)
+  const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180);
+  const tgt=(typeof reorderTargetQty==='function')?reorderTargetQty(it, basis, exAvg/30):(exAvg*4);
+  const sugEx=Math.max(0, Math.round(tgt-(rc.c3||0)));              // ควรสั่งเพิ่ม (ไม่รวม DIY)
+  const d=(typeof pkItem==='function')?pkItem(it.no):null;
+  const pcs=(d&&d.pcs>0)?d.pcs:0;
+  const cbmPer=(typeof pkBoxCbm==='function')?pkBoxCbm(it.no):0;    // CBM/ลัง
+  const ctn=(pcs>0 && sugEx>0)?Math.ceil(sugEx/pcs):0;             // จำนวนลังเต็ม (ปัดขึ้น)
+  const pieces=pcs>0?ctn*pcs:sugEx;                                 // ชิ้นหลังปัดเต็มลัง
+  const cbm=ctn*cbmPer;
+  return {sugEx, pcs, ctn, pieces, cbm, hasPk:pcs>0};
+}
 function flowSuggestCell(it, rc){
-  const a3=flowAvg3(it);
-  const sugAll=flowSugAll(it, rc);
-  let sugDiy=null;
-  if(it.mrdiySell){ const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180); const s3=flowStoreAvg(it,3), stk=flowMrdiyStockNow(it); const tD=(typeof reorderTargetQty==='function')?reorderTargetQty(it, basis, s3/30):(s3*4); sugDiy=Math.max(0, Math.round(tD-stk)); }
-  return `<td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;background:#111;">
-    <div style="border-bottom:1px dashed rgba(255,255,255,.25);padding-bottom:3px;margin-bottom:3px;" title="ควรสั่งเพิ่ม รวมทุกลูกค้า (เป้า ÷ อัตราขายเฉลี่ย 3 เดือน ${fmtNum(Math.round(a3))}/ด. − หมวด③ ${fmtNum(rc.c3||0)})"><b style="font-size:15px;color:#fff;">${fmtNum(sugAll)}</b> <span style="font-size:8.5px;color:#e5e7eb;">รวม</span></div>
-    <div title="ควรสั่งเพิ่ม พาร์ท Mr.DIY (ยอดขายหน้าร้านเฉลี่ย 3 เดือน − สต๊อกหน้าร้าน)">${sugDiy!=null?`<b style="font-size:13px;color:#facc15;">${fmtNum(sugDiy)}</b> <span style="font-size:8.5px;color:#fde68a;">Mr.DIY</span>`:'<span style="font-size:10px;color:#9ca3af;">—</span>'}</div>
+  const g=flowSugExCarton(it, rc);
+  const tip=`ควรสั่งเพิ่ม (ตัดยอด Mr.DIY ออก) = ${fmtNum(g.sugEx)} ชิ้น → ปัดขึ้นเต็มลัง${g.hasPk?' ('+fmtNum(g.pcs)+' ชิ้น/ลัง = '+fmtNum(g.pieces)+' ชิ้น · '+g.ctn+' ลัง · '+g.cbm.toFixed(3)+' CBM)':' · ยังไม่มีข้อมูลลังในไฟล์ Packing List'}`;
+  return `<td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;background:#111;" title="${tip}">
+    <div><b style="font-size:15px;color:#fff;">${fmtNum(g.pieces)}</b> <span style="font-size:8.5px;color:#e5e7eb;">ชิ้น</span></div>
+    <div style="margin-top:2px;">${g.hasPk?`<b style="font-size:12.5px;color:#facc15;">${fmtNum(g.ctn)}</b> <span style="font-size:8.5px;color:#fde68a;">CTN</span>`:'<span style="font-size:9px;color:#9ca3af;">— ไม่มีข้อมูลลัง</span>'}</div>
+    ${g.hasPk?`<div style="margin-top:2px;"><b style="font-size:11.5px;color:#7dd3fc;">${g.cbm.toFixed(3)}</b> <span style="font-size:8.5px;color:#bae6fd;">CBM</span></div>`:''}
   </td>`;
 }
 // คอลัมน์ยอดขายหน้าร้าน Mr.DIY เฉลี่ย 3ด.(บน)/6ด.(ล่าง)
@@ -9455,7 +9480,7 @@ const FLOW_SORTVAL={
   onhand:(it,rc)=>rc.onHand||0, po:(it,rc)=>Math.max(0,(rc.incoming||0)-(rc.packed||0)-(rc.production||0)),
   podiy:(it,rc)=>rc.poDiy||0, production:(it,rc)=>rc.production||0, packed:(it,rc)=>rc.packed||0,
   container:(it,rc)=>rc.packed||0,
-  suggest:(it,rc)=>{ const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180); const a3=flowAvg3(it); const t=(typeof reorderTargetQty==='function')?reorderTargetQty(it,basis,a3/30):(a3*4); return Math.max(0,Math.round(t-(rc.c3||0))); },
+  suggest:(it,rc)=>flowSugExCarton(it,rc).pieces,
   avg36:(it,rc)=>flowAvg3(it),
   exdiyavg:(it,rc)=>flowExDiyAvg(it,3),
   cover36:(it,rc)=>{ const a3=flowAvg3(it); return a3>0 ? (rc.c3||0)/a3 : ((rc.c3||0)>0?999999:0); },
@@ -9516,7 +9541,7 @@ function flowItemRow(it, basis, grp, salesCols){
     <td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;" title="จัดตู้แล้ว"><b style="font-size:13px;">${fmtNum(rc.packed)}</b></td>
     <td style="padding:7px 10px;vertical-align:top;">${tuChips}</td>
     ${flowCatCell(rc.c2, mo2, 'color:var(--muted);', '#fef9c3')}
-    <td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;" title="สั่งผลิต"><b style="font-size:13px;">${fmtNum(rc.production)}</b></td>
+    <td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;" title="สั่งผลิต — ดึงจากช่อง 'จำนวนสั่งผลิต' ในการ์ด PO หน้า 🚨 วางแผน Lead Time · ถ้ายังไม่กรอกจำนวนแต่กรอก Lead Time แล้ว = ใช้ยอดค้างรับของ PO นั้น (หักจาก PO ค้างรับให้)"><b style="font-size:13px;">${fmtNum(rc.production)}</b></td>
     <td style="padding:7px 10px;vertical-align:top;" title="PO ค้างรับ (หักส่วนที่จัดตู้/สั่งผลิตแล้ว)"><b style="font-size:13px;color:#2563eb;">${fmtNum(poRemain)}</b>${poDeduct>0?`<div style="font-size:9px;color:#dc2626;margin-top:1px;">PO ${fmtNum(rc.incoming)} − จัดตู้/ผลิต ${fmtNum(poDeduct)}</div>`:''}<div style="margin-top:2px;">${poChips}</div></td>
     ${flowCatCell(rc.c3, mo3, hi3, '#ffedd5')}
     ${flowCoverCell(it, rc)}
