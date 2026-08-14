@@ -9285,7 +9285,7 @@ function flowCatCell(num, mo, hiStyle){
 }
 // ---- Sort ตาราง Flowchart (คลิกหัวคอลัมน์ · default = ควรสั่งก่อน แล้วยอดขายมาก→น้อย) ----
 const FLOW_ST_RANK={red:0,warn:1,watch:2,noneed:3};
-const FLOW_FIXED_KEYS=['name','price','status','c1','c2','c3','cover36','covplus','onhand','po','podiy','production','packed','container','suggest','avg36','exdiyavg'];
+const FLOW_FIXED_KEYS=['name','price','status','c1','c2','c3','cover36','onhand','po','podiy','production','packed','container','suggest','covplus','avg36','exdiyavg'];
 const FLOW_DIY_BADGE='<span style="display:inline-flex;align-items:center;background:#ffe600;color:#e2231a;border:1.5px solid #111;border-radius:5px;padding:0 6px;font-weight:900;font-size:10px;letter-spacing:.2px;box-shadow:0 1px 2px rgba(0,0,0,.2);">Mr.DIY</span>';
 function flowMonMap(it){ return it._monMap || (it._monMap=Object.fromEntries((it.monthly||[]).map(m=>[m[0],m[1]]))); }
 function flowSalesYear(it,y){ let s=0; (it.monthly||[]).forEach(m=>{ if(m[0].slice(0,4)===y) s+=m[1]; }); return s; }
@@ -9334,9 +9334,9 @@ function flowDiyRisk(it){
   const subDeco=/DECORATIVE/i.test(it.subType||'');
   const toAvg=arr=>{ let t=0,n=0; arr.forEach(k=>{ const st=kmap[k]||0; if(st>0){ t+=(smap[k]||0)/st; n++; } }); return n?t/n:0; };
   const to3=toAvg(b3), toPrev=toAvg(b6.slice(3));
-  if(hist && store3===0 && ship3===0){   // เคยมียอดขายหน้าร้าน · ปัจจุบันไม่มี + ไม่สั่งต่อ
-    if(subDeco) return {key:'season', label:'ตามฤดูกาล', sub:'Decorative · สั่งช่วงคริสต์มาส', color:'#7c3aed', emoji:'🎄'};
-    return {key:'dropped', label:'ถอดออกแล้ว', sub:'ไม่มียอดขายหน้าร้าน + DIY ไม่สั่งต่อ', color:'#6b7280', emoji:'⛔'};
+  if(hist && store3===0){   // เคยมียอดขายหน้าร้าน · ปัจจุบันไม่มีแล้ว → ถือว่าถอดออก (ยกเว้น Decorative = ตามฤดูกาล)
+    if(subDeco) return {key:'season', label:'ตามฤดูกาล', sub:'Decorative · ไม่มียอดขายตอนนี้ แต่สั่งช่วงคริสต์มาส', color:'#7c3aed', emoji:'🎄'};
+    return {key:'dropped', label:'ถอดออกแล้ว', sub:'ไม่มียอดขายหน้าร้านแล้ว', color:'#6b7280', emoji:'⛔'};
   }
   const salesDown=storePrev3>0 && store3<storePrev3*0.7;
   const shipDown=ship3===0 || (shipPrev3>0 && ship3<shipPrev3*0.7);
@@ -9474,7 +9474,6 @@ function flowItemRow(it, basis, grp, salesCols){
     ${flowCatCell(rc.c2, mo2, 'color:var(--muted);')}
     ${flowCatCell(rc.c3, mo3, hi3)}
     ${flowCoverCell(it, rc)}
-    ${flowCoverPlusCell(it, rc)}
     <td style="padding:7px 10px;vertical-align:top;"><b style="font-size:13px;">${fmtNum(rc.onHand)}</b> <span class="muted" style="font-size:10px;">${it.uom}</span><div style="margin-top:2px;">${whChips}</div></td>
     <td style="padding:7px 10px;vertical-align:top;"><b style="font-size:13px;color:#2563eb;">${fmtNum(rc.incoming)}</b><div style="margin-top:2px;">${poChips}</div></td>
     <td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;" title="PO DIY (Mr.DIY จองล่วงหน้า)"><b style="font-size:13px;color:#e2231a;">${fmtNum(rc.poDiy)}</b></td>
@@ -9482,6 +9481,7 @@ function flowItemRow(it, basis, grp, salesCols){
     <td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;" title="จัดตู้แล้ว"><b style="font-size:13px;">${fmtNum(rc.packed)}</b></td>
     <td style="padding:7px 10px;vertical-align:top;">${tuChips}</td>
     ${flowSuggestCell(it, rc)}
+    ${flowCoverPlusCell(it, rc)}
     ${flowAvgCell(it)}
     ${flowExDiyAvgCell(it)}
     ${window.flowVersion==='diy' ? flowStoreAvgCell(it) : ''}
@@ -9508,7 +9508,7 @@ function renderFlowchart(){
   // 11 คอลัมน์คงที่ + คอลัมน์ยอดขาย (เดือน-ปี) เรียงไปทางขวา · จัดชิดขวา: ราคาตั้ง(1) หมวด①②③(3,4,5) ควรสั่ง(10)
   window._flowRcCache = {};                                 // รีเซ็ต cache ของ reorderCalc ทุกครั้งที่เรนเดอร์
   const salesCols = flowSalesCols(items);
-  let TH=['สินค้า','ราคาตั้ง','สถานะ','หมวด① คลัง−จอง','หมวด② +จัดตู้','หมวด③ +PO+ผลิต','Cover Stock (3/6ด.)','Cover Stock เป้าหมาย (3/6ด.)','คงเหลือ (แยกคลัง)','PO ค้างรับ',FLOW_DIY_BADGE,'สั่งผลิต','จัดตู้แล้ว','ตู้ (Container)','ควรสั่งเพิ่ม','ยอดขายเฉลี่ย/ด. (3/6ด.)','ยอดขายเฉลี่ย ไม่รวม DIY (3/6ด.)'];
+  let TH=['สินค้า','ราคาตั้ง','สถานะ','หมวด① คลัง−จอง','หมวด② +จัดตู้','หมวด③ +PO+ผลิต','Cover Stock (3/6ด.)','คงเหลือ (แยกคลัง)','PO ค้างรับ',FLOW_DIY_BADGE,'สั่งผลิต','จัดตู้แล้ว','ตู้ (Container)','ควรสั่งเพิ่ม','Cover Stock เป้าหมาย (3/6ด.)','ยอดขายทุกกลุ่มเฉลี่ย/ด. (3/6ด.)','ยอดขายเฉลี่ย ไม่รวม DIY (3/6ด.)'];
   let KEYS=FLOW_FIXED_KEYS.slice();
   if(DIY){ TH.splice(2,0,'ราคาส่งให้ DIY','ราคาขายหน้าร้าน (ไม่รวม VAT)'); KEYS.splice(2,0,'costdiy','npstore'); TH.push('ยอดขายหน้าร้าน DIY (3/6ด.)','แนวโน้ม Mr.DIY ถอดสินค้า'); KEYS.push('storeavg','diyrisk'); }   // + คอลัมน์ยอดขายหน้าร้าน DIY + วิเคราะห์ความเสี่ยงถอดสินค้า (เฉพาะเวอร์ชัน Mr.DIY)
   const RIGHT_KEYS=new Set(['price','costdiy','npstore','c1','c2','c3','podiy','production','packed','suggest','avg36','exdiyavg','cover36','covplus','storeavg']);
