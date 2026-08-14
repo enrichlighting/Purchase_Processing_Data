@@ -9406,23 +9406,23 @@ function flowDiyRiskCell(it){
   if(!r) return '<td style="padding:6px 10px;text-align:center;vertical-align:top;"><span class="muted" style="font-size:10px;">—</span></td>';
   return `<td style="padding:6px 10px;vertical-align:top;" title="${r.sub}"><span style="display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:${r.color};padding:2px 8px;border-radius:6px;white-space:nowrap;">${r.emoji} ${r.label}</span><div class="muted" style="font-size:8.5px;margin-top:2px;max-width:140px;white-space:normal;line-height:1.3;">${r.sub}</div></td>`;
 }
-// ควรสั่งเพิ่ม (Suggestion) · ตัดยอด Mr.DIY ออกก่อน (ใช้ยอดขายเฉลี่ยไม่รวม DIY) แล้วปัดขึ้นให้เต็มลังพอดี
+// ควรสั่งเพิ่ม (Suggestion) = ควรสั่งเพิ่มรวมทุกลูกค้า (เดิม) − ส่วน Mr.DIY → แล้วปัดขึ้นให้เต็มลังพอดี
 function flowSugExCarton(it, rc){
-  const exAvg=flowExDiyAvg(it,3);                                   // ยอดขายเฉลี่ย/เดือน (ไม่รวม Mr.DIY)
-  const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180);
-  const tgt=(typeof reorderTargetQty==='function')?reorderTargetQty(it, basis, exAvg/30):(exAvg*4);
-  const sugEx=Math.max(0, Math.round(tgt-(rc.c3||0)));              // ควรสั่งเพิ่ม (ไม่รวม DIY)
+  const sugAll=flowSugAll(it, rc);                                  // ควรสั่งเพิ่ม รวมทุกลูกค้า (ค่าเดิมที่เคยแสดง)
+  let sugDiy=0;
+  if(it.mrdiySell){ const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180); const s3=flowStoreAvg(it,3), stk=flowMrdiyStockNow(it); const tD=(typeof reorderTargetQty==='function')?reorderTargetQty(it,basis,s3/30):(s3*4); sugDiy=Math.max(0,Math.round(tD-stk)); }
+  const sugEx=Math.max(0, sugAll - sugDiy);                         // ตัดส่วน Mr.DIY ออกก่อน
   const d=(typeof pkItem==='function')?pkItem(it.no):null;
   const pcs=(d&&d.pcs>0)?d.pcs:0;
   const cbmPer=(typeof pkBoxCbm==='function')?pkBoxCbm(it.no):0;    // CBM/ลัง
   const ctn=(pcs>0 && sugEx>0)?Math.ceil(sugEx/pcs):0;             // จำนวนลังเต็ม (ปัดขึ้น)
-  const pieces=pcs>0?ctn*pcs:sugEx;                                 // ชิ้นหลังปัดเต็มลัง
+  const pieces=pcs>0?ctn*pcs:sugEx;                                 // ชิ้นหลังปัดขึ้นเต็มลัง
   const cbm=ctn*cbmPer;
-  return {sugEx, pcs, ctn, pieces, cbm, hasPk:pcs>0};
+  return {sugAll, sugDiy, sugEx, pcs, ctn, pieces, cbm, hasPk:pcs>0};
 }
 function flowSuggestCell(it, rc){
   const g=flowSugExCarton(it, rc);
-  const tip=`ควรสั่งเพิ่ม (ตัดยอด Mr.DIY ออก) = ${fmtNum(g.sugEx)} ชิ้น → ปัดขึ้นเต็มลัง${g.hasPk?' ('+fmtNum(g.pcs)+' ชิ้น/ลัง = '+fmtNum(g.pieces)+' ชิ้น · '+g.ctn+' ลัง · '+g.cbm.toFixed(3)+' CBM)':' · ยังไม่มีข้อมูลลังในไฟล์ Packing List'}`;
+  const tip=`ควรสั่งเพิ่ม รวม ${fmtNum(g.sugAll)}${g.sugDiy>0?' − Mr.DIY '+fmtNum(g.sugDiy):''} = ${fmtNum(g.sugEx)} ชิ้น → ปัดขึ้นเต็มลัง${g.hasPk?' ('+fmtNum(g.pcs)+' ชิ้น/ลัง = '+fmtNum(g.pieces)+' ชิ้น · '+g.ctn+' ลัง · '+g.cbm.toFixed(3)+' CBM)':' · ยังไม่มีข้อมูลลังในไฟล์ Packing List'}`;
   return `<td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;background:#111;" title="${tip}">
     <div><b style="font-size:15px;color:#fff;">${fmtNum(g.pieces)}</b> <span style="font-size:8.5px;color:#e5e7eb;">ชิ้น</span></div>
     <div style="margin-top:2px;">${g.hasPk?`<b style="font-size:12.5px;color:#facc15;">${fmtNum(g.ctn)}</b> <span style="font-size:8.5px;color:#fde68a;">CTN</span>`:'<span style="font-size:9px;color:#9ca3af;">— ไม่มีข้อมูลลัง</span>'}</div>
