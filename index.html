@@ -8245,6 +8245,27 @@ window.pkDirHandle = null;
 function pkLoadLog(){ try{ const s=localStorage.getItem(PK_LOGKEY); window.pkLog = s?JSON.parse(s):[]; }catch(e){ window.pkLog=[]; } }
 function pkSaveLogStore(){ try{ localStorage.setItem(PK_LOGKEY, JSON.stringify(window.pkLog)); }catch(e){} }
 function pkNowStr(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }
+// แยกเวลาสร้าง + ประวัติแก้ไข (รองรับข้อมูลเก่าที่ต่อสตริง "orig (แก้ไข t1) (แก้ไข t2)...")
+function pkTsParts(s){
+  if(s && s.ts0!==undefined) return {orig:s.ts0, edits:(s.edits||[]).slice()};
+  const raw=String((s&&s.ts)||'');
+  const parts=raw.split(/\s*\(แก้ไข\s*/);
+  const orig=(parts[0]||'').trim();
+  const edits=parts.slice(1).map(p=>p.replace(/\)\s*$/,'').trim()).filter(Boolean);
+  return {orig, edits};
+}
+// แสดงเฉพาะแก้ไขล่าสุด · ที่เหลือซ่อนไว้ (คลิกกางดูทั้งหมด)
+function pkTsHtml(s, idx){
+  const p=pkTsParts(s);
+  if(!p.edits.length) return `<b>${p.orig}</b>`;
+  const last=p.edits[p.edits.length-1];
+  const listId='pk-tslog-'+idx;
+  const hist=p.edits.map((e,i)=>`<div style="font-size:10.5px;color:var(--muted);">${i+1}. ${e}</div>`).join('');
+  return `<b>${p.orig}</b>`
+    +`<div style="font-size:11px;color:var(--warn);margin-top:1px;">✏️ แก้ไขล่าสุด ${last} `
+    +`<a href="#" onclick="var e=document.getElementById('${listId}');e.style.display=e.style.display==='none'?'block':'none';return false;" style="font-size:10.5px;color:var(--brand);white-space:nowrap;">(แก้ ${p.edits.length} ครั้ง ▾)</a></div>`
+    +`<div id="${listId}" style="display:none;margin-top:2px;padding:4px 7px;background:var(--bg);border:1px solid var(--line);border-radius:6px;">${hist}</div>`;
+}
 function pkTsFile(ts){ return ts.replace(/:/g,'').replace(/ /g,'_'); }
 
 /* ===== ชั้นบันทึกข้อมูล (เก็บในเครื่องตอนนี้ · เตรียม hook เชื่อม SharePoint) ===== */
@@ -8386,7 +8407,10 @@ function pkSaveRound(asNew){
   }
   let savedIdx=0;
   if(editIdx!=null && window.pkLog[editIdx]){
-    snap.ts = window.pkLog[editIdx].ts + ' (แก้ไข '+pkNowStr()+')';   // คงเวลาเดิม + ประทับเวลาแก้ไข
+    const prevParts=pkTsParts(window.pkLog[editIdx]);   // เวลาสร้างเดิม + ประวัติแก้ไขเดิม (รองรับข้อมูลเก่า)
+    snap.ts0 = prevParts.orig;
+    snap.edits = prevParts.edits.concat(pkNowStr());     // เก็บทุกรอบไว้ข้างใน · แสดงเฉพาะล่าสุด
+    snap.ts = prevParts.orig;                            // ts = เวลาสร้างเดิม (สะอาด · ใช้กับ filename/หัวพิมพ์)
     window.pkLog[editIdx]=snap; savedIdx=editIdx; window.pkEditIdx=null;
   } else {
     if(asNew) snap.ts = pkNowStr()+' · คัดลอกเป็นตู้ใหม่';
@@ -8438,7 +8462,7 @@ function pkPrintRound(idx){
   const s=window.pkLog[idx]; if(!s) return;
   const w=window.open('','_blank'); if(!w){ alert('เบราว์เซอร์บล็อกป๊อปอัป — อนุญาต popup เพื่อพิมพ์'); return; }
   const doc = pkRoundExcelHtml(s).replace('<head><meta charset="utf-8">',
-    '<head><meta charset="utf-8"><title>Packing List '+s.ts+'</title><style>body{font-family:\"Segoe UI\",Tahoma,sans-serif;padding:18px;color:#111;}table{border-collapse:collapse;margin-bottom:14px;font-size:12px;}td,th{border:1px solid #999;padding:4px 7px;}th{background:#eef2ff;}h2{margin:0 0 10px;}</style>');
+    '<head><meta charset="utf-8"><title>Packing List '+pkTsParts(s).orig+'</title><style>body{font-family:\"Segoe UI\",Tahoma,sans-serif;padding:18px;color:#111;}table{border-collapse:collapse;margin-bottom:14px;font-size:12px;}td,th{border:1px solid #999;padding:4px 7px;}th{background:#eef2ff;}h2{margin:0 0 10px;}</style>');
   w.document.write(doc); w.document.close();
   w.onload=function(){ w.focus(); w.print(); };
   setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} }, 500);
@@ -8522,10 +8546,10 @@ function pkRoundExcelHtml(s){
     if(logRows) sched+='<br><table border="1"><tr><td colspan="6"><b>ประวัติการแก้ไขวันที่</b></td></tr><tr><th>ตู้</th><th>เวลา</th><th>ช่อง</th><th>จากเดิม</th><th>เป็น</th><th>เหตุผล</th></tr>'+logRows+'</table>';
   }
   return `<html><head><meta charset="utf-8"></head><body>`
-    +`<table border="1"><tr><td colspan="6"><b>รูปแบบ:</b> ${modeLabel} · <b>บันทึกเมื่อ:</b> ${esc(s.ts)}</td><td colspan="6"><b>ความจุตู้:</b> ${s.cap} CBM · <b>Exchange Rate:</b> ${s.fx||'-'} บาท/หยวน · <b>รวม:</b> ${s.grand.cbm.toFixed(2)} CBM · ¥${Math.round(s.grand.valRmb).toLocaleString()} · ฿${Math.round(s.grand.valThb).toLocaleString()}</td></tr></table>`
+    +`<table border="1"><tr><td colspan="6"><b>รูปแบบ:</b> ${modeLabel} · <b>บันทึกเมื่อ:</b> ${esc(pkTsParts(s).orig)}${(function(){const p=pkTsParts(s);return p.edits.length?' · <b>แก้ไขล่าสุด:</b> '+esc(p.edits[p.edits.length-1])+' (แก้ '+p.edits.length+' ครั้ง)':'';})()}</td><td colspan="6"><b>ความจุตู้:</b> ${s.cap} CBM · <b>Exchange Rate:</b> ${s.fx||'-'} บาท/หยวน · <b>รวม:</b> ${s.grand.cbm.toFixed(2)} CBM · ¥${Math.round(s.grand.valRmb).toLocaleString()} · ฿${Math.round(s.grand.valThb).toLocaleString()}</td></tr></table>`
     +`<table border="1"><tr>${th}</tr>${body}${fc}${fvr}${fvt}</table>${sched}</body></html>`;
 }
-function pkExportExcel(idx){ const s=window.pkLog[idx]; if(!s) return; const blob=new Blob(['﻿'+pkRoundExcelHtml(s)],{type:'application/vnd.ms-excel;charset=utf-8'}); pkWriteFile('PackingList_'+pkTsFile(s.ts)+'.xls', blob); }
+function pkExportExcel(idx){ const s=window.pkLog[idx]; if(!s) return; const blob=new Blob(['﻿'+pkRoundExcelHtml(s)],{type:'application/vnd.ms-excel;charset=utf-8'}); pkWriteFile('PackingList_'+pkTsFile(pkTsParts(s).orig)+'.xls', blob); }
 
 // วาดภาพตู้จำลองลง canvas (scale = ความละเอียด/ขนาด, ค่าเริ่ม 2× เพื่อภาพใหญ่+คมชัด)
 function pkRoundCanvas(s, scale){
@@ -8540,7 +8564,7 @@ function pkRoundCanvas(s, scale){
   // วัดความกว้างหัวเรื่องกันตกขอบ
   const mctx=document.createElement('canvas').getContext('2d');
   const t1='🚢 จำลองการจัดตู้'; mctx.font='bold 22px sans-serif'; const w1=mctx.measureText(t1).width;
-  const t2=s.ts+' · ความจุ '+CAP+' CBM/ตู้ · รวม '+s.grand.cbm.toFixed(2)+' CBM'; mctx.font='15px sans-serif'; const w2=mctx.measureText(t2).width;
+  const t2=pkTsParts(s).orig+' · ความจุ '+CAP+' CBM/ตู้ · รวม '+s.grand.cbm.toFixed(2)+' CBM'; mctx.font='15px sans-serif'; const w2=mctx.measureText(t2).width;
   const bodyW = padL + contsW + legendGap + legendW + padL;
   const W = Math.max(bodyW, padL + Math.max(w1,w2) + padL);
   const H = padT + Math.max(boxH+labelH, legendH) + 24;
@@ -8583,7 +8607,7 @@ function pkRoundCanvas(s, scale){
   }
   return cv;
 }
-function pkExportImage(idx){ const s=window.pkLog[idx]; if(!s) return; pkRoundCanvas(s).toBlob(b=>{ if(b) pkWriteFile('Containers_'+pkTsFile(s.ts)+'.png', b); }, 'image/png'); }
+function pkExportImage(idx){ const s=window.pkLog[idx]; if(!s) return; pkRoundCanvas(s).toBlob(b=>{ if(b) pkWriteFile('Containers_'+pkTsFile(pkTsParts(s).orig)+'.png', b); }, 'image/png'); }
 // เปิดดูภาพตู้จำลองแบบ Preview ในหน้า แล้วค่อยกดดาวน์โหลด
 function pkPreviewImage(idx){
   const s=window.pkLog[idx]; if(!s) return;
@@ -8593,7 +8617,7 @@ function pkPreviewImage(idx){
   ov.onclick=(e)=>{ if(e.target===ov) ov.remove(); };
   ov.innerHTML=`<div style="background:var(--card);border-radius:14px;max-width:96vw;max-height:92vh;overflow:auto;padding:16px 18px;box-shadow:0 18px 50px rgba(0,0,0,.35);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:16px;flex-wrap:wrap;">
-      <div style="font-weight:700;font-size:15px;">🖼️ ภาพตู้จำลอง <span class="muted" style="font-weight:400;font-size:12px;">· ${s.ts}</span></div>
+      <div style="font-weight:700;font-size:15px;">🖼️ ภาพตู้จำลอง <span class="muted" style="font-weight:400;font-size:12px;">· ${pkTsParts(s).orig}</span></div>
       <div style="display:flex;gap:8px;">
         <button onclick="pkExportImage(${idx})" class="go" style="font-size:13px;">⬇️ ดาวน์โหลด PNG</button>
         <button onclick="document.getElementById('pk-modal').remove()" style="border:none;background:var(--line);border-radius:8px;padding:7px 14px;cursor:pointer;font-size:14px;color:var(--ink);">ปิด ✕</button>
@@ -8682,7 +8706,7 @@ function renderPkLog(){
     const editingTag = (window.pkEditIdx===idx)?' <span class="tag" style="background:var(--warn);color:#fff;">กำลังแก้ไข</span>':'';
     rows+=`<tr${window.pkEditIdx===idx?' style="outline:2px solid var(--warn);"':''}>
       <td><b>${idx+1}</b></td>
-      <td style="white-space:nowrap"><b>${s.ts}</b><br>${modeTag}${editingTag}</td>
+      <td style="white-space:nowrap">${pkTsHtml(s, idx)}<br>${modeTag}${editingTag}</td>
       <td class="num">${s.rows.length}</td>
       <td class="num">${s.containers.length}</td>
       <td class="num">${fmtNum(s.grand.pcs)}</td>
