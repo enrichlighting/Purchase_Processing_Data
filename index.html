@@ -8905,25 +8905,60 @@ function poSelectAllReady(checked){ window.poPackSel=window.poPackSel||new Set()
 // ส่งรายการที่ติ๊กไปหน้า Packing List (Released) พร้อม Item / PO(Lot) / จำนวนที่ยังเหลือต้องจัด
 function poGoPackSelected(){
   const sel=[...(window.poPackSel||[])]; if(!sel.length){ pkToast('กรุณาเลือกอย่างน้อย 1 รายการที่จะจัดตู้','bad'); return; }
+  // ลิสท์ตู้จากรอบที่บันทึกไว้ทั้งหมด (Released) — ให้เลือกจัดลงตู้เดิม หรือขึ้นตู้ใหม่
+  const opts=[]; (window.pkLog||[]).forEach((s,ri)=>{ if(s.mode!=='released') return; (s.containers||[]).forEach((c,ci)=>{ opts.push({ri,ci,name:c.name||('ตู้ '+(ci+1))}); }); });
+  const listHtml = opts.length ? opts.map(o=>`<label style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;margin-bottom:5px;"><input type="radio" name="poCont" value="${o.ri}_${o.ci}"><span><b>📦 ${o.name}</b> <span class="muted" style="font-size:11px;">· รอบที่บันทึก ${o.ri+1}</span></span></label>`).join('') : '<div class="muted" style="font-size:12px;margin-bottom:5px;">— ยังไม่มีตู้ที่บันทึกไว้ (จะขึ้นตู้ใหม่)</div>';
+  const ov=document.createElement('div'); ov.style.cssText='position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:14px;max-width:460px;width:100%;max-height:82vh;overflow:auto;padding:20px 22px;box-shadow:0 18px 50px rgba(0,0,0,.3);">
+    <div style="font-weight:800;font-size:15px;margin-bottom:4px;">📦 เลือกตู้ที่จะจัดลง</div>
+    <div class="muted" style="font-size:11.5px;margin-bottom:12px;">นำ ${sel.length} รายการที่เลือกไปจัดลงตู้ — เลือก "ตู้ที่บันทึกไว้" (จัดต่อในตู้เดิม) หรือ "ตู้ใหม่"</div>
+    <div style="margin-bottom:8px;">${listHtml}</div>
+    <label style="display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px dashed var(--brand);border-radius:8px;cursor:pointer;margin-bottom:14px;"><input type="radio" name="poCont" value="new" ${opts.length?'':'checked'}><span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b>➕ ตู้ใหม่</b> <input id="poNewContName" type="text" placeholder="ชื่อตู้ (เช่น ตู้ A)" onfocus="var r=document.querySelector('input[name=poCont][value=new]'); if(r) r.checked=true;" style="font-size:12px;padding:3px 6px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:130px;"></span></label>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="poContCancel" style="padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:600;">ยกเลิก</button>
+      <button id="poContOk" class="go" style="background:var(--bad);">➡️ ไปจัดตู้</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#poContCancel').onclick=()=>ov.remove();
+  ov.querySelector('#poContOk').onclick=()=>{
+    const r=ov.querySelector('input[name="poCont"]:checked'); if(!r){ pkToast('เลือกตู้ก่อน','bad'); return; }
+    const v=r.value, newName=(ov.querySelector('#poNewContName')||{}).value||'';
+    ov.remove(); poGoPackWithContainer(sel, v, newName);
+  };
+}
+function poGoPackWithContainer(sel, choice, newName){
   window.pkMode='released';
-  const packed=poPackedMap(), rows=[];
+  const rb=document.querySelector('input[name="pk-mode"][value="released"]'); if(rb) rb.checked=true;
+  let contIdx=0;
+  if(choice==='new'){
+    window.pkEditIdx=null;
+    window.pkContainers=[{name:(newName||'').trim()||'ตู้ใหม่'}];
+    window.packingRows=[];
+  } else {
+    const parts=choice.split('_'); const ri=+parts[0], ci=+parts[1];
+    pkEditRound(ri);              // โหลดรอบที่บันทึกไว้ (ตู้ + รายการเดิม) เข้ามาแก้ไข
+    contIdx=ci;
+  }
+  const nC=(window.pkContainers||[{}]).length||1;
+  const packed=poPackedMap();
+  window.packingRows=window.packingRows||[];
   sel.forEach(key=>{
     const sepi=key.indexOf('|'); const po=key.slice(0,sepi), item=key.slice(sepi+1);
     const o=poFI(po,item), target=(o.orderQty===''||o.orderQty==null)?null:(+o.orderQty);
     const pq=packed[po]?(packed[po].items[item]||0):0;
-    const list=pkLotList(item);                 // pkMode=released แล้ว
-    const idx=list.findIndex(e=>e.po===po);
+    const list=pkLotList(item); const idx=list.findIndex(e=>e.po===po);
     const outQty=idx>=0?list[idx].out:null;
-    const remaining = target!=null ? Math.max(0,target-pq) : outQty;   // จำนวนที่ยังเหลือต้องจัด
-    rows.push({item, costIdx: idx>=0?idx:null, lotMax: (remaining!=null?remaining:outQty), loads:[remaining], lots:[]});
+    const remaining = target!=null ? Math.max(0,target-pq) : outQty;
+    const loads=new Array(nC).fill(''); loads[Math.min(contIdx,nC-1)]=remaining;   // ใส่จำนวนลงตู้ที่เลือก
+    window.packingRows.push({item, costIdx: idx>=0?idx:null, lotMax:(remaining!=null?remaining:outQty), loads, lots:[]});
   });
-  window.packingRows = rows.length?rows:[{item:'',loads:[],lots:[],costIdx:null}];
-  window.pkContainers = (window.pkContainers&&window.pkContainers.length)?window.pkContainers:[{name:'ตู้ A'}];
+  if(!window.packingRows.length) window.packingRows=[{item:'',loads:[],lots:[],costIdx:null}];
   window.poPackSel = new Set();
   const t=document.querySelector('.tab[data-tab="packing"]'); if(t) t.click();
-  const rb=document.querySelector('input[name="pk-mode"][value="released"]'); if(rb) rb.checked=true;
   renderPacking();
   const res=document.getElementById('pk-result'); if(res) res.scrollIntoView({behavior:'smooth',block:'start'});
+  pkToast(choice==='new'?'ขึ้นตู้ใหม่ · เพิ่ม '+sel.length+' รายการ':'จัดต่อในตู้เดิม · เพิ่ม '+sel.length+' รายการ','good');
 }
 
 // แถวตาราง "รายการ Lead Time ที่บันทึกไว้" — กรองตามสถานะ + คำค้น (ชื่อ/รหัส/Lot)
@@ -8978,7 +9013,7 @@ function renderPoFollow(){
       rowsT+=`<tr style="cursor:pointer;background:#fffdf7;" onclick="poToggleM('${ym}')"><td></td><td style="padding-left:10px;">${mOpen?'▼':'▶'} <b style="font-size:11.5px;">${mm} ${y}</b> <span class="muted" style="font-size:10px;">${M.pos.size} PO</span></td><td class="num" style="font-size:11px;">${yuan(M.val)}<br><span class="muted" style="font-size:10px;">ค้าง ${fmtNum(M.out)}</span></td></tr>`;
       if(!mOpen) return;
       Object.entries(M.vendors).sort((a,b)=>{ const ea=a[1].oldestEta,eb=b[1].oldestEta; if(ea&&eb) return ea<eb?-1:1; if(ea) return -1; if(eb) return 1; return a[1].oldest<b[1].oldest?-1:1; }).forEach(([vn,V])=>{ const vk=ym+'|'+vn; const vOpen=!!window.poExpV[vk];
-        rowsT+=`<tr style="cursor:pointer;${vOpen?'background:var(--brand-soft);':''}" onclick="poToggleV('${escq(vk)}')"><td></td><td style="padding-left:22px;">${vOpen?'▼':'▶'} <b style="font-size:11px;">${(vn||'').slice(0,22)}</b><br><span class="muted" style="font-size:10px;">${etaWaitTxt(V.oldestEta)} · ${V.pos.length} PO</span></td><td class="num" style="font-size:11px;"><b>${yuan(V.val)}</b><br><span class="muted" style="font-size:10px;">${fmtNum(V.out)} ชิ้น</span></td></tr>`;
+        rowsT+=`<tr style="cursor:pointer;${vOpen?'background:var(--brand-soft);':''}" onclick="poToggleV('${escq(vk)}')"><td></td><td style="padding-left:22px;">${vOpen?'▼':'▶'} <b style="font-size:11px;">${(vn||'').slice(0,22)}</b><br><span class="muted" style="font-size:10px;">${V.oldestEta?('📅 ETA '+poThaiShort(V.oldestEta)+' · '):''}${etaWaitTxt(V.oldestEta)} · ${V.pos.length} PO</span></td><td class="num" style="font-size:11px;"><b>${yuan(V.val)}</b><br><span class="muted" style="font-size:10px;">${fmtNum(V.out)} ชิ้น</span></td></tr>`;
         if(!vOpen) return;
         V.pos.slice().sort((a,b)=>{ const ea=a.eta,eb=b.eta; if(ea&&eb) return ea<eb?-1:1; if(ea) return -1; if(eb) return 1; return a.doc<b.doc?-1:1; }).forEach(p=>{ rowsT+=`<tr style="cursor:pointer;${window.poSelected===p.po?'outline:2px solid var(--brand);':''}" onclick="poSelectPO('${p.po}')" title="เลือก PO นี้"><td></td><td style="padding-left:34px;"><b style="font-size:11px;">${p.po}</b>${p.lot?' <span class="muted" style="font-size:10px;">Lot '+p.lot+'</span>':''}<br><span class="muted" style="font-size:10px;">${fmtNum(p.out)} ชิ้น · ${p.eta?('ETA '+poThaiShort(p.eta)+' · '+etaWaitTxt(p.eta)):'ไม่ระบุ ETA'}</span></td><td class="num" style="font-size:11px;">${yuan(p.val)}</td></tr>`; }); });
     });
@@ -9246,8 +9281,7 @@ function flowSalesCellsHtml(it, salesCols){
 }
 // เซลล์หมวดการคำนวณ = จำนวนรวม + อยู่ได้ (เดือน)
 function flowCatCell(num, mo, hiStyle){
-  const moTxt=isFinite(mo)?fmtMo(mo)+' ด.':'∞';
-  return `<td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;"><b style="font-size:13px;">${fmtNum(num)}</b><div style="margin-top:3px;"><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;${hiStyle}">${moTxt}</span></div></td>`;
+  return `<td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;"><b style="font-size:13px;">${fmtNum(num)}</b></td>`;   // อยู่ได้(เดือน) ตัดออก · ยึดจากคอลัมน์ Cover Stock แทน
 }
 // ---- Sort ตาราง Flowchart (คลิกหัวคอลัมน์ · default = ควรสั่งก่อน แล้วยอดขายมาก→น้อย) ----
 const FLOW_ST_RANK={red:0,warn:1,watch:2,noneed:3};
