@@ -237,6 +237,15 @@
 
   <!-- ============ PAGE: FLOWCHART ============ -->
   <div class="page active" id="page-flowchart">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:7px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:13px;">
+      <span style="font-weight:700;">🔤 ขนาดตัวอักษรหน้านี้</span>
+      <button onclick="uiFontStep(-1)" title="เล็กลง" style="padding:4px 11px;font-size:12px;font-weight:800;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);cursor:pointer;">A−</button>
+      <input type="range" class="uifont-range" min="1" max="20" step="1" value="11" oninput="setUIFont(this.value)" style="width:170px;accent-color:var(--brand);cursor:pointer;">
+      <button onclick="uiFontStep(1)" title="ใหญ่ขึ้น" style="padding:4px 11px;font-size:15px;font-weight:800;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);cursor:pointer;">A+</button>
+      <span class="uifont-val" style="font-weight:800;min-width:46px;color:var(--brand);">11 pt</span>
+      <button onclick="setUIFont(11)" style="padding:4px 10px;font-size:12px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--muted);cursor:pointer;">รีเซ็ต</button>
+      <span class="muted" style="font-size:11px;">(ปรับได้ 1–20 pt · จำค่าไว้อัตโนมัติ)</span>
+    </div>
     <div class="card">
       <style>
         .flow-tscroll{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;}
@@ -255,6 +264,15 @@
 
   <!-- ============ PAGE: PACKING LIST ============ -->
   <div class="page" id="page-packing">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:7px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:13px;">
+      <span style="font-weight:700;">🔤 ขนาดตัวอักษรหน้านี้</span>
+      <button onclick="uiFontStep(-1)" title="เล็กลง" style="padding:4px 11px;font-size:12px;font-weight:800;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);cursor:pointer;">A−</button>
+      <input type="range" class="uifont-range" min="1" max="20" step="1" value="11" oninput="setUIFont(this.value)" style="width:170px;accent-color:var(--brand);cursor:pointer;">
+      <button onclick="uiFontStep(1)" title="ใหญ่ขึ้น" style="padding:4px 11px;font-size:15px;font-weight:800;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);cursor:pointer;">A+</button>
+      <span class="uifont-val" style="font-weight:800;min-width:46px;color:var(--brand);">11 pt</span>
+      <button onclick="setUIFont(11)" style="padding:4px 10px;font-size:12px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--muted);cursor:pointer;">รีเซ็ต</button>
+      <span class="muted" style="font-size:11px;">(ปรับได้ 1–20 pt · จำค่าไว้อัตโนมัติ)</span>
+    </div>
     <div class="card" id="sec-packing">
       <h2>📦 Packing List (คำนวณกล่อง &amp; CBM)</h2>
       <p class="hint">เลือกสินค้าในแต่ละแถว → ข้อมูลขนาดกล่อง (L/W/H) และจำนวนชิ้น/กล่อง จะเติมให้อัตโนมัติ · กรอก "จำนวนชิ้นที่โหลด" แล้วระบบคำนวณ จำนวนกล่อง · CBM · Total CBM · มูลค่า (¥/฿) ให้</p>
@@ -9679,7 +9697,21 @@ function init(){
   renderTab(active);
   // ค่าเริ่มต้นแถบสารบัญ: เปิดบนจอกว้าง · จำค่าที่ผู้ใช้เลือกไว้
   { let s=null; try{ s=localStorage.getItem('tocOpen'); }catch(e){} const op = s!=null ? s==='1' : (window.innerWidth>=1000); document.body.classList.toggle('toc-open', op); }
+  uiFontInit();          // ปรับขนาดตัวอักษรหน้า Flowchart/Packing ตามค่าที่จำไว้
 }
+/* ===== ปรับขนาดตัวอักษร (zoom) หน้า Flowchart + Packing List · 1–20 pt · จำค่าใน localStorage ===== */
+const UIFONT_KEY='uiFontPtV1', UIFONT_REF=11;   // 11 pt = ขนาดปกติ (zoom 1.0)
+function uiFontGet(){ let v; try{ v=parseFloat(localStorage.getItem(UIFONT_KEY)); }catch(e){} return (v>=1&&v<=20)?v:UIFONT_REF; }
+function setUIFont(pt){
+  pt=Math.max(1, Math.min(20, Math.round(+pt||UIFONT_REF)));
+  try{ localStorage.setItem(UIFONT_KEY, pt); }catch(e){}
+  const z=pt/UIFONT_REF;
+  document.querySelectorAll('#page-flowchart .card, #page-packing .card').forEach(c=>{ c.style.zoom=z; });
+  document.querySelectorAll('.uifont-range').forEach(r=>{ r.value=pt; });
+  document.querySelectorAll('.uifont-val').forEach(s=>{ s.textContent=pt+' pt'; });
+}
+function uiFontStep(d){ setUIFont(uiFontGet()+d); }
+function uiFontInit(){ setUIFont(uiFontGet()); }
 /* ===== แถบสารบัญด้านซ้าย ===== */
 function tocToggle(open){ document.body.classList.toggle('toc-open', open); try{ localStorage.setItem('tocOpen', open?'1':'0'); }catch(e){} }
 function tocGo(tab, anchor){
