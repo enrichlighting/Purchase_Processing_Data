@@ -9420,17 +9420,38 @@ function flowExDiyAvgCell(it){
 }
 // ควรสั่งเพิ่ม 2 บรรทัด: บน=รวมทุกลูกค้า(อัตราขายเฉลี่ย 3ด.) · ล่าง=พาร์ท Mr.DIY(ยอดขายหน้าร้านเฉลี่ย 3ด. − สต๊อกหน้าร้าน)
 function flowSugAll(it, rc){ const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180); const a3=flowAvg3(it); const t=(typeof reorderTargetQty==='function')?reorderTargetQty(it,basis,a3/30):(a3*4); return Math.max(0,Math.round(t-(rc.c3||0))); }
-// Cover Stock แบบช่องเดียว แบ่งซ้าย–ขวา · ซ้าย=เทียบเฉลี่ย 3 เดือน · ขวา=เทียบเฉลี่ย 6 เดือน
-function flowCoverSplitCell(q, a3, a6, tipNum){
+// สีของ "อยู่ได้ (เดือน)" อิงกับ Lead Time ของสินค้า · ยังอยู่ใน Lead Time=เขียว · <100% แต่ ≥50%=เหลือง · <50%=แดง
+function coverHiByLead(m, leadDays){
+  if(!isFinite(m)) return 'color:var(--muted);';
+  const lm=(+leadDays||0)/30;                                     // Lead Time เป็นเดือน
+  if(lm<=0) return (typeof pkCoverHi==='function')?pkCoverHi(m):'color:var(--muted);';   // ไม่มี Lead Time → เกณฑ์เดือนเดิม
+  if(m>=lm)     return 'background:#86efac;color:#14532d;';       // อยู่ได้ ≥ Lead Time → เขียว
+  if(m>=lm*0.5) return 'background:#fde047;color:#713f12;';       // < Lead Time แต่ ≥ 50% → เหลือง
+  return 'background:#f87171;color:#7f1d1d;';                     // < 50% ของ Lead Time → แดง
+}
+// Cover Stock แบบช่องเดียว แบ่งซ้าย–ขวา · ซ้าย=เทียบเฉลี่ย 3 เดือน · ขวา=เทียบเฉลี่ย 6 เดือน · สีอิง Lead Time
+function flowCoverSplitCell(q, a3, a6, tipNum, leadDays){
   const c3m=a3>0?q/a3:Infinity, c6m=a6>0?q/a6:Infinity;
-  const hi=m=>(typeof pkCoverHi==='function'&&isFinite(m))?pkCoverHi(m):'color:var(--muted);';
-  const side=(m,win,avg)=>`<div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:3px;">${win}</div><span style="display:inline-block;font-size:16px;font-weight:800;padding:2px 9px;border-radius:7px;${hi(m)}" title="${tipNum} ÷ ยอดขายเฉลี่ย ${win} ${fmtNum(Math.round(avg))}/ด. = อยู่ได้ ${isFinite(m)?fmtMo(m):'∞'} เดือน">${isFinite(m)?fmtMo(m):'∞'}</span>`;
+  const hi=m=>coverHiByLead(m, leadDays);
+  const ltTxt=(+leadDays>0)?(' · Lead Time '+Math.round((+leadDays)/30*10)/10+' เดือน'):'';
+  const side=(m,win,avg)=>`<div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:3px;">${win}</div><span style="display:inline-block;font-size:16px;font-weight:800;padding:2px 9px;border-radius:7px;${hi(m)}" title="${tipNum} ÷ ยอดขายเฉลี่ย ${win} ${fmtNum(Math.round(avg))}/ด. = อยู่ได้ ${isFinite(m)?fmtMo(m):'∞'} เดือน${ltTxt}">${isFinite(m)?fmtMo(m):'∞'}</span>`;
   return `<td style="padding:6px 8px;text-align:center;white-space:nowrap;vertical-align:top;"><div style="display:flex;"><div style="flex:1;border-right:1px dashed var(--line);padding:0 8px;">${side(c3m,'3 เดือน',a3)}</div><div style="flex:1;padding:0 8px;">${side(c6m,'6 เดือน',a6)}</div></div></td>`;
+}
+// ยอดขายเฉลี่ย/เดือน "ขายเข้า Mr.DIY" (เราขายให้ DIY = BC_DIYMON) N เดือนย้อนหลัง
+function flowDiySalesInAvg(it,n){ const diy=(window.BC_DIYMON&&window.BC_DIYMON[it.no])||{}; return flowMonthsBack(n).reduce((s,k)=>s+(diy[k]||0),0)/n; }
+// Cover Stock DIY (ขายเข้า) = หมวด③ ÷ ยอดขายเฉลี่ยเฉพาะลูกค้า Mr.DIY (3/6 เดือน)
+function flowCoverDiyInCell(it, rc){
+  return flowCoverSplitCell(rc.c3||0, flowDiySalesInAvg(it,3), flowDiySalesInAvg(it,6), 'หมวด③ '+fmtNum(rc.c3||0)+' (÷ ยอดขายให้ Mr.DIY)', it.leadTime);
+}
+// Cover Stock DIY (ขายออกหน้าร้าน) = สต๊อกหน้าร้าน Mr.DIY ÷ ยอดขายหน้าร้านเฉลี่ย (3/6 เดือน)
+function flowCoverDiyOutCell(it, rc){
+  const stk=flowMrdiyStockNow(it);
+  return flowCoverSplitCell(stk, flowStoreAvg(it,3), flowStoreAvg(it,6), 'สต๊อกหน้าร้าน Mr.DIY '+fmtNum(stk)+' (÷ ยอดขายหน้าร้าน)', it.leadTime);
 }
 // Cover Stock คงเหลือรวมสั่งเพิ่ม = (หมวด③ + ควรสั่งเพิ่ม) ÷ ยอดขายเฉลี่ย
 function flowCoverPlusCell(it, rc){
   const sug=flowSugAll(it,rc), q=(rc.c3||0)+sug;
-  return flowCoverSplitCell(q, flowAvg3(it), flowAvg6(it), '(หมวด③ '+fmtNum(rc.c3||0)+' + ควรสั่งเพิ่ม '+fmtNum(sug)+' = '+fmtNum(q)+')');
+  return flowCoverSplitCell(q, flowAvg3(it), flowAvg6(it), '(หมวด③ '+fmtNum(rc.c3||0)+' + ควรสั่งเพิ่ม '+fmtNum(sug)+' = '+fmtNum(q)+')', it.leadTime);
 }
 // วิเคราะห์ความเสี่ยง Mr.DIY ถอดสินค้า
 function flowDiyRisk(it){
@@ -9512,7 +9533,7 @@ function flowDiyPriceCells(it){
 // Cover Stock = หมวด③ (คลัง+PO+จัดตู้+ผลิต) ÷ ยอดขายเฉลี่ย · ช่องเดียวแบ่งซ้าย(3ด.)/ขวา(6ด.) = อยู่ได้อีกกี่เดือน
 function flowCoverCell(it, rc){
   const q=rc.c3||0;
-  return flowCoverSplitCell(q, flowAvg3(it), flowAvg6(it), 'หมวด③ '+fmtNum(q));
+  return flowCoverSplitCell(q, flowAvg3(it), flowAvg6(it), 'หมวด③ '+fmtNum(q), it.leadTime);
 }
 function flowAvgCell(it){
   const map=flowMonMap(it), m3=flowMonthsBack(3), m6=flowMonthsBack(6);
@@ -9542,6 +9563,8 @@ const FLOW_SORTVAL={
   exdiyavg:(it,rc)=>flowExDiyAvg(it,3),
   cover36:(it,rc)=>{ const a3=flowAvg3(it); return a3>0 ? (rc.c3||0)/a3 : ((rc.c3||0)>0?999999:0); },
   covplus:(it,rc)=>{ const a3=flowAvg3(it); const q=(rc.c3||0)+flowSugAll(it,rc); return a3>0 ? q/a3 : (q>0?999999:0); },
+  covdiyin:(it,rc)=>{ const a=flowDiySalesInAvg(it,3); return a>0 ? (rc.c3||0)/a : ((rc.c3||0)>0?999999:0); },
+  covdiyout:(it,rc)=>{ const a=flowStoreAvg(it,3), s=flowMrdiyStockNow(it); return a>0 ? s/a : (s>0?999999:0); },
   diyrisk:(it,rc)=>{ const R={dropped:5,season:4,risk:3,safe:1}; const r=it.mrdiySell?flowDiyRisk(it):null; return r?(R[r.key]||0):-1; }
 };
 function flowSort(key){ const S=window.flowSort||{key:'default',dir:'desc'};
@@ -9615,11 +9638,13 @@ function flowItemRow(it, basis, grp, salesCols){
     ${flowAvgCell(it)}
     ${flowExDiyAvgCell(it)}
     ${window.flowVersion==='diy' ? flowStoreAvgCell(it) : ''}
+    ${window.flowVersion==='diy' ? flowCoverDiyInCell(it, rc) : ''}
+    ${window.flowVersion==='diy' ? flowCoverDiyOutCell(it, rc) : ''}
     ${window.flowVersion==='diy' ? flowDiyRiskCell(it) : ''}
   </tr>`;
   if(!iOpen) return tr;
   const hideP = window.flowHidePrice ? (1 + (window.flowVersion==='diy'?2:0)) : 0;
-  const totalCols = (window.flowVersion==='diy'?23:19) - hideP + ((salesCols&&salesCols.length)||0);
+  const totalCols = (window.flowVersion==='diy'?25:19) - hideP + ((salesCols&&salesCols.length)||0);
   const detail=`<tr><td colspan="${totalCols}" style="padding:4px 16px 14px;background:var(--bg);border-top:1px dashed var(--line);">${flowSales(it)}<div style="text-align:right;margin-top:4px;"><a href="#" onclick="event.stopPropagation();openLeadtime('${it.no}');return false;" style="font-size:11.5px;color:var(--brand);font-weight:700;">→ เปิดหน้าวางแผนสั่งซื้อ</a></div></td></tr>`;
   return tr+detail;
 }
@@ -9645,9 +9670,9 @@ function renderFlowchart(){
   const salesCols = flowSalesCols(items);
   let TH=['Vendor','Factory','สินค้า','ราคาตั้ง','สถานะ','','คงเหลือ (แยกคลัง)',FLOW_DIY_BADGE,'หมวด① คงเหลือคลังหักจอง','จัดตู้แล้ว','ตู้ (Container)','หมวด② คงเหลือหลังจัดตู้แล้ว','สั่งผลิต','PO ค้างรับ','หมวด③ คงเหลือ+PO ค้างรับ','Cover Stock (3/6ด.)','Suggestion','Cover Stock คงเหลือรวมสั่งเพิ่ม','ยอดขายทุกกลุ่มเฉลี่ย/ด. (3/6ด.)','ยอดขายเฉลี่ย ไม่รวม DIY (3/6ด.)'];
   let KEYS=FLOW_FIXED_KEYS.slice();
-  if(DIY){ TH.splice(4,0,'ราคาส่งให้ DIY','ราคาขายหน้าร้าน (ไม่รวม VAT)'); KEYS.splice(4,0,'costdiy','npstore'); TH.push('ยอดขายหน้าร้าน DIY (3/6ด.)','แนวโน้ม Mr.DIY ถอดสินค้า'); KEYS.push('storeavg','diyrisk'); }   // แทรกหลัง 'ราคาตั้ง' (index 3) · + คอลัมน์ท้าย DIY
+  if(DIY){ TH.splice(4,0,'ราคาส่งให้ DIY','ราคาขายหน้าร้าน (ไม่รวม VAT)'); KEYS.splice(4,0,'costdiy','npstore'); TH.push('ยอดขายหน้าร้าน DIY (3/6ด.)','Cover Stock DIY · ขายเข้า (3/6ด.)','Cover Stock DIY · ขายออกหน้าร้าน (3/6ด.)','แนวโน้ม Mr.DIY ถอดสินค้า'); KEYS.push('storeavg','covdiyin','covdiyout','diyrisk'); }   // แทรกหลัง 'ราคาตั้ง' (index 3) · + คอลัมน์ท้าย DIY (รวม Cover Stock DIY ขายเข้า/ขายออก)
   if(window.flowHidePrice){ ['price','costdiy','npstore'].forEach(k=>{ const idx=KEYS.indexOf(k); if(idx>=0){ KEYS.splice(idx,1); TH.splice(idx,1); } }); }   // ซ่อนคอลัมน์ราคาทั้งหมด
-  const RIGHT_KEYS=new Set(['price','costdiy','npstore','c1','c2','c3','podiy','production','packed','suggest','avg36','exdiyavg','cover36','covplus','storeavg']);
+  const RIGHT_KEYS=new Set(['price','costdiy','npstore','c1','c2','c3','podiy','production','packed','suggest','avg36','exdiyavg','cover36','covplus','covdiyin','covdiyout','storeavg']);
   const COLBG={c1:'#dcfce7',c2:'#fef9c3',c3:'#ffedd5',suggest:'#111'};   // สีพื้นหัวคอลัมน์ (หมวด①เขียว ②เหลือง ③ส้ม · ควรสั่งเพิ่ม=ดำ)
   const STICKYL={vendor:0, factory:78, name:156};   // ตำแหน่งตรึงซ้าย (px) ของ 3 คอลัมน์แรก
   const salesTh = salesCols.map(c=>{ const key=(c.t==='y'?'sy:':'sm:')+c.k; return `<th onclick="flowSort('${key}')" title="คลิกเพื่อเรียงตามยอดขายเดือนนี้" style="cursor:pointer;user-select:none;padding:7px 9px;text-align:right;font-size:10px;color:#c2410c;white-space:nowrap;border-bottom:2px solid var(--line);border-left:1px solid #fde6cf;background:#fff4ea;position:sticky;top:0;z-index:6;">${flowSalesHead(c)} ${flowSortArrow(key)}</th>`; }).join('');
@@ -9844,19 +9869,6 @@ async function cloudPushNow(){ const b=document.getElementById('bc-push'); if(b)
   catch(e){ console.error(e); pkToast('อัปโหลดไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
   if(b) b.disabled=false;
 }
-const BC_REFRESH_ALL_URL = 'https://default77ec408036024d2eb2fbeee9ed878b.1c.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/02/workflows/80b41d8f368f4d819d60207494c49abc/triggers/manual/paths/invoke?api-version=1';
-async function refreshAllBcData(){ const b=document.getElementById('bc-refresh-all'); if(b) b.disabled=true;
-  try{
-    pkToast('กำลังรีเฟรชข้อมูลทั้งหมด (อาจใช้เวลาสักครู่)...','info');
-    await window.GraphAuth.signIn();
-    const token = await window.GraphAuth.getFlowToken();
-    const res = await fetch(BC_REFRESH_ALL_URL, { method:'POST', headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'application/json' }, body: JSON.stringify({}) });
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    pkToast('รีเฟรชข้อมูลสำเร็จ ✅ กำลังโหลดหน้าใหม่...','good');
-    setTimeout(function(){ location.reload(); }, 1200);
-  }
-  catch(e){ console.error(e); pkToast('รีเฟรชไม่สำเร็จ: '+((e&&e.message)||e),'bad'); if(b) b.disabled=false; }
-}
 function bcInjectSyncButtons(){
   if(document.getElementById('bc-sync-wrap') || !(window.GraphStorage && window.GraphAuth)) return;   // ขึ้นเฉพาะเมื่อมี SharePoint (GitHub Pages)
   const wrap=document.createElement('div'); wrap.id='bc-sync-wrap';
@@ -9867,10 +9879,7 @@ function bcInjectSyncButtons(){
   const bu=document.createElement('button'); bu.id='bc-push'; bu.textContent='⬆️ อัปโหลดขึ้นส่วนกลาง';
   bu.style.cssText='padding:10px 16px;border-radius:8px;background:#5b8bff;color:#fff;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:14px;font-family:inherit;';
   bu.onclick=cloudPushNow;
-  const br=document.createElement('button'); br.id='bc-refresh-all'; br.textContent='🔄 รีเฟรชข้อมูลทั้งหมด';
-  br.style.cssText='padding:10px 16px;border-radius:8px;background:#ff9f43;color:#fff;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:14px;font-family:inherit;';
-  br.onclick=refreshAllBcData;
-  wrap.appendChild(bp); wrap.appendChild(bu); wrap.appendChild(br); document.body.appendChild(wrap);
+  wrap.appendChild(bp); wrap.appendChild(bu); document.body.appendChild(wrap);
 }
 window.addEventListener('load', function(){ let n=0; const t=setInterval(function(){ if(window.GraphStorage && window.GraphAuth){ clearInterval(t); bcInjectSyncButtons(); } else if(++n>24){ clearInterval(t); } }, 250); });
 </script>
