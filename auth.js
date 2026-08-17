@@ -71,9 +71,39 @@ async function getGraphToken() {
   }
 }
 
-// เปิดให้ไฟล์อื่น (เช่น graphStorage.js หรือ bc-*.js) เรียกใช้งานผ่าน window.GraphAuth
-window.GraphAuth = {
-  signIn,
-  getGraphToken,
-  msalInstance,
-};
+/**
+    * สำหรับขอ Access Token เพื่อเรียก Power Automate HTTP trigger (ปุ่ม "รีเฟรชข้อมูลทั้งหมด")
+    * ใช้ resource คนละตัวกับ Microsoft Graph ด้านบน
+    */
+   const flowLoginRequest = {
+     scopes: ['https://service.flow.microsoft.com//.default'],
+   };
+
+   async function getFlowToken() {
+     await ensureMsalInitialized();
+
+     let account = msalInstance.getActiveAccount();
+     if (!account) {
+       account = await signIn();
+     }
+
+     try {
+       const response = await msalInstance.acquireTokenSilent({
+         ...flowLoginRequest,
+         account,
+       });
+       return response.accessToken;
+     } catch (error) {
+       const response = await msalInstance.acquireTokenPopup(flowLoginRequest);
+       return response.accessToken;
+     }
+   }
+
+   // เปิดให้ไฟล์อื่น (เช่น graphStorage.js หรือ bc-*.js) เรียกใช้งานผ่าน window.GraphAuth
+   window.GraphAuth = {
+     signIn,
+     getGraphToken,
+     getFlowToken,
+     msalInstance,
+   };
+
