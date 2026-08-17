@@ -9766,19 +9766,6 @@ async function cloudPushNow(){ const b=document.getElementById('bc-push'); if(b)
   catch(e){ console.error(e); pkToast('อัปโหลดไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
   if(b) b.disabled=false;
 }
-const BC_REFRESH_ALL_URL = 'https://default77ec408036024d2eb2fbeee9ed878b.1c.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/02/workflows/80b41d8f368f4d819d60207494c49abc/triggers/manual/paths/invoke?api-version=1';
-async function refreshAllBcData(){ const b=document.getElementById('bc-refresh-all'); if(b) b.disabled=true;
-  try{
-    pkToast('กำลังรีเฟรชข้อมูลทั้งหมด (อาจใช้เวลาสักครู่)...','info');
-    await window.GraphAuth.signIn();
-    const token = await window.GraphAuth.getFlowToken();
-    const res = await fetch(BC_REFRESH_ALL_URL, { method:'POST', headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'application/json' }, body: JSON.stringify({}) });
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    pkToast('รีเฟรชข้อมูลสำเร็จ ✅ กำลังโหลดหน้าใหม่...','good');
-    setTimeout(function(){ location.reload(); }, 1200);
-  }
-  catch(e){ console.error(e); pkToast('รีเฟรชไม่สำเร็จ: '+((e&&e.message)||e),'bad'); if(b) b.disabled=false; }
-}
 function bcInjectSyncButtons(){
   if(document.getElementById('bc-sync-wrap') || !(window.GraphStorage && window.GraphAuth)) return;   // ขึ้นเฉพาะเมื่อมี SharePoint (GitHub Pages)
   const wrap=document.createElement('div'); wrap.id='bc-sync-wrap';
@@ -9789,9 +9776,13 @@ function bcInjectSyncButtons(){
   const bu=document.createElement('button'); bu.id='bc-push'; bu.textContent='⬆️ อัปโหลดขึ้นส่วนกลาง';
   bu.style.cssText='padding:10px 16px;border-radius:8px;background:#5b8bff;color:#fff;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:14px;font-family:inherit;';
   bu.onclick=cloudPushNow;
-  const br=document.createElement('button'); br.id='bc-refresh-all'; br.textContent='🔄 รีเฟรชข้อมูลทั้งหมด';
-  br.style.cssText='padding:10px 16px;border-radius:8px;background:#ff9f43;color:#fff;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:14px;font-family:inherit;';
-  br.onclick=refreshAllBcData;
-  wrap.appendChild(bp); wrap.appendChild(bu); wrap.appendChild(br); document.body.appendChild(wrap);
+  wrap.appendChild(bp); wrap.appendChild(bu); document.body.appendChild(wrap);
 }
 window.addEventListener('load', function(){ let n=0; const t=setInterval(function(){ if(window.GraphStorage && window.GraphAuth){ clearInterval(t); bcInjectSyncButtons(); } else if(++n>24){ clearInterval(t); } }, 250); });
+</script>
+<!-- ===== SharePoint sync (โหลดเฉพาะบน GitHub Pages ที่มีไฟล์เหล่านี้ · ลิงก์ Artifact จะบล็อก/404 แล้วข้ามไป) ===== -->
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.0/lib/msal-browser.min.js" onerror="void 0"></script>
+<script src="auth.js" onerror="void 0"></script>
+<script src="graphStorage.js" onerror="void 0"></script>
+</body>
+</html>
