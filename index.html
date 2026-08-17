@@ -9367,7 +9367,7 @@ function flowSugAll(it, rc){ const basis=(window.RBASIS==='custom')?180:(+window
 function flowCoverSplitCell(q, a3, a6, tipNum){
   const c3m=a3>0?q/a3:Infinity, c6m=a6>0?q/a6:Infinity;
   const hi=m=>(typeof pkCoverHi==='function'&&isFinite(m))?pkCoverHi(m):'color:var(--muted);';
-  const side=(m,win,avg)=>`<div class="muted" style="font-size:10px;margin-bottom:2px;">${win}</div><span style="display:inline-block;font-size:16px;font-weight:800;padding:2px 9px;border-radius:7px;${hi(m)}" title="${tipNum} ÷ ยอดขายเฉลี่ย ${win} ${fmtNum(Math.round(avg))}/ด. = อยู่ได้ ${isFinite(m)?fmtMo(m):'∞'} เดือน">${isFinite(m)?fmtMo(m):'∞'}</span>`;
+  const side=(m,win,avg)=>`<div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:3px;">${win}</div><span style="display:inline-block;font-size:16px;font-weight:800;padding:2px 9px;border-radius:7px;${hi(m)}" title="${tipNum} ÷ ยอดขายเฉลี่ย ${win} ${fmtNum(Math.round(avg))}/ด. = อยู่ได้ ${isFinite(m)?fmtMo(m):'∞'} เดือน">${isFinite(m)?fmtMo(m):'∞'}</span>`;
   return `<td style="padding:6px 8px;text-align:center;white-space:nowrap;vertical-align:top;"><div style="display:flex;"><div style="flex:1;border-right:1px dashed var(--line);padding:0 8px;">${side(c3m,'3 เดือน',a3)}</div><div style="flex:1;padding:0 8px;">${side(c6m,'6 เดือน',a6)}</div></div></td>`;
 }
 // Cover Stock คงเหลือรวมสั่งเพิ่ม = (หมวด③ + ควรสั่งเพิ่ม) ÷ ยอดขายเฉลี่ย
