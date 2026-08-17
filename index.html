@@ -9372,6 +9372,7 @@ function flowSales(it){
 // ยอดขายเป็น "คอลัมน์เดือน-ปี" เรียงไปทางขวา · ย่อ=รวมรายปี / ขยาย=รายเดือน (window.flowMonExpand)
 function flowToggleMon(){ window.flowMonExpand=!window.flowMonExpand; renderFlowchart(); }
 function flowTogglePrice(){ window.flowHidePrice=!window.flowHidePrice; try{ localStorage.setItem('flowHidePriceV1', window.flowHidePrice?'1':'0'); }catch(e){} renderFlowchart(); }
+function flowToggleVF(){ window.flowHideVF=!window.flowHideVF; try{ localStorage.setItem('flowHideVFV1', window.flowHideVF?'1':'0'); }catch(e){} renderFlowchart(); }
 const FLOW_MN=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 function flowSalesCols(items){
   const set=new Set(); items.forEach(it=>(it.monthly||[]).forEach(m=>set.add(m[0])));
@@ -9625,9 +9626,9 @@ function flowItemRow(it, basis, grp, salesCols){
   const factoryHtml = lo ? `<span style="font-size:11px;">${lo.factory||'-'}</span>` : '<span class="muted" style="font-size:10px;">—</span>';
   const leadMoq = [ (lo&&lo.lead)?`LT ${lo.lead} วัน`:'', (it.moq)?`MOQ ${fmtNum(it.moq)}`:'' ].filter(Boolean).join(' · ');
   const tr=`<tr onclick="flowToggleItem('${it.no}')" style="cursor:pointer;border-top:1px solid var(--line);${iOpen?'background:var(--bg);':''}">
-    <td style="padding:6px 6px;vertical-align:top;position:sticky;left:0;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${vendorHtml}</td>
-    <td style="padding:6px 6px;vertical-align:top;position:sticky;left:78px;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${factoryHtml}</td>
-    <td style="padding:7px 10px;white-space:nowrap;vertical-align:top;position:sticky;left:156px;z-index:3;background:${stickyBg};box-shadow:2px 0 4px -2px rgba(0,0,0,.18);min-width:150px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st.c};margin-right:6px;"></span><b style="font-size:12px;">${flowShort(it.no)}</b> <span class="muted" style="font-size:9px;">${iOpen?'▼':'▶'}</span>${leadMoq?`<div style="font-size:12px;font-weight:700;color:var(--muted);margin-top:2px;">${leadMoq}</div>`:''}</td>
+    ${window.flowHideVF?'':`<td style="padding:6px 6px;vertical-align:top;position:sticky;left:0;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${vendorHtml}</td>
+    <td style="padding:6px 6px;vertical-align:top;position:sticky;left:78px;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${factoryHtml}</td>`}
+    <td style="padding:7px 10px;white-space:nowrap;vertical-align:top;position:sticky;left:${window.flowHideVF?0:156}px;z-index:3;background:${stickyBg};box-shadow:2px 0 4px -2px rgba(0,0,0,.18);min-width:150px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st.c};margin-right:6px;"></span><b style="font-size:12px;">${flowShort(it.no)}</b> <span class="muted" style="font-size:9px;">${iOpen?'▼':'▶'}</span>${leadMoq?`<div style="font-size:12px;font-weight:700;color:var(--muted);margin-top:2px;">${leadMoq}</div>`:''}</td>
     ${window.flowHidePrice?'':`<td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;font-size:12px;">${priceTxt}</td>`}
     ${(window.flowVersion==='diy' && !window.flowHidePrice) ? flowDiyPriceCells(it) : ''}
     <td style="padding:7px 8px;vertical-align:top;"><span style="font-size:10.5px;font-weight:700;color:${st.c};background:${st.bg};padding:2px 7px;border-radius:5px;white-space:nowrap;">${st.t}</span></td>
@@ -9654,7 +9655,8 @@ function flowItemRow(it, basis, grp, salesCols){
   </tr>`;
   if(!iOpen) return tr;
   const hideP = window.flowHidePrice ? (1 + (window.flowVersion==='diy'?2:0)) : 0;
-  const totalCols = (window.flowVersion==='diy'?26:19) - hideP + ((salesCols&&salesCols.length)||0);
+  const hideVFc = window.flowHideVF ? 2 : 0;
+  const totalCols = (window.flowVersion==='diy'?26:19) - hideP - hideVFc + ((salesCols&&salesCols.length)||0);
   const detail=`<tr><td colspan="${totalCols}" style="padding:4px 16px 14px;background:var(--bg);border-top:1px dashed var(--line);">${flowSales(it)}<div style="text-align:right;margin-top:4px;"><a href="#" onclick="event.stopPropagation();openLeadtime('${it.no}');return false;" style="font-size:11.5px;color:var(--brand);font-weight:700;">→ เปิดหน้าวางแผนสั่งซื้อ</a></div></td></tr>`;
   return tr+detail;
 }
@@ -9665,6 +9667,7 @@ function renderFlowchart(){
   const q=(window.flowQuery||'').trim().toLowerCase();
   const DIY = window.flowVersion==='diy';
   if(window.flowHidePrice===undefined){ try{ window.flowHidePrice=localStorage.getItem('flowHidePriceV1')==='1'; }catch(e){ window.flowHidePrice=false; } }
+  if(window.flowHideVF===undefined){ try{ window.flowHideVF=localStorage.getItem('flowHideVFV1')==='1'; }catch(e){ window.flowHideVF=false; } }
   let items=ITEMS.filter(i=> i.ileReal || (typeof itemHasReleasedPO==='function' && itemHasReleasedPO(i)));
   if(DIY) items=items.filter(i=> i.hasPLU);                       // เวอร์ชัน Mr.DIY = เฉพาะสินค้าที่มี PLU
   if(q) items=items.filter(i=> (i.no+' '+(i.desc||'')+' '+flowShort(i.no)).toLowerCase().indexOf(q)>=0);
@@ -9682,9 +9685,10 @@ function renderFlowchart(){
   let KEYS=FLOW_FIXED_KEYS.slice();
   if(DIY){ TH.splice(4,0,'ราคาส่งให้ DIY','ราคาขายหน้าร้าน (ไม่รวม VAT)'); KEYS.splice(4,0,'costdiy','npstore'); TH.push('ยอดขายเฉลี่ยเฉพาะ Mr.DIY (3/6ด.)','Cover Stock DIY · ขายเข้า (3/6ด.)','ยอดขายหน้าร้าน DIY (3/6ด.)','Cover Stock DIY · ขายออกหน้าร้าน (3/6ด.)','แนวโน้ม Mr.DIY ถอดสินค้า'); KEYS.push('diyinavg','covdiyin','storeavg','covdiyout','diyrisk'); }   // แทรกหลัง 'ราคาตั้ง' (index 3) · + คอลัมน์ท้าย DIY (รวม Cover Stock DIY ขายเข้า/ขายออก)
   if(window.flowHidePrice){ ['price','costdiy','npstore'].forEach(k=>{ const idx=KEYS.indexOf(k); if(idx>=0){ KEYS.splice(idx,1); TH.splice(idx,1); } }); }   // ซ่อนคอลัมน์ราคาทั้งหมด
+  if(window.flowHideVF){ ['vendor','factory'].forEach(k=>{ const idx=KEYS.indexOf(k); if(idx>=0){ KEYS.splice(idx,1); TH.splice(idx,1); } }); }   // ซ่อนคอลัมน์ Vendor/Factory
   const RIGHT_KEYS=new Set(['price','costdiy','npstore','c1','c2','c3','podiy','production','packed','suggest','avg36','exdiyavg','cover36','covplus','covdiyin','covdiyout','storeavg','diyinavg']);
   const COLBG={c1:'#dcfce7',c2:'#fef9c3',c3:'#ffedd5',suggest:'#111'};   // สีพื้นหัวคอลัมน์ (หมวด①เขียว ②เหลือง ③ส้ม · ควรสั่งเพิ่ม=ดำ)
-  const STICKYL={vendor:0, factory:78, name:156};   // ตำแหน่งตรึงซ้าย (px) ของ 3 คอลัมน์แรก
+  const STICKYL = window.flowHideVF ? {name:0} : {vendor:0, factory:78, name:156};   // ตรึงซ้าย · ซ่อน VF แล้วชื่อสินค้าเลื่อนไปซ้ายสุด
   const salesTh = salesCols.map(c=>{ const key=(c.t==='y'?'sy:':'sm:')+c.k; return `<th onclick="flowSort('${key}')" title="คลิกเพื่อเรียงตามยอดขายเดือนนี้" style="cursor:pointer;user-select:none;padding:7px 9px;text-align:right;font-size:10px;color:#c2410c;white-space:nowrap;border-bottom:2px solid var(--line);border-left:1px solid #fde6cf;background:#fff4ea;position:sticky;top:0;z-index:6;">${flowSalesHead(c)} ${flowSortArrow(key)}</th>`; }).join('');
   const fixedTh = TH.map((h,i)=>{ const key=KEYS[i]; if(key==='__sales__') return salesTh;   // แทรกคอลัมน์ยอดขาย (ปี/เดือน) ไว้หน้า "คงเหลือ"
     const cbg=COLBG[key]?`background:${COLBG[key]};${key==='suggest'?'color:#fff;':''}`:'background:var(--bg);';
@@ -9717,6 +9721,7 @@ function renderFlowchart(){
     <button onclick="flowSort('default')" title="เรียง: ควรสั่งซื้อขึ้นก่อน แล้วยอดขายมาก→น้อย" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--brand);background:${isDefaultSort?'var(--brand)':'var(--card)'};color:${isDefaultSort?'#fff':'var(--brand)'};">🎯 เรียงตามความจำเป็น</button>
     <button onclick="flowToggleMon()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #ea580c;background:${window.flowMonExpand?'#ea580c':'var(--card)'};color:${window.flowMonExpand?'#fff':'#ea580c'};">${window.flowMonExpand?'🔽 ย่อยอดขายเป็นรายปี':'▶️ กางยอดขายรายเดือน (คอลัมน์)'}</button>
     <button onclick="flowTogglePrice()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #0891b2;background:${window.flowHidePrice?'#0891b2':'var(--card)'};color:${window.flowHidePrice?'#fff':'#0891b2'};">${window.flowHidePrice?'👁️ แสดงคอลัมน์ราคา':'🙈 ซ่อนคอลัมน์ราคา'}</button>
+    <button onclick="flowToggleVF()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #7c3aed;background:${window.flowHideVF?'#7c3aed':'var(--card)'};color:${window.flowHideVF?'#fff':'#7c3aed'};">${window.flowHideVF?'👁️ แสดง Vendor/Factory':'🙈 ซ่อน Vendor/Factory'}</button>
     <span class="muted" style="font-size:11px;">คลิกหัวคอลัมน์เพื่อเรียงมาก↔น้อย · ค่าเริ่มต้น: ควรสั่งซื้อขึ้นก่อน แล้วยอดขายมากสุดในหมวด</span>
   </div>`;
   gkeys.forEach(sub=>{
