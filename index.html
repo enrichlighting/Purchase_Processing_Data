@@ -9697,7 +9697,7 @@ function renderFlowchart(){
     const sticky = (sl!=null)
       ? `position:sticky;left:${sl}px;top:0;z-index:7;box-shadow:2px 0 4px -2px rgba(0,0,0,.18);`   // มุม: ตรึงทั้งซ้าย+บน
       : `position:sticky;top:0;z-index:6;`;                                                          // หัวปกติ: ตรึงบน
-    return `<th onclick="flowSort('${key}')" title="คลิกเพื่อเรียง" style="cursor:pointer;user-select:none;padding:7px 10px;text-align:${RIGHT_KEYS.has(key)?'right':'left'};font-size:10.5px;color:var(--muted);white-space:nowrap;border-bottom:2px solid var(--line);${cbg}${sticky}${w}">${h} ${flowSortArrow(key)}</th>`; }).join('');
+    return `<th onclick="flowSort('${key}')" title="คลิกเพื่อเรียง" style="cursor:pointer;user-select:none;padding:7px 8px;text-align:${RIGHT_KEYS.has(key)?'right':'left'};font-size:10.5px;line-height:1.25;color:var(--muted);white-space:normal;word-break:break-word;vertical-align:top;border-bottom:2px solid var(--line);${cbg}${sticky}${w}">${h} ${flowSortArrow(key)}</th>`; }).join('');
   const theadHtml = `<thead><tr style="background:var(--bg);">${fixedTh}</tr></thead>`;
   // ความกว้างคอลัมน์คงที่ (เท่ากันทุกหมวด → คอลัมน์ตรงกัน) · table-layout:fixed
   const CW={vendor:78,factory:78,name:186,price:78,costdiy:102,npstore:120,status:104,c1:88,c2:88,c3:102,onhand:152,podiy:74,production:76,packed:78,container:134,po:146,cover36:150,covplus:160,covdiyin:150,covdiyout:174,suggest:114,avg36:120,exdiyavg:132,diyinavg:122,storeavg:122,diyrisk:152};
