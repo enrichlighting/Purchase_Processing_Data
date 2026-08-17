@@ -260,7 +260,13 @@
       </style>
       <h2>🗺️ Flowchart — ภาพรวมรายสินค้า</h2>
       <p class="hint">ตารางภาพรวมทุกสินค้าในหน้าเดียว · แยกหมวดตาม Subtype (เรียงจากยอดขายสูงสุด) · เห็นครบ: ราคาตั้ง · สถานะ · <b>3 หมวดการคำนวณ</b> (①คลัง−จอง ②+จัดตู้ ③+PO+ผลิต) · คลัง → PO/DIY/ผลิต → ตู้ → ควรสั่ง · ยอดขายเป็นคอลัมน์เดือน-ปีเรียงไปทางขวา (ย่อ=รายปี/ขยาย=รายเดือน) · <span style="color:#2563eb;font-weight:700;">น้ำเงิน=PO</span> · <span style="color:#7c3aed;font-weight:700;">ม่วง=ตู้</span> · คลังแยกสี</p>
-      <div style="margin-bottom:12px;"><input id="flow-search" type="search" autocomplete="off" placeholder="🔍 ค้นหาชื่อ/รหัสสินค้า" oninput="flowSearch(this.value)" style="width:100%;max-width:420px;box-sizing:border-box;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;"></div>
+      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <input id="flow-search" type="search" autocomplete="off" placeholder="🔍 ค้นหาชื่อ/รหัสสินค้า" oninput="flowSearch(this.value)" style="flex:1;min-width:200px;max-width:340px;box-sizing:border-box;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;">
+        <input id="flow-vendor" list="flow-vendor-dl" autocomplete="off" placeholder="🏭 Vendor ทั้งหมด" oninput="flowSetVF()" style="width:170px;box-sizing:border-box;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;">
+        <datalist id="flow-vendor-dl"></datalist>
+        <input id="flow-factory" list="flow-factory-dl" autocomplete="off" placeholder="🔧 Factory ทั้งหมด" oninput="flowSetVF()" style="width:170px;box-sizing:border-box;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;">
+        <datalist id="flow-factory-dl"></datalist>
+      </div>
       <div id="flow-body"></div>
     </div>
   </div>
@@ -9254,10 +9260,40 @@ function flowWhColor(w){ return FLOW_WH_COLORS[w]||'#64748b'; }
 const FLOW_ST={red:{t:'🔴 ควรสั่งซื้อ',c:'#dc2626',bg:'#fdeaea'},warn:{t:'⏰ ใกล้ถึงจุดสั่ง',c:'#b45309',bg:'#fdf1e0'},watch:{t:'👀 เฝ้าระวัง',c:'#a16207',bg:'#fef9c3'},noneed:{t:'🟢 ยังไม่ต้องสั่ง',c:'#16a34a',bg:'#e7f6ec'}};
 function flowShort(no){ if(typeof pkDisplayName==='function'){ const s=pkDisplayName(no); if(s && s!==no) return s; } const g=(typeof getItem==='function')?getItem(no):null; return g?(typeof pkShortName==='function'?pkShortName(g.desc, (window.BC_PACKING&&window.BC_PACKING[no]||{}).model):g.desc):no; }
 function flowSearch(v){ window.flowQuery=String(v||''); renderFlowchart(); }
+// ตัวกรอง Vendor / Factory (ช่องค้นหาแบบ datalist ข้างช่องค้นหาสินค้า)
+function flowFillVF(){
+  const vd=document.getElementById('flow-vendor-dl'), fd=document.getElementById('flow-factory-dl');
+  if(vd && typeof allVendors==='function') vd.innerHTML=allVendors().map(v=>`<option value="${v}">`).join('');
+  if(fd && typeof allFactories==='function') fd.innerHTML=allFactories().map(f=>`<option value="${f}">`).join('');
+}
+function flowSetVF(){
+  window.flowVendorFilter=(document.getElementById('flow-vendor')||{}).value||'';
+  window.flowFactoryFilter=(document.getElementById('flow-factory')||{}).value||'';
+  renderFlowchart();
+}
 function flowToggleSub(el){ const s=decodeURIComponent(el.getAttribute('data-sub')); window.flowState.sub[s]=!window.flowState.sub[s]; renderFlowchart(); }
 function flowExpandAll(){ (window.flowAllSubs||[]).forEach(s=>window.flowState.sub[s]=true); renderFlowchart(); }
 function flowCollapseAll(){ (window.flowAllSubs||[]).forEach(s=>window.flowState.sub[s]=false); renderFlowchart(); }
 // ซิงก์ scrollbar ส่วนกลาง (sticky) กับตารางทุกหมวด — เลื่อนซ้ายขวาได้โดยไม่ต้องเลื่อนลงล่าง
+// จำ/คืนตำแหน่งการเลื่อน (แนวตั้ง+แนวนอน+หน้าเว็บ) เวลารีเรนเดอร์ — กันจอเด้งไปบนสุดตอนคลิกสินค้า
+function flowCaptureScroll(){
+  const st={page: window.scrollY||window.pageYOffset||0, subs:{}};
+  document.querySelectorAll('#flow-body .card').forEach(card=>{
+    const hd=card.querySelector('[data-sub]'), sc=card.querySelector('.flow-tscroll');
+    if(hd&&sc) st.subs[hd.getAttribute('data-sub')]={top:sc.scrollTop, left:sc.scrollLeft};
+  });
+  const hbar=document.getElementById('flow-hbar'); if(hbar) st.hbar=hbar.scrollLeft;
+  window._flowScroll=st;
+}
+function flowRestoreScroll(){
+  const st=window._flowScroll; if(!st) return;
+  document.querySelectorAll('#flow-body .card').forEach(card=>{
+    const hd=card.querySelector('[data-sub]'), sc=card.querySelector('.flow-tscroll');
+    if(hd&&sc){ const s=st.subs[hd.getAttribute('data-sub')]; if(s){ sc.scrollTop=s.top; sc.scrollLeft=s.left; } }
+  });
+  const hbar=document.getElementById('flow-hbar'); if(hbar && st.hbar!=null) hbar.scrollLeft=st.hbar;
+  if(st.page!=null) window.scrollTo(0, st.page);
+}
 function flowBindScroll(){
   const bar=document.getElementById('flow-hbar'); if(!bar) return;
   const tabs=[...document.querySelectorAll('#flow-body .flow-tscroll')]; if(!tabs.length) return;
@@ -9555,11 +9591,11 @@ function flowItemRow(it, basis, grp, salesCols){
     ? `<select onclick="event.stopPropagation()" onchange="flowSetVendor('${it.no}',this.value)" style="max-width:74px;font-size:10.5px;padding:2px;border:1px solid var(--brand);border-radius:5px;background:var(--bg);color:var(--ink);cursor:pointer;">${lopts.map((o,i)=>`<option value="${i}" ${i===lsi?'selected':''}>${o.vendor}</option>`).join('')}</select>`
     : (lopts.length===1 ? `<span style="font-size:11px;font-weight:600;">${lopts[0].vendor}</span>` : '<span class="muted" style="font-size:10px;">—</span>');
   const factoryHtml = lo ? `<span style="font-size:11px;">${lo.factory||'-'}</span>` : '<span class="muted" style="font-size:10px;">—</span>';
-  const leadMoq = [ (lo&&lo.lead)?`LT ${lo.lead}ว.`:'', (it.moq)?`MOQ ${fmtNum(it.moq)}`:'' ].filter(Boolean).join(' · ');
+  const leadMoq = [ (lo&&lo.lead)?`LT ${lo.lead} วัน`:'', (it.moq)?`MOQ ${fmtNum(it.moq)}`:'' ].filter(Boolean).join(' · ');
   const tr=`<tr onclick="flowToggleItem('${it.no}')" style="cursor:pointer;border-top:1px solid var(--line);${iOpen?'background:var(--bg);':''}">
     <td style="padding:6px 6px;vertical-align:top;position:sticky;left:0;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${vendorHtml}</td>
     <td style="padding:6px 6px;vertical-align:top;position:sticky;left:78px;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${factoryHtml}</td>
-    <td style="padding:7px 10px;white-space:nowrap;vertical-align:top;position:sticky;left:156px;z-index:3;background:${stickyBg};box-shadow:2px 0 4px -2px rgba(0,0,0,.18);min-width:150px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st.c};margin-right:6px;"></span><b style="font-size:12px;">${flowShort(it.no)}</b> <span class="muted" style="font-size:9px;">${iOpen?'▼':'▶'}</span>${leadMoq?`<div class="muted" style="font-size:9.5px;margin-top:2px;">${leadMoq}</div>`:''}</td>
+    <td style="padding:7px 10px;white-space:nowrap;vertical-align:top;position:sticky;left:156px;z-index:3;background:${stickyBg};box-shadow:2px 0 4px -2px rgba(0,0,0,.18);min-width:150px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st.c};margin-right:6px;"></span><b style="font-size:12px;">${flowShort(it.no)}</b> <span class="muted" style="font-size:9px;">${iOpen?'▼':'▶'}</span>${leadMoq?`<div style="font-size:12px;font-weight:700;color:var(--muted);margin-top:2px;">${leadMoq}</div>`:''}</td>
     ${window.flowHidePrice?'':`<td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;font-size:12px;">${priceTxt}</td>`}
     ${(window.flowVersion==='diy' && !window.flowHidePrice) ? flowDiyPriceCells(it) : ''}
     <td style="padding:7px 8px;vertical-align:top;"><span style="font-size:10.5px;font-weight:700;color:${st.c};background:${st.bg};padding:2px 7px;border-radius:5px;white-space:nowrap;">${st.t}</span></td>
@@ -9589,6 +9625,7 @@ function flowItemRow(it, basis, grp, salesCols){
 }
 function renderFlowchart(){
   const el=document.getElementById('flow-body'); if(!el) return;
+  flowCaptureScroll();          // จำตำแหน่งเลื่อนก่อนรีเรนเดอร์
   const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180), grp=window.RGROUP||'all';
   const q=(window.flowQuery||'').trim().toLowerCase();
   const DIY = window.flowVersion==='diy';
@@ -9596,6 +9633,9 @@ function renderFlowchart(){
   let items=ITEMS.filter(i=> i.ileReal || (typeof itemHasReleasedPO==='function' && itemHasReleasedPO(i)));
   if(DIY) items=items.filter(i=> i.hasPLU);                       // เวอร์ชัน Mr.DIY = เฉพาะสินค้าที่มี PLU
   if(q) items=items.filter(i=> (i.no+' '+(i.desc||'')+' '+flowShort(i.no)).toLowerCase().indexOf(q)>=0);
+  const vf=(window.flowVendorFilter||'').trim(), ff=(window.flowFactoryFilter||'').trim();
+  if(vf) items=items.filter(i=> (i.sources||[]).some(x=>x.vendor===vf));       // กรองตาม Vendor
+  if(ff) items=items.filter(i=> (i.sources||[]).some(x=>x.factory===ff));      // กรองตาม Factory
   const groups={}; items.forEach(i=>{ const s=(i.subType||'').trim()||'(ไม่ระบุ Subtype)'; (groups[s]=groups[s]||[]).push(i); });
   // เรียงหมวดจากยอดขายรวม 1 ปี (s365) มาก→น้อย
   const gsalesOf=arr=>arr.reduce((s,i)=>s+(i.s365||0),0);
@@ -9657,6 +9697,7 @@ function renderFlowchart(){
   if(anyOpen) html+=`<div id="flow-hbar" title="เลื่อนซ้าย–ขวา ดูทุกคอลัมน์"><div style="width:1180px;height:1px;"></div></div>`;
   el.innerHTML = html || '<div class="empty">ไม่พบสินค้า</div>';
   flowBindScroll();
+  flowRestoreScroll();          // คืนตำแหน่งเลื่อนเดิม (ไม่เด้งขึ้นบนสุด)
 }
 function renderTab(tab){
   if(tab==='flowchart'){ if(typeof poLoadFollow==='function') poLoadFollow(); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderFlowchart(); }
@@ -9762,6 +9803,7 @@ function init(){
   // ค่าเริ่มต้นแถบสารบัญ: เปิดบนจอกว้าง · จำค่าที่ผู้ใช้เลือกไว้
   { let s=null; try{ s=localStorage.getItem('tocOpen'); }catch(e){} const op = s!=null ? s==='1' : (window.innerWidth>=1000); document.body.classList.toggle('toc-open', op); }
   uiFontInit();          // ปรับขนาดตัวอักษรหน้า Flowchart/Packing ตามค่าที่จำไว้
+  if(typeof flowFillVF==='function') flowFillVF();   // เติมรายชื่อ Vendor/Factory ในช่องค้นหา
 }
 /* ===== ปรับขนาดตัวอักษร (zoom) หน้า Flowchart + Packing List · 1–20 pt · จำค่าใน localStorage ===== */
 const UIFONT_KEY='uiFontPtV1', UIFONT_REF=11;   // 11 pt = ขนาดปกติ (zoom 1.0)
