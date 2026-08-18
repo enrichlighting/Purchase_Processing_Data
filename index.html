@@ -295,6 +295,10 @@
           <span><b>Released PO Packing List</b><br><span class="muted" style="font-size:12px;">เลือกจาก PO ที่ Released &amp; ยังค้างรับ · เลือก Lot No แล้วดึงจำนวนค้างรับมาใส่ตู้แรกให้ (แก้ได้ แต่ไม่เกินจำนวนใน Lot) · รวมมูลค่า ¥/฿</span></span>
         </label>
       </div>
+      <div style="margin-bottom:12px;padding:9px 12px;border:1.5px dashed #16a34a;border-radius:10px;background:var(--good-soft);display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="go" onclick="pkConvertDraftToReleased()" style="background:#16a34a;">🔗 จับคู่ร่างนี้กับ PO → ไปต่อ Released PO</button>
+        <span class="muted" style="font-size:11.5px;">ร่างจัดตู้ไว้ในโหมด Forecast → พอจัดซื้อเปิด PO แล้ว กดปุ่มนี้เพื่อจับคู่กับ PO Released ของแต่ละสินค้า (คงผังตู้/จำนวนที่ร่างไว้) แล้วทำต่อในโหมด Released PO ได้เลย</span>
+      </div>
       <div style="margin-bottom:12px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;">
         <fieldset style="border:1.5px dashed #2563eb;border-radius:10px;padding:6px 12px 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0;">
           <legend style="font-size:12px;font-weight:800;color:#2563eb;padding:0 6px;">➕ เพิ่ม</legend>
@@ -7898,6 +7902,26 @@ function pkSetMode(m){
   // รีเซ็ตการเลือก Lot ของทุกแถว (คนละชุดข้อมูลระหว่างโหมด)
   window.packingRows.forEach(r=>{ const list=pkLotList(r.item); r.costIdx = list.length?0:null; r.lotMax = (window.pkMode==='released'&&list.length&&list[0].out!=null)?list[0].out:null; if(window.pkMode==='released'&&list.length){ r.loads=[pkDefaultLoad(r)]; r.lots=[]; } });
   renderPacking();
+}
+// จับคู่ "ร่างจัดตู้ (Forecast)" กับ PO ที่เปิดแล้ว → สลับเป็นโหมด Released PO โดย "คงจำนวน/ผังตู้ที่ร่างไว้"
+function pkConvertDraftToReleased(){
+  const rows=(window.packingRows||[]).filter(r=>r.item);
+  if(!rows.length){ pkToast('ยังไม่มีรายการในร่างจัดตู้','bad'); return; }
+  window._pkRelSet=null;                                  // ล้าง cache เซ็ต PO Released
+  window.pkMode='released';
+  const rb=document.querySelector('input[name="pk-mode"][value="released"]'); if(rb) rb.checked=true;
+  const matched=[], unmatched=[];
+  window.packingRows.forEach(r=>{ if(!r.item) return;
+    const list=pkLotList(r.item);                         // Lot จาก PO Released ของสินค้านี้
+    if(list.length){ r.costIdx=0; r.lotMax=(list[0].out!=null)?list[0].out:null; if(!Array.isArray(r.loads)) r.loads=[]; matched.push(r.item); }   // คงจำนวนที่ร่างไว้ (ไม่รีเซ็ต r.loads)
+    else { r.costIdx=null; r.lotMax=null; unmatched.push(r.item); }
+  });
+  pkSaveDraft(true);
+  renderPacking();
+  const nm=(typeof pkShortName==='function')?pkShortName:(x=>x);
+  let msg='🔗 จับคู่ร่างกับ PO แล้ว → โหมด Released PO (คงผังตู้/จำนวนเดิมไว้)\n• จับคู่ PO ได้ '+matched.length+' รายการ';
+  if(unmatched.length) msg+='\n• ยังไม่มี PO Released ('+unmatched.length+'): '+unmatched.slice(0,4).map(nm).join(', ')+(unmatched.length>4?' ...':'')+'\n  (ให้จัดซื้อเปิด PO ก่อน แล้วเลือก Lot ในแถวนั้น)';
+  pkToast(msg, unmatched.length?'warn':'good');
 }
 function pkSetCostLot(i, v){
   const r=window.packingRows[i];
