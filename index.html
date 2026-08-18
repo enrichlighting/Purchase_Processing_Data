@@ -295,9 +295,9 @@
           <span><b>Released PO Packing List</b><br><span class="muted" style="font-size:12px;">เลือกจาก PO ที่ Released &amp; ยังค้างรับ · เลือก Lot No แล้วดึงจำนวนค้างรับมาใส่ตู้แรกให้ (แก้ได้ แต่ไม่เกินจำนวนใน Lot) · รวมมูลค่า ¥/฿</span></span>
         </label>
       </div>
-      <div style="margin-bottom:12px;padding:9px 12px;border:1.5px dashed #16a34a;border-radius:10px;background:var(--good-soft);display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <div id="pk-convert-wrap" style="margin-bottom:12px;padding:9px 12px;border:1.5px dashed #16a34a;border-radius:10px;background:var(--good-soft);display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
         <button class="go" onclick="pkConvertDraftToReleased()" style="background:#16a34a;">🔗 จับคู่ร่างนี้กับ PO → ไปต่อ Released PO</button>
-        <span class="muted" style="font-size:11.5px;">ร่างจัดตู้ไว้ในโหมด Forecast → พอจัดซื้อเปิด PO แล้ว กดปุ่มนี้เพื่อจับคู่กับ PO Released ของแต่ละสินค้า (คงผังตู้/จำนวนที่ร่างไว้) แล้วทำต่อในโหมด Released PO ได้เลย</span>
+        <span class="muted" style="font-size:11.5px;">ร่างจัดตู้ไว้ในโหมด Forecast → เลือกว่าแต่ละสินค้าไปจับคู่ PO ใด · บันทึกร่างไว้ก่อนได้ (สถานะ "รอเปิด PO") · จับคู่แล้วไปทำต่อโหมด Released PO (กรอกวันที่ตู้ · เช็คจำนวน/ผู้ขาย)</span>
       </div>
       <div style="margin-bottom:12px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;">
         <fieldset style="border:1.5px dashed #2563eb;border-radius:10px;padding:6px 12px 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0;">
@@ -7896,33 +7896,96 @@ function pkRowCost(r){
   const e=list[r.costIdx];
   return {lot:e.lot, po:e.po, rmb:e.rmb, thb:e.rmb*pkFxVal(), out:e.out};
 }
+function pkUpdateConvertVis(){ const w=document.getElementById('pk-convert-wrap'); if(w) w.style.display=(window.pkMode==='forecast')?'':'none'; }   // ปุ่มจับคู่ PO เฉพาะโหมด Forecast
 function pkSetMode(m){
   window.pkMode = m;
   const rb=document.querySelector('input[name="pk-mode"][value="'+m+'"]'); if(rb) rb.checked=true;
+  pkUpdateConvertVis();
   // รีเซ็ตการเลือก Lot ของทุกแถว (คนละชุดข้อมูลระหว่างโหมด)
   window.packingRows.forEach(r=>{ const list=pkLotList(r.item); r.costIdx = list.length?0:null; r.lotMax = (window.pkMode==='released'&&list.length&&list[0].out!=null)?list[0].out:null; if(window.pkMode==='released'&&list.length){ r.loads=[pkDefaultLoad(r)]; r.lots=[]; } });
   renderPacking();
 }
-// จับคู่ "ร่างจัดตู้ (Forecast)" กับ PO ที่เปิดแล้ว → สลับเป็นโหมด Released PO โดย "คงจำนวน/ผังตู้ที่ร่างไว้"
-function pkConvertDraftToReleased(){
+// ผู้ขายของ (สินค้า, PO) จาก BC_PO
+function poVendorFromBcpo(item,po){ const arr=((window.BC_PO&&window.BC_PO[item])||{}).pos||[]; const f=arr.find(p=>p[0]===po); return f?(f[3]||''):''; }
+// ตัวเลือก PO Released ของสินค้า (สำหรับจับคู่ร่าง) → [{po,lot,out,doc,vendor}]
+function pkMatchOptions(item){
+  const rel=(window.BC_POREL&&window.BC_POREL[item])||[], rs=pkReleasedSet();
+  return rel.filter(e=>rs[e[0]]).map(e=>({po:e[0],lot:e[1],out:e[3],doc:(window.BC_PODATE||{})[e[0]]||'',vendor:poVendorFromBcpo(item,e[0])}));
+}
+// เปิดหน้าจับคู่ร่างจัดตู้ (Forecast) กับ PO — เลือก PO ต่อสินค้า ก่อนไปต่อ Released / หรือบันทึกร่างไว้ก่อน (รอเปิด PO)
+function pkOpenMatchModal(){
+  if(window.pkMode!=='forecast'){ pkToast('ปุ่มนี้ใช้เฉพาะโหมด Forecast Packing List','warn'); return; }
   const rows=(window.packingRows||[]).filter(r=>r.item);
   if(!rows.length){ pkToast('ยังไม่มีรายการในร่างจัดตู้','bad'); return; }
-  window._pkRelSet=null;                                  // ล้าง cache เซ็ต PO Released
-  window.pkMode='released';
-  const rb=document.querySelector('input[name="pk-mode"][value="released"]'); if(rb) rb.checked=true;
-  const matched=[], unmatched=[];
-  window.packingRows.forEach(r=>{ if(!r.item) return;
-    const list=pkLotList(r.item);                         // Lot จาก PO Released ของสินค้านี้
-    if(list.length){ r.costIdx=0; r.lotMax=(list[0].out!=null)?list[0].out:null; if(!Array.isArray(r.loads)) r.loads=[]; matched.push(r.item); }   // คงจำนวนที่ร่างไว้ (ไม่รีเซ็ต r.loads)
-    else { r.costIdx=null; r.lotMax=null; unmatched.push(r.item); }
+  window._pkRelSet=null;
+  let ov=document.getElementById('pk-match-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='pk-match-ov';
+  ov.style.cssText='position:fixed;inset:0;z-index:100003;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';
+  const box=document.createElement('div');
+  box.style.cssText='background:var(--card,#fff);color:var(--ink,#111);max-width:720px;width:100%;max-height:86vh;overflow:auto;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:20px;';
+  let body='<div style="font-size:16px;font-weight:800;margin-bottom:4px;">🔗 จับคู่ร่างจัดตู้กับ PO</div>'
+    +'<div class="muted" style="font-size:12px;margin-bottom:14px;">เลือกว่าสินค้าแต่ละตัวที่ร่างจัดตู้ไว้ จะไปจับคู่กับ PO ใด · ตัวที่ยังไม่มี PO ให้เว้นไว้ (จะขึ้นสถานะ "รอเปิด PO")</div>';
+  body+='<table style="width:100%;font-size:12.5px;border-collapse:collapse;">';
+  body+='<tr style="text-align:left;border-bottom:2px solid var(--line);"><th style="padding:5px;">สินค้า</th><th class="num" style="padding:5px;">ร่างไว้</th><th style="padding:5px;">จับคู่กับ PO</th></tr>';
+  rows.forEach((r,i)=>{
+    const total=(r.loads||[]).reduce((s,x)=>s+(+x||0),0);
+    const opts=pkMatchOptions(r.item);
+    const sel=`<select id="pk-match-${i}" style="width:100%;max-width:330px;font-size:11.5px;padding:5px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);"><option value="">— ยังไม่เปิด PO (รอเปิด) —</option>${opts.map((o,j)=>`<option value="${o.po}">${o.po} · Lot ${o.lot} · ค้าง ${fmtNum(o.out||0)}${o.vendor?' · '+o.vendor:''}${o.doc?' · เอกสาร '+poThaiShort(o.doc):''}</option>`).join('')}</select>`;
+    body+=`<tr style="border-bottom:1px solid var(--line);"><td style="padding:6px 5px;"><b>${pkDisplayName(r.item)}</b><div class="muted" style="font-size:10px;">${r.item}</div></td><td class="num" style="padding:6px 5px;">${fmtNum(total)}</td><td style="padding:6px 5px;">${sel}${opts.length?'':'<div class="muted" style="font-size:10px;color:#dc2626;">ยังไม่มี PO Released</div>'}</td></tr>`;
+    box.dataset['n']=rows.length;
   });
-  pkSaveDraft(true);
-  renderPacking();
-  const nm=(typeof pkShortName==='function')?pkShortName:(x=>x);
-  let msg='🔗 จับคู่ร่างกับ PO แล้ว → โหมด Released PO (คงผังตู้/จำนวนเดิมไว้)\n• จับคู่ PO ได้ '+matched.length+' รายการ';
-  if(unmatched.length) msg+='\n• ยังไม่มี PO Released ('+unmatched.length+'): '+unmatched.slice(0,4).map(nm).join(', ')+(unmatched.length>4?' ...':'')+'\n  (ให้จัดซื้อเปิด PO ก่อน แล้วเลือก Lot ในแถวนั้น)';
-  pkToast(msg, unmatched.length?'warn':'good');
+  body+='</table>';
+  body+='<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap;">'
+    +'<button class="go" style="background:#64748b;" onclick="document.getElementById(\'pk-match-ov\').remove()">ยกเลิก</button>'
+    +'<button class="go" style="background:var(--warn);" onclick="pkMatchSaveDraft()">💾 บันทึกร่างไว้ก่อน (รอเปิด PO)</button>'
+    +'<button class="go" style="background:#16a34a;" onclick="pkMatchApply()">🔗 จับคู่ & ไปต่อ Released PO</button></div>';
+  box.innerHTML=body; ov.appendChild(box); document.body.appendChild(ov);
+  ov.onclick=(e)=>{ if(e.target===ov) ov.remove(); };
 }
+// อ่านค่าที่เลือกในหน้าจับคู่ → [{i, po}]
+function pkMatchRead(){
+  const rows=(window.packingRows||[]).filter(r=>r.item); const out=[];
+  rows.forEach((r,i)=>{ const sel=document.getElementById('pk-match-'+i); out.push({i, item:r.item, po:sel?sel.value:''}); });
+  return out;
+}
+// บันทึกร่างไว้ก่อน (ยังไม่จับคู่ครบ) — ลงตาราง Packing List เป็นรอบ "รอเปิด PO"
+function pkMatchSaveDraft(){
+  const picks=pkMatchRead();
+  const snap=pkSnapshot();                          // โหมด forecast
+  if(!snap.rows.length){ pkToast('ยังไม่มีสินค้าในร่าง','bad'); return; }
+  snap.pending=true;                                // รอเปิด PO
+  snap.matchSel={}; picks.forEach(p=>{ if(p.po) snap.matchSel[p.item]=p.po; });
+  window.pkLog.unshift(snap); pkSaveLogStore();
+  const ov=document.getElementById('pk-match-ov'); if(ov) ov.remove();
+  renderPkLog(); pkToast('บันทึกร่างไว้แล้ว (สถานะ: รอเปิด PO) — ในตาราง Packing List ด้านล่าง','good');
+}
+// จับคู่ตามที่เลือก → ผูก PO/Lot + ตั้ง Lead Time สั่งผลิต (default) แล้วสลับไปโหมด Released PO
+function pkMatchApply(){
+  const picks=pkMatchRead();
+  window._pkRelSet=null; window.pkMode='released';
+  const rb=document.querySelector('input[name="pk-mode"][value="released"]'); if(rb) rb.checked=true;
+  let matched=0, pending=0;
+  picks.forEach(p=>{
+    const r=window.packingRows[p.i]; if(!r) return;
+    if(!Array.isArray(r.loads)) r.loads=[];
+    if(p.po){
+      const list=pkLotList(r.item);                 // released lots
+      const idx=list.findIndex(e=>e.po===p.po);
+      if(idx>=0){ r.costIdx=idx; r.lotMax=(list[idx].out!=null)?list[idx].out:null; matched++;
+        // ตั้ง Lead Time สั่งผลิต (default) = Lead Time สินค้า − 20 วัน · เริ่มจาก document date ของ PO → หน้า 🚨 คำนวณสถานะเอง
+        const it=ITEMS.find(x=>x.no===r.item)||{}; const prodLead=Math.max(0,(+it.leadTime||0)-20);
+        const o=poFI(p.po, r.item); if(o.leadDays===''||o.leadDays==null) o.leadDays=prodLead;
+      } else { r.costIdx=null; r.lotMax=null; pending++; }
+    } else { r.costIdx=null; r.lotMax=null; pending++; }
+  });
+  poSaveFollow();
+  const ov=document.getElementById('pk-match-ov'); if(ov) ov.remove();
+  renderPacking();
+  if(window.tabRendered && window.tabRendered.leadtime) poRefresh();
+  pkToast('🔗 จับคู่ PO แล้ว '+matched+' รายการ → โหมด Released PO (คงผังตู้/จำนวนเดิม)\nตั้ง Lead Time สั่งผลิต (Lead Time สินค้า − 20 วัน · เริ่มจากวันเอกสาร PO) ให้หน้า 🚨 อัตโนมัติ'+(pending?'\nยังไม่จับคู่ '+pending+' รายการ (รอเปิด PO)':'')+'\nกรอกวันที่ตู้ + ตรวจจำนวน/ผู้ขาย แล้วกดบันทึกจริง', matched?'good':'warn');
+}
+// เรียกเดิม (ปุ่ม) → เปิดหน้าจับคู่
+function pkConvertDraftToReleased(){ pkOpenMatchModal(); }
 function pkSetCostLot(i, v){
   const r=window.packingRows[i];
   r.costIdx = (v==='')? null : (+v);
@@ -8236,6 +8299,7 @@ function renderShipPanel(){
 }
 
 function renderPacking(){
+  if(typeof pkUpdateConvertVis==='function') pkUpdateConvertVis();   // ปุ่มจับคู่ PO เฉพาะโหมด Forecast
   const conts=window.pkContainers;
   // header
   let contTh=''; conts.forEach((ct,c)=>{ contTh+=`<th class="num" style="min-width:110px;"><input type="text" value="${(ct.name||pkDefName(c)).replace(/"/g,'&quot;')}" onchange="pkSetContName(${c},this.value)" style="width:90px;text-align:center;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-weight:700;"><br><a href="#" style="font-size:11px;" onclick="pkDelCont(${c});return false;">ลบตู้</a></th>`; });
@@ -8799,18 +8863,20 @@ function renderPkLog(){
   let rows='';
   order.forEach((o,pos)=>{ const s=o.s, idx=o.idx;
     const cont=s.containers.map((c,i)=>`${c.name}: <b>${s.contTotals[i].cbm.toFixed(2)}</b> CBM / ¥${Math.round(s.contTotals[i].valRmb).toLocaleString()} / ฿${Math.round(s.contTotals[i].valThb).toLocaleString()}`).join(' &nbsp;·&nbsp; ');
-    const modeTag = (s.mode==='released')?'<span class="tag" style="background:var(--good-soft);color:var(--good);">Released PO</span>':'<span class="tag" style="background:var(--brand-soft);color:var(--brand);">Forecast</span>';
+    const modeTag = s.pending
+      ? '<span class="tag" style="background:#fef3c7;color:#92400e;">⏳ รอเปิด PO</span>'
+      : ((s.mode==='released')?'<span class="tag" style="background:var(--good-soft);color:var(--good);">Released PO</span>':'<span class="tag" style="background:var(--brand-soft);color:var(--brand);">Forecast</span>');
     const editingTag = (window.pkEditIdx===idx)?' <span class="tag" style="background:var(--warn);color:#fff;">กำลังแก้ไข</span>':'';
     rows+=`<tr${window.pkEditIdx===idx?' style="outline:2px solid var(--warn);"':''}>
       <td><b>${pos+1}</b></td>
       <td style="white-space:nowrap">${pkTsHtml(s, idx)}<br>${modeTag}${editingTag}</td>
       <td class="num">${s.rows.length}</td>
-      <td class="num"><b>${pkContNum(s)||'-'}</b>${s.containers.length>1?`<div class="muted" style="font-size:9px;">${s.containers.length} ตู้</div>`:''}</td>
+      <td class="num">${s.pending?'<span class="muted">—</span>':`<b>${pkContNum(s)||'-'}</b>${s.containers.length>1?`<div class="muted" style="font-size:9px;">${s.containers.length} ตู้</div>`:''}`}</td>
       <td class="num">${fmtNum(s.grand.pcs)}</td>
       <td class="num"><b>${s.grand.cbm.toFixed(2)}</b></td>
       <td class="num">¥${pkMoney(s.grand.valRmb)}<br>฿${pkMoney(s.grand.valThb)}</td>
       <td style="font-size:11px;">${cont}</td>
-      <td style="min-width:180px;">${s.containers.map((c,i)=>`<div style="margin-bottom:7px;"><span style="font-size:11px;font-weight:700;">${c.name}</span>${pkShipStatusHtml(c.dates)}</div>`).join('')}</td>
+      <td style="min-width:180px;">${s.pending?'<span style="font-size:11px;font-weight:700;color:#92400e;">⏳ รอเปิด PO</span><div class="muted" style="font-size:10px;">ยังไม่ทราบเลขตู้/วันที่ · จับคู่ PO แล้วไปทำต่อ Released PO</div>':s.containers.map((c,i)=>`<div style="margin-bottom:7px;"><span style="font-size:11px;font-weight:700;">${c.name}</span>${pkShipStatusHtml(c.dates)}</div>`).join('')}</td>
       <td style="white-space:nowrap"><button style="${mini}" onclick="pkEditRound(${idx})">✏️ แก้ไข</button> <button style="${mini}" onclick="pkPrintRound(${idx})">🖨️ พิมพ์</button> <button style="${mini}" onclick="pkExportExcel(${idx})">📄 Excel</button> <button style="${mini}" onclick="pkPreviewImage(${idx})">🖼️ ภาพตู้</button> <a href="#" style="color:var(--bad);font-size:12px;font-weight:${window.pkDelConfirm===idx?'700':'400'};${window.pkDelConfirm===idx?'background:#fdecec;padding:2px 6px;border-radius:5px;':''}" onclick="pkDelRound(${idx});return false;">${window.pkDelConfirm===idx?'⚠️ คลิกอีกครั้งเพื่อยืนยันลบ':'🗑️ ลบ'}</a></td>
     </tr>`;
   });
