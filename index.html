@@ -8776,20 +8776,36 @@ function poProgressHtml(po,item,packedQ){
   return html;
 }
 function poShipCardBlock(item){ const si=itemShipStatus(item); return si?`<div style="margin-top:8px;border-top:1px dashed var(--line);padding-top:7px;"><span style="font-size:11px;font-weight:700;color:var(--muted);">🚚 ${si.contName} · สถานะขนส่ง</span>${pkShipStatusHtml(si.dates)}</div>`:''; }
+// เลขตู้สูงสุดในรอบ (สำหรับเรียง) · ประวัติ Packing เรียงได้ + ค่าเริ่มต้น = เลขตู้ มาก→น้อย
+function pkContNum(s){ let mx=0; (s.containers||[]).forEach(c=>{ const m=String(c.name||'').match(/(\d+)/); if(m){ const n=+m[1]; if(n>mx) mx=n; } }); return mx; }
+function pkLogSortVal(s,key){ switch(key){
+  case 'cont': return pkContNum(s);
+  case 'ts': return (typeof pkTsParts==='function'?pkTsParts(s).orig:s.ts)||'';
+  case 'rows': return (s.rows||[]).length;
+  case 'nc': return (s.containers||[]).length;
+  case 'pcs': return (s.grand&&s.grand.pcs)||0;
+  case 'cbm': return (s.grand&&s.grand.cbm)||0;
+  case 'val': return (s.grand&&s.grand.valThb)||0;
+  default: return 0; } }
+function pkLogSortBy(key){ const S=window.pkLogSort||(window.pkLogSort={key:'cont',dir:'desc'}); if(S.key===key) S.dir=(S.dir==='asc'?'desc':'asc'); else { S.key=key; S.dir='desc'; } renderPkLog(); }
+function pkLogArrow(key){ const S=window.pkLogSort||{}; if(S.key!==key) return '<span style="opacity:.35;">↕</span>'; return S.dir==='asc'?'▲':'▼'; }
 function renderPkLog(){
   const el=document.getElementById('pk-log'); if(!el) return;
   if(!window.pkLog.length){ el.innerHTML='<p class="muted" style="margin:6px 0;">ยังไม่มีการบันทึก — กด "💾 บันทึกรอบนี้" ด้านบน</p>'; return; }
   const mini='padding:3px 9px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-size:12px;';
+  const S=window.pkLogSort||(window.pkLogSort={key:'cont',dir:'desc'});   // ค่าเริ่มต้น: เรียงเลขตู้ มาก→น้อย
+  const order=window.pkLog.map((s,idx)=>({s,idx}));
+  order.sort((a,b)=>{ const va=pkLogSortVal(a.s,S.key), vb=pkLogSortVal(b.s,S.key); let c=(typeof va==='string'||typeof vb==='string')?String(va).localeCompare(String(vb)):(va-vb); if(c===0) c=a.idx-b.idx; return S.dir==='asc'?c:-c; });
   let rows='';
-  window.pkLog.forEach((s,idx)=>{
+  order.forEach((o,pos)=>{ const s=o.s, idx=o.idx;
     const cont=s.containers.map((c,i)=>`${c.name}: <b>${s.contTotals[i].cbm.toFixed(2)}</b> CBM / ¥${Math.round(s.contTotals[i].valRmb).toLocaleString()} / ฿${Math.round(s.contTotals[i].valThb).toLocaleString()}`).join(' &nbsp;·&nbsp; ');
     const modeTag = (s.mode==='released')?'<span class="tag" style="background:var(--good-soft);color:var(--good);">Released PO</span>':'<span class="tag" style="background:var(--brand-soft);color:var(--brand);">Forecast</span>';
     const editingTag = (window.pkEditIdx===idx)?' <span class="tag" style="background:var(--warn);color:#fff;">กำลังแก้ไข</span>':'';
     rows+=`<tr${window.pkEditIdx===idx?' style="outline:2px solid var(--warn);"':''}>
-      <td><b>${idx+1}</b></td>
+      <td><b>${pos+1}</b></td>
       <td style="white-space:nowrap">${pkTsHtml(s, idx)}<br>${modeTag}${editingTag}</td>
       <td class="num">${s.rows.length}</td>
-      <td class="num">${s.containers.length}</td>
+      <td class="num"><b>${pkContNum(s)||'-'}</b>${s.containers.length>1?`<div class="muted" style="font-size:9px;">${s.containers.length} ตู้</div>`:''}</td>
       <td class="num">${fmtNum(s.grand.pcs)}</td>
       <td class="num"><b>${s.grand.cbm.toFixed(2)}</b></td>
       <td class="num">¥${pkMoney(s.grand.valRmb)}<br>฿${pkMoney(s.grand.valThb)}</td>
@@ -8798,7 +8814,8 @@ function renderPkLog(){
       <td style="white-space:nowrap"><button style="${mini}" onclick="pkEditRound(${idx})">✏️ แก้ไข</button> <button style="${mini}" onclick="pkPrintRound(${idx})">🖨️ พิมพ์</button> <button style="${mini}" onclick="pkExportExcel(${idx})">📄 Excel</button> <button style="${mini}" onclick="pkPreviewImage(${idx})">🖼️ ภาพตู้</button> <a href="#" style="color:var(--bad);font-size:12px;font-weight:${window.pkDelConfirm===idx?'700':'400'};${window.pkDelConfirm===idx?'background:#fdecec;padding:2px 6px;border-radius:5px;':''}" onclick="pkDelRound(${idx});return false;">${window.pkDelConfirm===idx?'⚠️ คลิกอีกครั้งเพื่อยืนยันลบ':'🗑️ ลบ'}</a></td>
     </tr>`;
   });
-  el.innerHTML=`<table><tr><th>#</th><th>วัน–เวลา / รูปแบบ</th><th class="num">แถว</th><th class="num">ตู้</th><th class="num">รวมชิ้น</th><th class="num">รวม CBM</th><th class="num">มูลค่า (¥/฿)</th><th>สรุปต่อตู้</th><th>สถานะขนส่ง (วันนี้)</th><th>จัดการ</th></tr>${rows}</table>`;
+  const sh=(key,label,cls)=>`<th${cls?' class="'+cls+'"':''} onclick="pkLogSortBy('${key}')" title="คลิกเพื่อเรียง" style="cursor:pointer;user-select:none;white-space:nowrap;">${label} ${pkLogArrow(key)}</th>`;
+  el.innerHTML=`<table><tr><th>#</th>${sh('ts','วัน–เวลา / รูปแบบ')}${sh('rows','แถว','num')}${sh('cont','ตู้ (เลข)','num')}${sh('pcs','รวมชิ้น','num')}${sh('cbm','รวม CBM','num')}${sh('val','มูลค่า (¥/฿)','num')}<th>สรุปต่อตู้</th><th>สถานะขนส่ง (วันนี้)</th><th>จัดการ</th></tr>${rows}</table>`;
 }
 
 /* ============ ติดตามสถานะ PO & จัดตู้ (เชื่อม Packing Log ↔ Lead Time) ============ */
