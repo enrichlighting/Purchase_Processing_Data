@@ -9076,6 +9076,7 @@ function renderPoFollow(){
   const tree={};
   list.forEach(po=>{ const doc=PD[po.po]; if(!doc) return; const y=doc.slice(0,4), ym=doc.slice(0,7); const vn=po.vendor||'(ไม่ระบุผู้ขาย)';
     let val=0,out=0,lots=[],eta=null; po.items.forEach(x=>{ const rl=poRelLot(po.po,x.item)||{}; const o=+x.out||0; out+=o; val+=o*(+rl.rmb||0); if(rl.lot) lots.push(rl.lot); const e=poEtaOf(po.po,x.item); if(e && (!eta||e<eta)) eta=e; });  // eta = ETA เร็วสุดของ PO (ค้างนานสุด)
+    if(!(eta && (new Date(today)-new Date(eta))>0)) return;   // เฉพาะ PO ที่เลย ETA แล้วเท่านั้น (ตัดที่ยังไม่ถึง/ไม่มี ETA ออก)
     const Y=tree[y]||(tree[y]={val:0,out:0,pos:new Set(),months:{}}); Y.val+=val; Y.out+=out; Y.pos.add(po.po);
     const M=Y.months[ym]||(Y.months[ym]={val:0,out:0,pos:new Set(),vendors:{}}); M.val+=val; M.out+=out; M.pos.add(po.po);
     const V=M.vendors[vn]||(M.vendors[vn]={val:0,out:0,oldest:doc,oldestEta:null,pos:[]}); V.val+=val; V.out+=out; if(doc<V.oldest)V.oldest=doc; if(eta && (!V.oldestEta||eta<V.oldestEta)) V.oldestEta=eta;
@@ -9100,8 +9101,9 @@ function renderPoFollow(){
     });
   });
   const tbl=`<div style="flex:1 1 300px;min-width:280px;max-width:420px;">
-    <div style="font-weight:700;font-size:13px;margin-bottom:3px;">⏳ อันดับค้างรับนานสุด <span class="muted" style="font-weight:400;font-size:11px;">(ปี → เดือน → ผู้ขาย)</span></div>
-    <div class="muted" style="font-size:10.5px;margin-bottom:6px;">มูลค่าค้างรับ = ต้นทุน RMB × จำนวนค้างรับ · <b>วันค้างนับจาก ETA</b> (Purchase Order Line) · คลิกเพื่อกางดูย่อย</div>
+    <div style="font-weight:700;font-size:13px;margin-bottom:3px;">⏳ อันดับค้างรับ (เลย ETA แล้ว) <span class="muted" style="font-weight:400;font-size:11px;">(ปี → เดือน → ผู้ขาย)</span></div>
+    <div class="muted" style="font-size:10.5px;margin-bottom:6px;">แสดง<b>เฉพาะ PO ที่เลยกำหนด ETA แล้ว</b> · มูลค่าค้างรับ = ต้นทุน RMB × จำนวนค้างรับ · <b>วันค้างนับจาก ETA</b> · คลิกเพื่อกางดูย่อย</div>
+    ${rowsT?'':'<div class="muted" style="font-size:12px;padding:8px 4px;">🎉 ไม่มี PO ที่เลย ETA</div>'}
     <div style="overflow-x:auto;"><table style="width:100%;font-size:12px;table-layout:fixed;"><tr><th style="width:18px;"></th><th>ช่วง / ผู้ขาย / PO</th><th class="num" style="width:104px;">มูลค่า ¥ / ค้าง</th></tr>${rowsT}</table></div></div>`;
   // ===== dropdown เลือก PO =====
   const sorted=list.slice().sort((a,b)=>a.po<b.po?-1:1);
@@ -9683,7 +9685,7 @@ function renderFlowchart(){
   const salesCols = flowSalesCols(items);
   let TH=['Vendor','Factory','สินค้า','ราคาตั้ง','สถานะ','','คงเหลือ (แยกคลัง)',FLOW_DIY_BADGE,'หมวด① คงเหลือคลังหักจอง','จัดตู้แล้ว','ตู้ (Container)','หมวด② คงเหลือหลังจัดตู้แล้ว','สั่งผลิต','PO ค้างรับ','หมวด③ คงเหลือ+PO ค้างรับ','Cover Stock (3/6ด.)','Suggestion','Cover Stock คงเหลือรวมสั่งเพิ่ม','ยอดขายทุกกลุ่มเฉลี่ย/ด. (3/6ด.)','ยอดขายเฉลี่ย ไม่รวม DIY (3/6ด.)'];
   let KEYS=FLOW_FIXED_KEYS.slice();
-  if(DIY){ TH.splice(4,0,'ราคาส่งให้ DIY','ราคาขายหน้าร้าน (ไม่รวม VAT)'); KEYS.splice(4,0,'costdiy','npstore'); TH.push('ยอดขายเฉลี่ยเฉพาะ Mr.DIY (3/6ด.)','Cover Stock DIY · ขายเข้า (3/6ด.)','ยอดขายหน้าร้าน DIY (3/6ด.)','Cover Stock DIY · ขายออกหน้าร้าน (3/6ด.)','แนวโน้ม Mr.DIY ถอดสินค้า'); KEYS.push('diyinavg','covdiyin','storeavg','covdiyout','diyrisk'); }   // แทรกหลัง 'ราคาตั้ง' (index 3) · + คอลัมน์ท้าย DIY (รวม Cover Stock DIY ขายเข้า/ขายออก)
+  if(DIY){ TH.splice(4,0,'ราคาส่งให้ DIY','ราคาขายหน้าร้าน (ไม่รวม VAT)'); KEYS.splice(4,0,'costdiy','npstore'); TH.push('ยอดขายเฉลี่ยเฉพาะ Mr.DIY (3/6ด.)','Cover Stock Sales In Mr.DIY (3/6ด.)','ยอดขายหน้าร้าน DIY (3/6ด.)','Cover Stock Sales Out Mr.DIY (3/6ด.)','แนวโน้ม Mr.DIY ถอดสินค้า'); KEYS.push('diyinavg','covdiyin','storeavg','covdiyout','diyrisk'); }   // แทรกหลัง 'ราคาตั้ง' (index 3) · + คอลัมน์ท้าย DIY (รวม Cover Stock DIY ขายเข้า/ขายออก)
   if(window.flowHidePrice){ ['price','costdiy','npstore'].forEach(k=>{ const idx=KEYS.indexOf(k); if(idx>=0){ KEYS.splice(idx,1); TH.splice(idx,1); } }); }   // ซ่อนคอลัมน์ราคาทั้งหมด
   if(window.flowHideVF){ ['vendor','factory'].forEach(k=>{ const idx=KEYS.indexOf(k); if(idx>=0){ KEYS.splice(idx,1); TH.splice(idx,1); } }); }   // ซ่อนคอลัมน์ Vendor/Factory
   const RIGHT_KEYS=new Set(['price','costdiy','npstore','c1','c2','c3','podiy','production','packed','suggest','avg36','exdiyavg','cover36','covplus','covdiyin','covdiyout','storeavg','diyinavg']);
