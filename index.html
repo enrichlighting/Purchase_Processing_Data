@@ -9555,11 +9555,11 @@ function flowCatCell(num, mo, hiStyle, bg, xtra){
 // ---- Sort ตาราง Flowchart (คลิกหัวคอลัมน์ · default = ควรสั่งก่อน แล้วยอดขายมาก→น้อย) ----
 const FLOW_ST_RANK={red:0,warn:1,watch:2,noneed:3};
 const FLOW_FIXED_KEYS=['vendor','factory','name','price','status','__sales__','onhand','podiy','c1','packed','container','c2','production','po','c3','cover36','avg36','exdiyavg','suggest','covplus','moqplan'];
-const FLOW_GRP_STARTS=['podiy','packed','production','suggest','moqplan'];   // แทรกช่องว่างก่อนคอลัมน์เหล่านี้ (คั่นระหว่างกลุ่ม)
+const FLOW_GRP_STARTS=['podiy','packed','production','diyinavg','storeavg','suggest','moqplan'];   // แทรกช่องว่างก่อนคอลัมน์เหล่านี้ (diyinavg/storeavg = เฉพาะ DIY)
 // จัดกลุ่มคอลัมน์ด้วยเส้นประสีต่างกัน · G1 น้ำเงิน(Mr.DIY+หมวด①) · G2 ม่วง(จัดตู้+ตู้+หมวด②) · G3 ส้ม(สั่งผลิต+PO+หมวด③+Cover) · G4 เขียวน้ำเงิน(Suggestion+Cover รวมสั่งเพิ่ม)
-const FLOW_GRP_L={podiy:'#2563eb', packed:'#7c3aed', production:'#ea580c', suggest:'#0891b2'};   // ขอบซ้าย (คอลัมน์เริ่มกลุ่ม)
-const FLOW_GRP_R={c1:'#2563eb', c2:'#7c3aed', cover36:'#ea580c', covplus:'#0891b2'};              // ขอบขวา (คอลัมน์จบกลุ่ม)
-const FLOW_GRP_TOP={podiy:'#2563eb',c1:'#2563eb', packed:'#7c3aed',container:'#7c3aed',c2:'#7c3aed', production:'#ea580c',po:'#ea580c',c3:'#ea580c',cover36:'#ea580c', suggest:'#0891b2',covplus:'#0891b2'};
+const FLOW_GRP_L={podiy:'#2563eb', packed:'#7c3aed', production:'#ea580c', suggest:'#0891b2', diyinavg:'#db2777', storeavg:'#65a30d'};   // ขอบซ้าย (เริ่มกลุ่ม) · G5 ชมพู · G6 เขียว
+const FLOW_GRP_R={c1:'#2563eb', c2:'#7c3aed', cover36:'#ea580c', covplus:'#0891b2', covdiyin:'#db2777', covdiyout:'#65a30d'};              // ขอบขวา (จบกลุ่ม)
+const FLOW_GRP_TOP={podiy:'#2563eb',c1:'#2563eb', packed:'#7c3aed',container:'#7c3aed',c2:'#7c3aed', production:'#ea580c',po:'#ea580c',c3:'#ea580c',cover36:'#ea580c', suggest:'#0891b2',covplus:'#0891b2', diyinavg:'#db2777',covdiyin:'#db2777', storeavg:'#65a30d',covdiyout:'#65a30d'};
 function flowGrpBorder(key){ let s=''; if(FLOW_GRP_L[key]) s+='border-left:3px dashed '+FLOW_GRP_L[key]+';box-shadow:-5px 0 7px -4px '+FLOW_GRP_L[key]+'99;'; if(FLOW_GRP_R[key]) s+='border-right:3px dashed '+FLOW_GRP_R[key]+';box-shadow:5px 0 7px -4px '+FLOW_GRP_R[key]+'99;'; return s; }
 const FLOW_DIY_BADGE='<span style="display:inline-flex;align-items:center;background:#ffe600;color:#e2231a;border:1.5px solid #111;border-radius:5px;padding:0 6px;font-weight:900;font-size:10px;letter-spacing:.2px;box-shadow:0 1px 2px rgba(0,0,0,.2);">Mr.DIY</span>';
 function flowMonMap(it){ return it._monMap || (it._monMap=Object.fromEntries((it.monthly||[]).map(m=>[m[0],m[1]]))); }
@@ -9604,12 +9604,12 @@ function flowCoverSplitCell(q, a3, a6, tipNum, leadDays, xtra){
 function flowDiySalesInAvg(it,n){ const diy=(window.BC_DIYMON&&window.BC_DIYMON[it.no])||{}; return flowMonthsBack(n).reduce((s,k)=>s+(diy[k]||0),0)/n; }
 // Cover Stock DIY (ขายเข้า) = หมวด③ ÷ ยอดขายเฉลี่ยเฉพาะลูกค้า Mr.DIY (3/6 เดือน)
 function flowCoverDiyInCell(it, rc){
-  return flowCoverSplitCell(rc.c3||0, flowDiySalesInAvg(it,3), flowDiySalesInAvg(it,6), 'หมวด③ '+fmtNum(rc.c3||0)+' (÷ ยอดขายให้ Mr.DIY)', it.leadTime);
+  return flowCoverSplitCell(rc.c3||0, flowDiySalesInAvg(it,3), flowDiySalesInAvg(it,6), 'หมวด③ '+fmtNum(rc.c3||0)+' (÷ ยอดขายให้ Mr.DIY)', it.leadTime, flowGrpBorder('covdiyin'));
 }
 // Cover Stock DIY (ขายออกหน้าร้าน) = สต๊อกหน้าร้าน Mr.DIY ÷ ยอดขายหน้าร้านเฉลี่ย (3/6 เดือน)
 function flowCoverDiyOutCell(it, rc){
   const stk=flowMrdiyStockNow(it);
-  return flowCoverSplitCell(stk, flowStoreAvg(it,3), flowStoreAvg(it,6), 'สต๊อกหน้าร้าน Mr.DIY '+fmtNum(stk)+' (÷ ยอดขายหน้าร้าน)', it.leadTime);
+  return flowCoverSplitCell(stk, flowStoreAvg(it,3), flowStoreAvg(it,6), 'สต๊อกหน้าร้าน Mr.DIY '+fmtNum(stk)+' (÷ ยอดขายหน้าร้าน)', it.leadTime, flowGrpBorder('covdiyout'));
 }
 // Cover Stock คงเหลือรวมสั่งเพิ่ม = (หมวด③ + ควรสั่งเพิ่ม) ÷ ยอดขายเฉลี่ย
 function flowCoverPlusCell(it, rc){
@@ -9742,15 +9742,15 @@ function flowSuggestCell(it, rc){
 // ยอดขายเฉลี่ยเฉพาะ Mr.DIY (เราขายให้ DIY = Sales In) 3ด.(บน)/6ด.(ล่าง)
 function flowDiyInAvgCell(it){
   const a3=Math.round(flowDiySalesInAvg(it,3)), a6=Math.round(flowDiySalesInAvg(it,6));
-  return `<td style="padding:6px 10px;text-align:right;white-space:nowrap;vertical-align:top;">
+  return `<td style="padding:6px 10px;text-align:right;white-space:nowrap;vertical-align:top;${flowGrpBorder('diyinavg')}">
     <div style="border-bottom:1px dashed var(--line);padding-bottom:3px;margin-bottom:3px;" title="ยอดขายเฉพาะลูกค้า Mr.DIY (ขายเข้า DIY) เฉลี่ย/เดือน 3 เดือนย้อนหลัง"><b style="font-size:13px;color:#e2231a;">${fmtNum(a3)}</b> <span class="muted" style="font-size:8.5px;">/ด. 3ด.</span></div>
     <div title="ยอดขายเฉพาะลูกค้า Mr.DIY (ขายเข้า DIY) เฉลี่ย/เดือน 6 เดือนย้อนหลัง"><b style="font-size:13px;color:#64748b;">${fmtNum(a6)}</b> <span class="muted" style="font-size:8.5px;">/ด. 6ด.</span></div>
   </td>`;
 }
 function flowStoreAvgCell(it){
-  if(!it.mrdiySell) return '<td style="padding:6px 10px;text-align:right;vertical-align:top;"><span class="muted" style="font-size:10px;">—</span></td>';
+  if(!it.mrdiySell) return `<td style="padding:6px 10px;text-align:right;vertical-align:top;${flowGrpBorder('storeavg')}"><span class="muted" style="font-size:10px;">—</span></td>`;
   const a3=Math.round(flowStoreAvg(it,3)), a6=Math.round(flowStoreAvg(it,6));
-  return `<td style="padding:6px 10px;text-align:right;white-space:nowrap;vertical-align:top;">
+  return `<td style="padding:6px 10px;text-align:right;white-space:nowrap;vertical-align:top;${flowGrpBorder('storeavg')}">
     <div style="border-bottom:1px dashed var(--line);padding-bottom:3px;margin-bottom:3px;" title="ยอดขายหน้าร้าน Mr.DIY เฉลี่ย/เดือน (3 เดือนย้อนหลัง)"><b style="font-size:13px;color:#2563eb;">${fmtNum(a3)}</b> <span class="muted" style="font-size:8.5px;">/ด. 3ด.</span></div>
     <div title="ยอดขายหน้าร้าน Mr.DIY เฉลี่ย/เดือน (6 เดือนย้อนหลัง)"><b style="font-size:13px;color:#64748b;">${fmtNum(a6)}</b> <span class="muted" style="font-size:8.5px;">/ด. 6ด.</span></div>
   </td>`;
@@ -9879,8 +9879,10 @@ function flowItemRow(it, basis, grp, salesCols){
     ${flowCoverCell(it, rc)}
     ${flowAvgCell(it)}
     ${flowExDiyAvgCell(it)}
+    ${window.flowVersion==='diy' ? '<td style="padding:0;border:0;"></td>' : ''}
     ${window.flowVersion==='diy' ? flowDiyInAvgCell(it) : ''}
     ${window.flowVersion==='diy' ? flowCoverDiyInCell(it, rc) : ''}
+    ${window.flowVersion==='diy' ? '<td style="padding:0;border:0;"></td>' : ''}
     ${window.flowVersion==='diy' ? flowStoreAvgCell(it) : ''}
     ${window.flowVersion==='diy' ? flowCoverDiyOutCell(it, rc) : ''}
     <td style="padding:0;border:0;"></td>
@@ -9893,7 +9895,7 @@ function flowItemRow(it, basis, grp, salesCols){
   if(!iOpen) return tr;
   const hideP = window.flowHidePrice ? (1 + (window.flowVersion==='diy'?2:0)) : 0;
   const hideVFc = window.flowHideVF ? 2 : 0;
-  const totalCols = (window.flowVersion==='diy'?27:20) + 5 - hideP - hideVFc + ((salesCols&&salesCols.length)||0);   // +5 = ช่องว่างคั่นกลุ่ม
+  const totalCols = (window.flowVersion==='diy'?27:20) + (window.flowVersion==='diy'?7:5) - hideP - hideVFc + ((salesCols&&salesCols.length)||0);   // ช่องว่างคั่นกลุ่ม (DIY 7 · อื่น 5)
   const detail=`<tr><td colspan="${totalCols}" style="padding:4px 16px 14px;background:var(--bg);border-top:1px dashed var(--line);">${flowSales(it)}<div style="text-align:right;margin-top:4px;"><a href="#" onclick="event.stopPropagation();openLeadtime('${it.no}');return false;" style="font-size:11.5px;color:var(--brand);font-weight:700;">→ เปิดหน้าวางแผนสั่งซื้อ</a></div></td></tr>`;
   return tr+detail;
 }
