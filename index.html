@@ -9635,10 +9635,15 @@ function flowMoqResult(it, rc){
   if(mode==='time'){
     const unit=window.flowMoqUnit||'month';
     const tv=(window.flowMoqT&&window.flowMoqT[it.no]!=null)?(+window.flowMoqT[it.no]||0):0;
-    const days=unit==='month'?tv*30:tv;
-    const daily=+rc.paidDaily||0;
-    desired=Math.round(daily*days);
-    note = tv>0 ? ('พอขาย '+fmtNum(tv)+' '+(unit==='month'?'เดือน':'วัน')+' · ขาย '+fmtNum(Math.round(daily))+'/วัน') : 'กรอกเวลา';
+    if(unit==='month'){
+      const monRate=(typeof flowAvg3==='function')?flowAvg3(it):((+rc.paidDaily||0)*30);   // ยอดขายทุกกลุ่มเฉลี่ย 3 เดือน/เดือน (คอลัมน์ถัดไป)
+      desired=Math.round(monRate*tv);
+      note = tv>0 ? ('พอขาย '+fmtNum(tv)+' เดือน · เฉลี่ย '+fmtNum(Math.round(monRate))+'/เดือน (3ด.)') : 'กรอกเวลา';
+    } else {
+      const daily=+rc.paidDaily||0;
+      desired=Math.round(daily*tv);
+      note = tv>0 ? ('พอขาย '+fmtNum(tv)+' วัน · ขาย '+fmtNum(Math.round(daily))+'/วัน') : 'กรอกเวลา';
+    }
   } else {
     const saved=(window.flowMoq&&window.flowMoq[it.no]!=null)?window.flowMoq[it.no]:null;
     const moq=(saved!=null)?(+saved||0):(+it.moq||0);      // ค่าเริ่มต้น = MOQ จาก Lead Time
