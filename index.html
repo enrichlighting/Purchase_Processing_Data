@@ -9511,37 +9511,61 @@ function flowDiyRiskCell(it){
   if(!r) return '<td style="padding:6px 10px;text-align:center;vertical-align:top;"><span class="muted" style="font-size:10px;">—</span></td>';
   return `<td style="padding:6px 10px;vertical-align:top;" title="${r.sub}"><span style="display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:${r.color};padding:2px 8px;border-radius:6px;white-space:nowrap;">${r.emoji} ${r.label}</span><div class="muted" style="font-size:8.5px;margin-top:2px;max-width:140px;white-space:normal;line-height:1.3;">${r.sub}</div></td>`;
 }
-// ===== MOQ / วางแผนสั่งเพิ่ม (ช่องเดียว · กรอก MOQ ขั้นต่ำ → คำนวณปริมาณสั่งปัดขึ้นเต็มลัง) =====
+// ===== MOQ / วางแผนสั่งเพิ่ม (ช่องเดียว · 2 โหมด: กรอกจำนวนชิ้น(MOQ) หรือกรอกระยะเวลา วัน/เดือน → ปัดขึ้นเต็มลัง) =====
 function flowMoqResult(it, rc){
   const g=flowSugExCarton(it, rc);                       // base = ควรสั่งเพิ่ม (ตัด DIY)
-  const saved=(window.flowMoq&&window.flowMoq[it.no]!=null)?window.flowMoq[it.no]:null;
-  const moq=(saved!=null)?(+saved||0):(+it.moq||0);      // ค่าเริ่มต้น = MOQ จาก Lead Time
-  const base=g.sugEx, pcs=g.pcs, cbmPer=(typeof pkBoxCbm==='function')?pkBoxCbm(it.no):0;
-  const desired=Math.max(base, moq);
+  const pcs=g.pcs, cbmPer=(typeof pkBoxCbm==='function')?pkBoxCbm(it.no):0;
+  const mode=window.flowMoqMode||'qty';
+  let desired, note;
+  if(mode==='time'){
+    const unit=window.flowMoqUnit||'month';
+    const tv=(window.flowMoqT&&window.flowMoqT[it.no]!=null)?(+window.flowMoqT[it.no]||0):0;
+    const days=unit==='month'?tv*30:tv;
+    const daily=+rc.paidDaily||0;
+    desired=Math.round(daily*days);
+    note = tv>0 ? ('พอขาย '+fmtNum(tv)+' '+(unit==='month'?'เดือน':'วัน')+' · ขาย '+fmtNum(Math.round(daily))+'/วัน') : 'กรอกเวลา';
+  } else {
+    const saved=(window.flowMoq&&window.flowMoq[it.no]!=null)?window.flowMoq[it.no]:null;
+    const moq=(saved!=null)?(+saved||0):(+it.moq||0);      // ค่าเริ่มต้น = MOQ จาก Lead Time
+    desired=Math.max(g.sugEx, moq);
+    note = desired<=0 ? 'ไม่ต้องสั่ง' : (moq>g.sugEx?'ยึด MOQ · ควรสั่ง '+fmtNum(g.sugEx):'ยึดควรสั่ง '+fmtNum(g.sugEx));
+  }
   const ctn=(pcs>0&&desired>0)?Math.ceil(desired/pcs):0;
   const pieces=pcs>0?ctn*pcs:desired;
   const cbm=ctn*cbmPer;
-  const src = desired<=0 ? 'ไม่ต้องสั่ง' : (moq>base ? 'ยึด MOQ' : 'ยึดควรสั่ง');
   return `<b style="font-size:14px;color:var(--brand);">${fmtNum(pieces)}</b> <span class="muted" style="font-size:8.5px;">PCS</span>`
     + (pcs>0?`<div class="muted" style="font-size:9px;">${fmtNum(ctn)} CTN · ${cbm.toFixed(3)} CBM</div>`:'<div class="muted" style="font-size:8.5px;">— ไม่มีข้อมูลกล่อง</div>')
-    + `<div class="muted" style="font-size:8.5px;">${src} · ควรสั่ง ${fmtNum(base)}</div>`;
+    + `<div class="muted" style="font-size:8.5px;">${note}</div>`;
 }
 function flowMoqCell(it, rc){
-  const saved=(window.flowMoq&&window.flowMoq[it.no]!=null)?window.flowMoq[it.no]:null;
-  const moqVal=(saved!=null)?saved:(it.moq||'');
-  return `<td style="padding:6px 8px;vertical-align:top;white-space:nowrap;">
-    <div><input type="number" min="0" step="1" value="${moqVal}" onclick="event.stopPropagation()" onchange="flowSetMoq('${it.no}',this.value)" title="MOQ ขั้นต่ำ · ปรับได้ (ค่าเริ่มต้นดึงจาก Lead Time)" style="width:72px;text-align:right;font-size:11px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);"> <span class="muted" style="font-size:8.5px;">MOQ</span></div>
-    <div id="moq-res-${it.no}" style="margin-top:3px;">${flowMoqResult(it, rc)}</div>
-  </td>`;
+  const mode=window.flowMoqMode||'qty';
+  let inputHtml;
+  if(mode==='time'){
+    const tv=(window.flowMoqT&&window.flowMoqT[it.no]!=null)?window.flowMoqT[it.no]:'';
+    const unit=(window.flowMoqUnit||'month')==='month'?'เดือน':'วัน';
+    inputHtml=`<input type="number" min="0" step="1" value="${tv}" onclick="event.stopPropagation()" onchange="flowSetMoqT('${it.no}',this.value)" title="อยากให้พอขายกี่${unit} → คำนวณจำนวนชิ้นย้อนกลับ" style="width:58px;text-align:right;font-size:11px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);"> <span class="muted" style="font-size:8.5px;">${unit}</span>`;
+  } else {
+    const saved=(window.flowMoq&&window.flowMoq[it.no]!=null)?window.flowMoq[it.no]:null;
+    const moqVal=(saved!=null)?saved:(it.moq||'');
+    inputHtml=`<input type="number" min="0" step="1" value="${moqVal}" onclick="event.stopPropagation()" onchange="flowSetMoq('${it.no}',this.value)" title="MOQ ขั้นต่ำ (ค่าเริ่มต้นจาก Lead Time)" style="width:68px;text-align:right;font-size:11px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);"> <span class="muted" style="font-size:8.5px;">MOQ</span>`;
+  }
+  return `<td style="padding:6px 8px;vertical-align:top;white-space:nowrap;"><div>${inputHtml}</div><div id="moq-res-${it.no}" style="margin-top:3px;">${flowMoqResult(it, rc)}</div></td>`;
 }
+function flowMoqUpdate(no){ const it=ITEMS.find(x=>x.no===no); if(!it) return; const rc=reorderCalc(it,(window.RBASIS==='custom')?180:(+window.RBASIS||180),window.RGROUP||'all'); const el=document.getElementById('moq-res-'+no); if(el) el.innerHTML=flowMoqResult(it, rc); }
 function flowSetMoq(no, val){
   window.flowMoq=window.flowMoq||{};
   if(val===''||val==null) delete window.flowMoq[no]; else window.flowMoq[no]=Math.max(0,+val||0);
   try{ localStorage.setItem('flowMoqV1', JSON.stringify(window.flowMoq)); }catch(e){}
-  const it=ITEMS.find(x=>x.no===no); if(!it) return;
-  const rc=reorderCalc(it,(window.RBASIS==='custom')?180:(+window.RBASIS||180),window.RGROUP||'all');
-  const el=document.getElementById('moq-res-'+no); if(el) el.innerHTML=flowMoqResult(it, rc);
+  flowMoqUpdate(no);
 }
+function flowSetMoqT(no, val){
+  window.flowMoqT=window.flowMoqT||{};
+  if(val===''||val==null) delete window.flowMoqT[no]; else window.flowMoqT[no]=Math.max(0,+val||0);
+  try{ localStorage.setItem('flowMoqTV1', JSON.stringify(window.flowMoqT)); }catch(e){}
+  flowMoqUpdate(no);
+}
+function flowSetMoqMode(m){ window.flowMoqMode=m; try{ localStorage.setItem('flowMoqModeV1', m); }catch(e){} renderFlowchart(); }
+function flowSetMoqUnit(u){ window.flowMoqUnit=u; try{ localStorage.setItem('flowMoqUnitV1', u); }catch(e){} renderFlowchart(); }
 // ควรสั่งเพิ่ม (Suggestion) = ควรสั่งเพิ่มรวมทุกลูกค้า (เดิม) − ส่วน Mr.DIY → แล้วปัดขึ้นให้เต็มลังพอดี
 function flowSugExCarton(it, rc){
   const sugAll=flowSugAll(it, rc);                                  // ควรสั่งเพิ่ม รวมทุกลูกค้า (ค่าเดิมที่เคยแสดง)
@@ -9727,6 +9751,9 @@ function renderFlowchart(){
   if(window.flowHidePrice===undefined){ try{ window.flowHidePrice=localStorage.getItem('flowHidePriceV1')==='1'; }catch(e){ window.flowHidePrice=false; } }
   if(window.flowHideVF===undefined){ try{ window.flowHideVF=localStorage.getItem('flowHideVFV1')==='1'; }catch(e){ window.flowHideVF=false; } }
   if(!window.flowMoq){ try{ window.flowMoq=JSON.parse(localStorage.getItem('flowMoqV1')||'{}'); }catch(e){ window.flowMoq={}; } }
+  if(!window.flowMoqT){ try{ window.flowMoqT=JSON.parse(localStorage.getItem('flowMoqTV1')||'{}'); }catch(e){ window.flowMoqT={}; } }
+  if(window.flowMoqMode===undefined){ try{ window.flowMoqMode=localStorage.getItem('flowMoqModeV1')||'qty'; }catch(e){ window.flowMoqMode='qty'; } }
+  if(window.flowMoqUnit===undefined){ try{ window.flowMoqUnit=localStorage.getItem('flowMoqUnitV1')||'month'; }catch(e){ window.flowMoqUnit='month'; } }
   let items=ITEMS.filter(i=> i.ileReal || (typeof itemHasReleasedPO==='function' && itemHasReleasedPO(i)));
   if(DIY) items=items.filter(i=> i.hasPLU);                       // เวอร์ชัน Mr.DIY = เฉพาะสินค้าที่มี PLU
   if(q) items=items.filter(i=> (i.no+' '+(i.desc||'')+' '+flowShort(i.no)).toLowerCase().indexOf(q)>=0);
@@ -9750,6 +9777,13 @@ function renderFlowchart(){
   const STICKYL = window.flowHideVF ? {name:0} : {vendor:0, factory:78, name:156};   // ตรึงซ้าย · ซ่อน VF แล้วชื่อสินค้าเลื่อนไปซ้ายสุด
   const salesTh = salesCols.map(c=>{ const key=(c.t==='y'?'sy:':'sm:')+c.k; return `<th onclick="flowSort('${key}')" title="คลิกเพื่อเรียงตามยอดขายเดือนนี้" style="cursor:pointer;user-select:none;padding:7px 9px;text-align:right;font-size:10px;color:#c2410c;white-space:nowrap;border-bottom:2px solid var(--line);border-left:1px solid #fde6cf;background:#fff4ea;position:sticky;top:0;z-index:6;">${flowSalesHead(c)} ${flowSortArrow(key)}</th>`; }).join('');
   const fixedTh = TH.map((h,i)=>{ const key=KEYS[i]; if(key==='__sales__') return salesTh;   // แทรกคอลัมน์ยอดขาย (ปี/เดือน) ไว้หน้า "คงเหลือ"
+    if(key==='moqplan'){ const mq=(window.flowMoqMode||'qty'), un=(window.flowMoqUnit||'month');   // หัวคอลัมน์ MOQ = มีปุ่มเลือก ชิ้น/เวลา + วัน/เดือน
+      const b=(on,lbl,fn)=>`<button onclick="event.stopPropagation();${fn}" style="padding:1px 7px;font-size:9.5px;font-weight:700;border:1px solid var(--brand);border-radius:5px;cursor:pointer;background:${on?'var(--brand)':'var(--card)'};color:${on?'#fff':'var(--brand)'};">${lbl}</button>`;
+      return `<th style="padding:5px 6px;vertical-align:top;white-space:nowrap;position:sticky;top:0;z-index:6;background:var(--bg);border-bottom:2px solid var(--line);text-align:left;font-size:10.5px;color:var(--muted);">
+        <div style="font-weight:700;margin-bottom:3px;">MOQ / วางแผนสั่ง</div>
+        <div style="display:flex;gap:3px;">${b(mq==='qty','ชิ้น',"flowSetMoqMode('qty')")}${b(mq==='time','เวลา',"flowSetMoqMode('time')")}</div>
+        ${mq==='time'?`<div style="display:flex;gap:3px;margin-top:3px;">${b(un==='day','วัน',"flowSetMoqUnit('day')")}${b(un==='month','เดือน',"flowSetMoqUnit('month')")}</div>`:''}
+      </th>`; }
     const cbg=COLBG[key]?`background:${COLBG[key]};${key==='suggest'?'color:#fff;':''}`:'background:var(--bg);';
     const sl=STICKYL[key];
     const w = (key==='vendor'||key==='factory')?'width:78px;min-width:78px;max-width:78px;':(key==='name'?'min-width:150px;':'');
@@ -9759,7 +9793,7 @@ function renderFlowchart(){
     return `<th onclick="flowSort('${key}')" title="คลิกเพื่อเรียง" style="cursor:pointer;user-select:none;padding:7px 8px;text-align:${RIGHT_KEYS.has(key)?'right':'left'};font-size:10.5px;line-height:1.25;color:var(--muted);white-space:normal;word-break:break-word;vertical-align:top;border-bottom:2px solid var(--line);${cbg}${sticky}${w}">${h} ${flowSortArrow(key)}</th>`; }).join('');
   const theadHtml = `<thead><tr style="background:var(--bg);">${fixedTh}</tr></thead>`;
   // ความกว้างคอลัมน์คงที่ (เท่ากันทุกหมวด → คอลัมน์ตรงกัน) · table-layout:fixed
-  const CW={vendor:78,factory:78,name:186,price:78,costdiy:102,npstore:120,status:104,c1:88,c2:88,c3:102,onhand:152,podiy:74,production:76,packed:78,container:134,po:146,cover36:150,covplus:160,covdiyin:150,covdiyout:174,suggest:114,covplus:160,moqplan:150,avg36:120,exdiyavg:132,diyinavg:122,storeavg:122,diyrisk:152};
+  const CW={vendor:78,factory:78,name:186,price:78,costdiy:102,npstore:120,status:104,c1:88,c2:88,c3:102,onhand:152,podiy:74,production:76,packed:78,container:134,po:200,cover36:150,covplus:160,covdiyin:150,covdiyout:174,suggest:114,moqplan:172,avg36:120,exdiyavg:132,diyinavg:122,storeavg:122,diyrisk:152};
   const SALESW=76;
   let tableW=0, colHtml='';
   KEYS.forEach(k=>{ if(k==='__sales__'){ (salesCols||[]).forEach(()=>{ colHtml+=`<col style="width:${SALESW}px">`; tableW+=SALESW; }); } else { const w=CW[k]||100; colHtml+=`<col style="width:${w}px">`; tableW+=w; } });
