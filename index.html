@@ -9644,31 +9644,39 @@ function flowMoqResult(it, rc){
   const g=flowSugExCarton(it, rc);                       // base = ควรสั่งเพิ่ม (ตัด DIY)
   const pcs=g.pcs, cbmPer=(typeof pkBoxCbm==='function')?pkBoxCbm(it.no):0;
   const mode=window.flowMoqMode||'qty';
-  let desired, note;
+  const c3=rc.c3||0;
+  let desired, note, work;
   if(mode==='time'){
     const unit=window.flowMoqUnit||'month';
+    const uTxt=unit==='month'?'เดือน':'วัน';
     const tv=(window.flowMoqT&&window.flowMoqT[it.no]!=null)?(+window.flowMoqT[it.no]||0):0;
-    if(unit==='month'){
-      const monRate=(typeof flowAvg3==='function')?flowAvg3(it):((+rc.paidDaily||0)*30);   // ยอดขายทุกกลุ่มเฉลี่ย 3 เดือน/เดือน (คอลัมน์ถัดไป)
-      desired=Math.round(monRate*tv);
-      note = tv>0 ? ('พอขาย '+fmtNum(tv)+' เดือน · เฉลี่ย '+fmtNum(Math.round(monRate))+'/เดือน (3ด.)') : 'กรอกเวลา';
-    } else {
-      const daily=+rc.paidDaily||0;
-      desired=Math.round(daily*tv);
-      note = tv>0 ? ('พอขาย '+fmtNum(tv)+' วัน · ขาย '+fmtNum(Math.round(daily))+'/วัน') : 'กรอกเวลา';
+    const rate=(unit==='month') ? ((typeof flowAvg3==='function')?flowAvg3(it):((+rc.paidDaily||0)*30)) : (+rc.paidDaily||0);
+    const target=rate*tv;                                // จำนวนที่ต้องมีเพื่อพอขาย tv (เดือน/วัน)
+    const haveCover=rate>0?c3/rate:0;                    // มีของอยู่แล้ว = อยู่ได้กี่เดือน/วัน (= Cover Stock)
+    desired=Math.max(0, Math.round(target - c3));        // สั่งเพิ่ม = เป้าหมาย − ของที่มีอยู่ (หมวด③)
+    if(tv<=0){ note='กรอกเวลา'; work=''; }
+    else {
+      note = 'พอขาย '+fmtNum(tv)+' '+uTxt+' · มีอยู่ '+(rate>0?fmtMo(haveCover):'∞')+' '+uTxt+' → +'+fmtMo(Math.max(0,tv-haveCover))+' '+uTxt;
+      work = 'วิธีคิด (โหมดเวลา):\n'
+        +'1) ต้องการพอขาย '+fmtNum(tv)+' '+uTxt+' = '+fmtNum(tv)+' × '+fmtNum(Math.round(rate))+'/'+uTxt+(unit==='month'?' (เฉลี่ย 3ด.)':' (เฉลี่ย/วัน)')+' = '+fmtNum(Math.round(target))+' ชิ้น\n'
+        +'2) มีอยู่แล้ว หมวด③ = '+fmtNum(c3)+' ชิ้น (อยู่ได้ '+(rate>0?fmtMo(haveCover):'∞')+' '+uTxt+' · จาก Cover Stock)\n'
+        +'3) ต้องสั่งเพิ่ม = '+fmtNum(Math.round(target))+' − '+fmtNum(c3)+' = '+fmtNum(desired)+' ชิ้น'
+        +(pcs>0?'\n4) ปัดขึ้นเต็มลัง ('+fmtNum(pcs)+' ชิ้น/ลัง) = '+fmtNum(pcs>0?Math.ceil(desired/pcs)*pcs:desired)+' ชิ้น':'');
     }
   } else {
     const saved=(window.flowMoq&&window.flowMoq[it.no]!=null)?window.flowMoq[it.no]:null;
     const moq=(saved!=null)?(+saved||0):(+it.moq||0);      // ค่าเริ่มต้น = MOQ จาก Lead Time
     desired=Math.max(g.sugEx, moq);
     note = desired<=0 ? 'ไม่ต้องสั่ง' : (moq>g.sugEx?'ยึด MOQ · ควรสั่ง '+fmtNum(g.sugEx):'ยึดควรสั่ง '+fmtNum(g.sugEx));
+    work = 'วิธีคิด (โหมดชิ้น):\n1) ควรสั่งเพิ่ม (Suggestion ตัด DIY) = '+fmtNum(g.sugEx)+' ชิ้น\n2) MOQ ขั้นต่ำ = '+fmtNum(moq)+' ชิ้น\n3) ใช้ค่าที่มากกว่า = '+fmtNum(desired)+' ชิ้น'+(pcs>0?'\n4) ปัดขึ้นเต็มลัง = '+fmtNum(pcs>0?Math.ceil(desired/pcs)*pcs:desired)+' ชิ้น':'');
   }
   const ctn=(pcs>0&&desired>0)?Math.ceil(desired/pcs):0;
   const pieces=pcs>0?ctn*pcs:desired;
   const cbm=ctn*cbmPer;
-  return `<b style="font-size:14px;color:var(--brand);">${fmtNum(pieces)}</b> <span class="muted" style="font-size:8.5px;">PCS</span>`
+  const tip=(work||'').replace(/"/g,'&quot;');
+  return `<span title="${tip}" style="cursor:help;"><b style="font-size:14px;color:var(--brand);">${fmtNum(pieces)}</b> <span class="muted" style="font-size:8.5px;">PCS</span>`
     + (pcs>0?`<div class="muted" style="font-size:9px;">${fmtNum(ctn)} CTN · ${cbm.toFixed(3)} CBM</div>`:'<div class="muted" style="font-size:8.5px;">— ไม่มีข้อมูลกล่อง</div>')
-    + `<div class="muted" style="font-size:8.5px;">${note}</div>`;
+    + `<div class="muted" style="font-size:8.5px;">${note}</div></span>`;
 }
 function flowMoqCell(it, rc){
   const mode=window.flowMoqMode||'qty';
