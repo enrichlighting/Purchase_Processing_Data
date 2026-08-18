@@ -8497,6 +8497,17 @@ function pkSnapshot(){
   return {ts:pkNowStr(), mode:window.pkMode, cap:CAP, fx, containers:conts, rows, contTotals, grand:{pcs:gp,boxes:gb,cbm:gc,valRmb:gvr,valThb:gvt}};
 }
 function pkOutstandingFor(po,item){ const rel=(window.BC_POREL&&window.BC_POREL[item])||[]; const e=rel.find(x=>x[0]===po); return e?e[3]:null; }
+// ตู้ "ถึงคลังแล้ว" = PO ที่เชื่อมกับตู้มีการรับเข้า (ค้างรับปัจจุบัน < ตอนจัดตู้) หรือทุกตู้ผ่าน ETA ถึงคลังแล้ว
+function pkRoundArrived(s){
+  if(!s || s.pending || s.mode!=='released') return false;
+  let base=0, cur=0, any=false;
+  (s.rows||[]).forEach(r=>{ if(!r.item||!r.po) return; const lm=(r.lotMax!=null&&r.lotMax!=='')?(+r.lotMax):null; if(lm==null) return; const c=pkOutstandingFor(r.po,r.item); if(c==null) return; base+=lm; cur+=c; any=true; });
+  if(any && cur < base-0.5) return true;                                   // มีการรับเข้า (ค้างรับลดลง)
+  const conts=s.containers||[]; if(conts.length && conts.every(ct=>{ const w=ct.dates&&ct.dates.arrWh; return w && poToday()>=w; })) return true;   // ทุกตู้ถึงคลังแล้ว (ETA)
+  return false;
+}
+// วันที่อ้างอิงของรอบ (สำหรับจัดกลุ่มเดือน/ปี ในแท็บถึงคลัง) = วันถึงคลังล่าสุด · ไม่มีก็ใช้เวลาบันทึก
+function pkRoundDate(s){ let d=''; (s.containers||[]).forEach(ct=>{ const w=ct.dates&&ct.dates.arrWh; if(w && w>d) d=w; }); if(!d) d=(typeof pkTsParts==='function'?pkTsParts(s).orig:s.ts||'').slice(0,10); return d; }
 // เพดานที่จัดตู้ได้ = จำนวนสั่งผลิต (ถ้าระบุ) มิเช่นนั้น = ค้างรับใน PO
 function pkPackCap(po,item){
   const items=((window.poFollow||{})[po]||{}).items||{}; const o=items[item];
@@ -8852,14 +8863,33 @@ function pkLogSortVal(s,key){ switch(key){
   case 'val': return (s.grand&&s.grand.valThb)||0;
   default: return 0; } }
 function pkLogSortBy(key){ const S=window.pkLogSort||(window.pkLogSort={key:'cont',dir:'desc'}); if(S.key===key) S.dir=(S.dir==='asc'?'desc':'asc'); else { S.key=key; S.dir='desc'; } renderPkLog(); }
+function pkSetLogTab(t){ window.pkLogTab=t; if(t!=='arrived') window.pkArrMonth=''; renderPkLog(); }
+function pkSetArrMonth(m){ window.pkArrMonth=m||''; renderPkLog(); }
 function pkLogArrow(key){ const S=window.pkLogSort||{}; if(S.key!==key) return '<span style="opacity:.35;">↕</span>'; return S.dir==='asc'?'▲':'▼'; }
 function renderPkLog(){
   const el=document.getElementById('pk-log'); if(!el) return;
   if(!window.pkLog.length){ el.innerHTML='<p class="muted" style="margin:6px 0;">ยังไม่มีการบันทึก — กด "💾 บันทึกรอบนี้" ด้านบน</p>'; return; }
   const mini='padding:3px 9px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-size:12px;';
   const S=window.pkLogSort||(window.pkLogSort={key:'cont',dir:'desc'});   // ค่าเริ่มต้น: เรียงเลขตู้ มาก→น้อย
-  const order=window.pkLog.map((s,idx)=>({s,idx}));
-  order.sort((a,b)=>{ const va=pkLogSortVal(a.s,S.key), vb=pkLogSortVal(b.s,S.key); let c=(typeof va==='string'||typeof vb==='string')?String(va).localeCompare(String(vb)):(va-vb); if(c===0) c=a.idx-b.idx; return S.dir==='asc'?c:-c; });
+  if(window.pkLogTab===undefined) window.pkLogTab='active';
+  const all=window.pkLog.map((s,idx)=>({s,idx}));
+  const arrivedAll=all.filter(o=>pkRoundArrived(o.s));
+  const activeAll =all.filter(o=>!pkRoundArrived(o.s));
+  const MN_TH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const months=[...new Set(arrivedAll.map(o=>pkRoundDate(o.s).slice(0,7)).filter(Boolean))].sort().reverse();
+  if(window.pkArrMonth===undefined) window.pkArrMonth='';
+  let order = (window.pkLogTab==='arrived')?arrivedAll.slice():activeAll.slice();
+  if(window.pkLogTab==='arrived' && window.pkArrMonth) order=order.filter(o=>pkRoundDate(o.s).slice(0,7)===window.pkArrMonth);
+  order.sort((a,b)=>{
+    const pa=a.s.pending?1:0, pb=b.s.pending?1:0; if(pa!==pb) return pa-pb;   // รอเปิด PO (ดราฟ) ลงล่างสุดเสมอ
+    const va=pkLogSortVal(a.s,S.key), vb=pkLogSortVal(b.s,S.key); let c=(typeof va==='string'||typeof vb==='string')?String(va).localeCompare(String(vb)):(va-vb); if(c===0) c=a.idx-b.idx; return S.dir==='asc'?c:-c; });
+  const tabBtn=(t,lbl)=>`<button onclick="pkSetLogTab('${t}')" style="padding:7px 14px;border-radius:9px;font-size:12.5px;font-weight:800;cursor:pointer;border:1px solid var(--brand);background:${window.pkLogTab===t?'var(--brand)':'var(--card)'};color:${window.pkLogTab===t?'#fff':'var(--brand)'};">${lbl}</button>`;
+  const tabBar=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+    ${tabBtn('active','📦 ตู้ที่ดำเนินการอยู่ ('+activeAll.length+')')}
+    ${tabBtn('arrived','🏭 ตู้ที่ของถึงคลังแล้ว ('+arrivedAll.length+')')}
+    ${window.pkLogTab==='arrived'?`<select onchange="pkSetArrMonth(this.value)" style="padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:12.5px;"><option value="">ทุกเดือน</option>${months.map(m=>`<option value="${m}" ${m===window.pkArrMonth?'selected':''}>${MN_TH[+m.slice(5,7)-1]} ${m.slice(0,4)}</option>`).join('')}</select>`:''}
+  </div>`;
+  if(!order.length){ el.innerHTML=tabBar+'<p class="muted" style="margin:6px 0;">'+(window.pkLogTab==='arrived'?'ยังไม่มีตู้ที่ของถึงคลัง'+(window.pkArrMonth?'ในเดือนนี้':''):'ไม่มีรายการ')+'</p>'; return; }
   let rows='';
   order.forEach((o,pos)=>{ const s=o.s, idx=o.idx;
     const cont=s.containers.map((c,i)=>`${c.name}: <b>${s.contTotals[i].cbm.toFixed(2)}</b> CBM / ¥${Math.round(s.contTotals[i].valRmb).toLocaleString()} / ฿${Math.round(s.contTotals[i].valThb).toLocaleString()}`).join(' &nbsp;·&nbsp; ');
@@ -8881,7 +8911,7 @@ function renderPkLog(){
     </tr>`;
   });
   const sh=(key,label,cls)=>`<th${cls?' class="'+cls+'"':''} onclick="pkLogSortBy('${key}')" title="คลิกเพื่อเรียง" style="cursor:pointer;user-select:none;white-space:nowrap;">${label} ${pkLogArrow(key)}</th>`;
-  el.innerHTML=`<table><tr><th>#</th>${sh('ts','วัน–เวลา / รูปแบบ')}${sh('rows','แถว','num')}${sh('cont','ตู้ (เลข)','num')}${sh('pcs','รวมชิ้น','num')}${sh('cbm','รวม CBM','num')}${sh('val','มูลค่า (¥/฿)','num')}<th>สรุปต่อตู้</th><th>สถานะขนส่ง (วันนี้)</th><th>จัดการ</th></tr>${rows}</table>`;
+  el.innerHTML=tabBar+`<table><tr><th>#</th>${sh('ts','วัน–เวลา / รูปแบบ')}${sh('rows','แถว','num')}${sh('cont','ตู้ (เลข)','num')}${sh('pcs','รวมชิ้น','num')}${sh('cbm','รวม CBM','num')}${sh('val','มูลค่า (¥/฿)','num')}<th>สรุปต่อตู้</th><th>สถานะขนส่ง (วันนี้)</th><th>จัดการ</th></tr>${rows}</table>`;
 }
 
 /* ============ ติดตามสถานะ PO & จัดตู้ (เชื่อม Packing Log ↔ Lead Time) ============ */
@@ -8925,7 +8955,9 @@ function poReleasedList(){
 // จำนวนที่จัดตู้แล้วต่อ PO (จาก pkLog) → {po:{qty, items:{}, rounds:Set}}
 function poPackedMap(){
   const m={};
-  (window.pkLog||[]).forEach((s,idx)=>{ (s.rows||[]).forEach(r=>{ if(!r.po) return; const q=r.pcs||0; if(!q) return; if(!m[r.po]) m[r.po]={qty:0,items:{},rounds:new Set()}; m[r.po].qty+=q; m[r.po].items[r.item]=(m[r.po].items[r.item]||0)+q; m[r.po].rounds.add(idx); }); });
+  (window.pkLog||[]).forEach((s,idx)=>{ if(s.pending) return;   // ดราฟรอเปิด PO ยังไม่นับเป็นจัดตู้จริง
+    if(typeof pkRoundArrived==='function' && pkRoundArrived(s)) return;   // ตู้ถึงคลังแล้ว → ไม่นับเป็น "จัดตู้แล้ว" (ของอยู่ในคลัง = นับที่ on-hand แทน)
+    (s.rows||[]).forEach(r=>{ if(!r.po) return; const q=r.pcs||0; if(!q) return; if(!m[r.po]) m[r.po]={qty:0,items:{},rounds:new Set()}; m[r.po].qty+=q; m[r.po].items[r.item]=(m[r.po].items[r.item]||0)+q; m[r.po].rounds.add(idx); }); });
   return m;
 }
 function poSchedule(po,item){
@@ -9778,7 +9810,8 @@ function flowItemRow(it, basis, grp, salesCols){
   const whChips=Object.keys(loc).filter(w=>ONHAND_ALLOW_WH[w]).sort().map(w=>flowChip(w+' '+fmtNum(loc[w]), flowWhColor(w)+'1a', flowWhColor(w), 'คลัง '+w)).join('')||'';   // เฉพาะ 6 คลังที่กำหนด
   const pos=((window.BC_PO&&window.BC_PO[it.no])||{}).pos||[];
   const poChips=pos.map(p=>flowChip(p[0]+' ค้าง '+fmtNum(p[1]), '#eaf1ff', '#2563eb', (p[3]||'')+(p[2]?' · ETA '+p[2]:''))).join('')||(rc.incoming>0?'':'<span class="muted" style="font-size:10px;">—</span>');
-  let tuArr=[]; (window.pkLog||[]).forEach(s=>{ if(s.mode!=='released')return; (s.rows||[]).forEach(r=>{ if(r.item!==it.no)return; (r.per||[]).forEach((per,ci)=>{ if(per&&per.pcs>0){ const ct=(s.containers||[])[ci]||{}; tuArr.push(flowChip((ct.name||'ตู้')+' '+fmtNum(per.pcs), '#ede9fe', '#7c3aed', 'จัดตู้ '+(ct.name||''))); } }); }); });
+  let tuArr=[]; (window.pkLog||[]).forEach(s=>{ if(s.mode!=='released'||s.pending)return; if(typeof pkRoundArrived==='function' && pkRoundArrived(s)) return;   // ดราฟรอเปิด PO / ตู้ถึงคลังแล้ว → ไม่โชว์ chip ตู้ใน Flowchart
+    (s.rows||[]).forEach(r=>{ if(r.item!==it.no)return; (r.per||[]).forEach((per,ci)=>{ if(per&&per.pcs>0){ const ct=(s.containers||[])[ci]||{}; tuArr.push(flowChip((ct.name||'ตู้')+' '+fmtNum(per.pcs), '#ede9fe', '#7c3aed', 'จัดตู้ '+(ct.name||''))); } }); }); });
   const tuChips=tuArr.join('')||'<span class="muted" style="font-size:10px;">—</span>';
   const stickyBg = iOpen?'#f3f6fb':'var(--card)';   // ตรึงคอลัมน์ Vendor/Factory/ชื่อสินค้าไว้ซ้าย (ต้องมีพื้นทึบ)
   const poRemain = Math.max(0, (rc.incoming||0)-(rc.packed||0)-(rc.production||0));   // PO ค้างรับ หักส่วนที่จัดตู้/สั่งผลิตไปแล้ว
