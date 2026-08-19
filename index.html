@@ -9586,6 +9586,8 @@ function flowSales(it){
 function flowToggleMon(){ window.flowMonExpand=!window.flowMonExpand; renderFlowchart(); }
 function flowTogglePrice(){ window.flowHidePrice=!window.flowHidePrice; try{ localStorage.setItem('flowHidePriceV1', window.flowHidePrice?'1':'0'); }catch(e){} renderFlowchart(); }
 function flowToggleVF(){ window.flowHideVF=!window.flowHideVF; try{ localStorage.setItem('flowHideVFV1', window.flowHideVF?'1':'0'); }catch(e){} renderFlowchart(); }
+function flowToggleCode(){ window.flowShowCode=!window.flowShowCode; try{ localStorage.setItem('flowShowCodeV1', window.flowShowCode?'1':'0'); }catch(e){} renderFlowchart(); }
+function flowToggleDG(){ window.flowDGOnly=!window.flowDGOnly; renderFlowchart(); }
 const FLOW_MN=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 function flowSalesCols(items){
   const set=new Set(); items.forEach(it=>(it.monthly||[]).forEach(m=>set.add(m[0])));
@@ -9611,7 +9613,7 @@ function flowCatCell(num, mo, hiStyle, bg, xtra){
 }
 // ---- Sort ตาราง Flowchart (คลิกหัวคอลัมน์ · default = ควรสั่งก่อน แล้วยอดขายมาก→น้อย) ----
 const FLOW_ST_RANK={red:0,warn:1,watch:2,noneed:3};
-const FLOW_FIXED_KEYS=['vendor','factory','name','price','status','__sales__','onhand','podiy','c1','packed','container','c2','production','po','c3','cover36','avg36','exdiyavg','suggest','covplus','moqplan'];
+const FLOW_FIXED_KEYS=['vendor','factory','code','name','price','status','__sales__','onhand','podiy','c1','packed','container','c2','production','po','c3','cover36','avg36','exdiyavg','suggest','covplus','moqplan'];
 const FLOW_GRP_STARTS=['podiy','packed','production','diyinavg','storeavg','suggest','moqplan'];   // แทรกช่องว่างก่อนคอลัมน์เหล่านี้ (diyinavg/storeavg = เฉพาะ DIY)
 // จัดกลุ่มคอลัมน์ด้วยเส้นประสีต่างกัน · G1 น้ำเงิน(Mr.DIY+หมวด①) · G2 ม่วง(จัดตู้+ตู้+หมวด②) · G3 ส้ม(สั่งผลิต+PO+หมวด③+Cover) · G4 เขียวน้ำเงิน(Suggestion+Cover รวมสั่งเพิ่ม)
 const FLOW_GRP_L={podiy:'#2563eb', packed:'#7c3aed', production:'#ea580c', suggest:'#0891b2', diyinavg:'#db2777', storeavg:'#65a30d'};   // ขอบซ้าย (เริ่มกลุ่ม) · G5 ชมพู · G6 เขียว
@@ -9914,9 +9916,10 @@ function flowItemRow(it, basis, grp, salesCols){
   const factoryHtml = lo ? `<span style="font-size:11px;">${lo.factory||'-'}</span>` : '<span class="muted" style="font-size:10px;">—</span>';
   const leadMoq = [ (lo&&lo.lead)?`LT ${lo.lead} วัน`:'', (it.moq)?`MOQ ${fmtNum(it.moq)}`:'' ].filter(Boolean).join(' · ');
   const tr=`<tr onclick="flowToggleItem('${it.no}')" style="cursor:pointer;border-top:1px solid var(--line);${iOpen?'background:var(--bg);':''}">
-    ${window.flowHideVF?'':`<td style="padding:6px 6px;vertical-align:top;position:sticky;left:0;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${vendorHtml}</td>
-    <td style="padding:6px 6px;vertical-align:top;position:sticky;left:78px;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${factoryHtml}</td>`}
-    <td style="padding:7px 10px;white-space:normal;word-break:break-word;line-height:1.3;vertical-align:top;position:sticky;left:${window.flowHideVF?0:156}px;z-index:3;background:${stickyBg};box-shadow:2px 0 4px -2px rgba(0,0,0,.18);min-width:150px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st.c};margin-right:6px;"></span><b style="font-size:12px;">${flowShort(it.no)}</b> <span class="muted" style="font-size:9px;">${iOpen?'▼':'▶'}</span>${leadMoq?`<div style="font-size:12px;font-weight:700;color:var(--muted);margin-top:2px;">${leadMoq}</div>`:''}${((window.BC_PACKING&&window.BC_PACKING[it.no]&&window.BC_PACKING[it.no].dg))?`<div style="font-size:11px;font-weight:700;color:#b45309;margin-top:2px;" title="สินค้าอันตราย (Dangerous Goods) — มีแบตเตอรี่/สารไวไฟ ต้องขนส่งแบบพิเศษ">⚠️ DG (สินค้าอันตราย)</div>`:''}</td>
+    ${window.flowHideVF?'':`<td style="padding:6px 6px;vertical-align:top;position:sticky;left:${(window._flowSL||{}).vendor||0}px;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${vendorHtml}</td>
+    <td style="padding:6px 6px;vertical-align:top;position:sticky;left:${(window._flowSL||{}).factory||78}px;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${factoryHtml}</td>`}
+    ${window.flowShowCode?`<td style="padding:6px 8px;vertical-align:top;position:sticky;left:${(window._flowSL||{}).code||0}px;z-index:3;background:${stickyBg};width:110px;min-width:110px;max-width:110px;"><span style="font-size:11px;font-weight:700;color:var(--muted);">${it.no}</span></td>`:''}
+    <td style="padding:7px 10px;white-space:normal;word-break:break-word;line-height:1.3;vertical-align:top;position:sticky;left:${(window._flowSL||{}).name||0}px;z-index:3;background:${stickyBg};box-shadow:2px 0 4px -2px rgba(0,0,0,.18);min-width:150px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st.c};margin-right:6px;"></span><b style="font-size:12px;">${flowShort(it.no)}</b> <span class="muted" style="font-size:9px;">${iOpen?'▼':'▶'}</span>${leadMoq?`<div style="font-size:12px;font-weight:700;color:var(--muted);margin-top:2px;">${leadMoq}</div>`:''}${((window.BC_PACKING&&window.BC_PACKING[it.no]&&window.BC_PACKING[it.no].dg))?`<div style="font-size:11px;font-weight:700;color:#b45309;margin-top:2px;" title="สินค้าอันตราย (Dangerous Goods) — มีแบตเตอรี่/สารไวไฟ ต้องขนส่งแบบพิเศษ">⚠️ DG (สินค้าอันตราย)</div>`:''}</td>
     ${window.flowHidePrice?'':`<td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;font-size:12px;">${priceTxt}</td>`}
     ${(window.flowVersion==='diy' && !window.flowHidePrice) ? flowDiyPriceCells(it) : ''}
     <td style="padding:7px 8px;vertical-align:top;">${st.nostatus?'<span class="muted" style="font-size:11px;">—</span>':`<span title="${st.sub||''}" style="font-size:10.5px;font-weight:700;color:${st.c};background:${st.bg};padding:2px 7px;border-radius:5px;white-space:nowrap;">${st.t}</span>`}</td>
@@ -9952,7 +9955,7 @@ function flowItemRow(it, basis, grp, salesCols){
   if(!iOpen) return tr;
   const hideP = window.flowHidePrice ? (1 + (window.flowVersion==='diy'?2:0)) : 0;
   const hideVFc = window.flowHideVF ? 2 : 0;
-  const totalCols = (window.flowVersion==='diy'?27:20) + (window.flowVersion==='diy'?7:5) - hideP - hideVFc + ((salesCols&&salesCols.length)||0);   // ช่องว่างคั่นกลุ่ม (DIY 7 · อื่น 5)
+  const totalCols = (window.flowVersion==='diy'?27:20) + (window.flowVersion==='diy'?7:5) + (window.flowShowCode?1:0) - hideP - hideVFc + ((salesCols&&salesCols.length)||0);   // ช่องว่างคั่นกลุ่ม (DIY 7 · อื่น 5) + รหัส
   const detail=`<tr><td colspan="${totalCols}" style="padding:4px 16px 14px;background:var(--bg);border-top:1px dashed var(--line);">${flowSales(it)}<div style="text-align:right;margin-top:4px;"><a href="#" onclick="event.stopPropagation();openLeadtime('${it.no}');return false;" style="font-size:11.5px;color:var(--brand);font-weight:700;">→ เปิดหน้าวางแผนสั่งซื้อ</a></div></td></tr>`;
   return tr+detail;
 }
@@ -9964,6 +9967,7 @@ function renderFlowchart(){
   const DIY = window.flowVersion==='diy';
   if(window.flowHidePrice===undefined){ try{ window.flowHidePrice=localStorage.getItem('flowHidePriceV1')==='1'; }catch(e){ window.flowHidePrice=false; } }
   if(window.flowHideVF===undefined){ try{ window.flowHideVF=localStorage.getItem('flowHideVFV1')==='1'; }catch(e){ window.flowHideVF=false; } }
+  if(window.flowShowCode===undefined){ try{ window.flowShowCode=localStorage.getItem('flowShowCodeV1')==='1'; }catch(e){ window.flowShowCode=false; } }   // ค่าเริ่มต้น = ไม่แสดงรหัส
   if(!window.flowMoq){ try{ window.flowMoq=JSON.parse(localStorage.getItem('flowMoqV1')||'{}'); }catch(e){ window.flowMoq={}; } }
   if(!window.flowMoqT){ try{ window.flowMoqT=JSON.parse(localStorage.getItem('flowMoqTV1')||'{}'); }catch(e){ window.flowMoqT={}; } }
   if(window.flowMoqMode===undefined){ try{ window.flowMoqMode=localStorage.getItem('flowMoqModeV1')||'qty'; }catch(e){ window.flowMoqMode='qty'; } }
@@ -9974,6 +9978,7 @@ function renderFlowchart(){
   const vf=(window.flowVendorFilter||'').trim(), ff=(window.flowFactoryFilter||'').trim();
   if(vf) items=items.filter(i=> (i.sources||[]).some(x=>x.vendor===vf));       // กรองตาม Vendor
   if(ff) items=items.filter(i=> (i.sources||[]).some(x=>x.factory===ff));      // กรองตาม Factory
+  if(window.flowDGOnly) items=items.filter(i=> (window.BC_PACKING&&window.BC_PACKING[i.no]&&window.BC_PACKING[i.no].dg));   // เฉพาะสินค้า DG
   const groups={}; items.forEach(i=>{ const s=(i.subType||'').trim()||'(ไม่ระบุ Subtype)'; (groups[s]=groups[s]||[]).push(i); });
   // เรียงหมวดจากยอดขายรวม 1 ปี (s365) มาก→น้อย
   const gsalesOf=arr=>arr.reduce((s,i)=>s+(i.s365||0),0);
@@ -9981,19 +9986,21 @@ function renderFlowchart(){
   // 11 คอลัมน์คงที่ + คอลัมน์ยอดขาย (เดือน-ปี) เรียงไปทางขวา · จัดชิดขวา: ราคาตั้ง(1) หมวด①②③(3,4,5) ควรสั่ง(10)
   window._flowRcCache = {};                                 // รีเซ็ต cache ของ reorderCalc ทุกครั้งที่เรนเดอร์
   const salesCols = flowSalesCols(items);
-  let TH=['Vendor','Factory','สินค้า','ราคาตั้ง','สถานะ','','คงเหลือ (แยกคลัง)',FLOW_DIY_BADGE,'หมวด① คงเหลือคลังหักจอง','จัดตู้แล้ว','ตู้ (Container)','หมวด② คงเหลือหลังจัดตู้แล้ว','สั่งผลิต','PO ค้างรับ','หมวด③ คงเหลือ+PO ค้างรับ','Cover Stock (3/6ด.)','ยอดขายทุกกลุ่มเฉลี่ย/ด. (3/6ด.)','ยอดขายเฉลี่ย ไม่รวม DIY (3/6ด.)','Suggestion','Cover Stock คงเหลือรวมสั่งเพิ่ม','MOQ / วางแผนสั่ง'];
+  let TH=['Vendor','Factory','รหัสสินค้า','สินค้า','ราคาตั้ง','สถานะ','','คงเหลือ (แยกคลัง)',FLOW_DIY_BADGE,'หมวด① คงเหลือคลังหักจอง','จัดตู้แล้ว','ตู้ (Container)','หมวด② คงเหลือหลังจัดตู้แล้ว','สั่งผลิต','PO ค้างรับ','หมวด③ คงเหลือ+PO ค้างรับ','Cover Stock (3/6ด.)','ยอดขายทุกกลุ่มเฉลี่ย/ด. (3/6ด.)','ยอดขายเฉลี่ย ไม่รวม DIY (3/6ด.)','Suggestion','Cover Stock คงเหลือรวมสั่งเพิ่ม','MOQ / วางแผนสั่ง'];
   let KEYS=FLOW_FIXED_KEYS.slice();
-  if(DIY){ TH.splice(4,0,'ราคาส่งให้ DIY','ราคาขายหน้าร้าน (ไม่รวม VAT)'); KEYS.splice(4,0,'costdiy','npstore');
+  if(DIY){ TH.splice(5,0,'ราคาส่งให้ DIY','ราคาขายหน้าร้าน (ไม่รวม VAT)'); KEYS.splice(5,0,'costdiy','npstore');
     const ex=KEYS.indexOf('exdiyavg');   // แทรกคอลัมน์ Sales In/Out DIY หลัง "ยอดขายเฉลี่ย ไม่รวม DIY" (ก่อน Suggestion)
     KEYS.splice(ex+1,0,'diyinavg','covdiyin','storeavg','covdiyout');
     TH.splice(ex+1,0,'Sales In Mr.DIY (3/6ด.)','Cover Stock Sales In Mr.DIY (3/6ด.)','Sales Out Mr.DIY (3/6ด.)','Cover Stock Sales Out Mr.DIY (3/6ด.)');
     TH.push('แนวโน้ม Mr.DIY ถอดสินค้า'); KEYS.push('diyrisk'); }
   if(window.flowHidePrice){ ['price','costdiy','npstore'].forEach(k=>{ const idx=KEYS.indexOf(k); if(idx>=0){ KEYS.splice(idx,1); TH.splice(idx,1); } }); }   // ซ่อนคอลัมน์ราคาทั้งหมด
   if(window.flowHideVF){ ['vendor','factory'].forEach(k=>{ const idx=KEYS.indexOf(k); if(idx>=0){ KEYS.splice(idx,1); TH.splice(idx,1); } }); }   // ซ่อนคอลัมน์ Vendor/Factory
+  if(!window.flowShowCode){ const idx=KEYS.indexOf('code'); if(idx>=0){ KEYS.splice(idx,1); TH.splice(idx,1); } }   // ค่าเริ่มต้น = ซ่อนรหัสสินค้า
   FLOW_GRP_STARTS.forEach(k=>{ const idx=KEYS.indexOf(k); if(idx>0){ KEYS.splice(idx,0,'__gap__'); TH.splice(idx,0,''); } });   // แทรกช่องว่างคั่นกลุ่ม
   const RIGHT_KEYS=new Set(['price','costdiy','npstore','c1','c2','c3','podiy','production','packed','suggest','avg36','exdiyavg','cover36','covplus','covdiyin','covdiyout','storeavg','diyinavg']);
   const COLBG={c1:'#dcfce7',c2:'#fef9c3',c3:'#ffedd5',suggest:'#111'};   // สีพื้นหัวคอลัมน์ (หมวด①เขียว ②เหลือง ③ส้ม · ควรสั่งเพิ่ม=ดำ)
-  const STICKYL = window.flowHideVF ? {name:0} : {vendor:0, factory:78, name:156};   // ตรึงซ้าย · ซ่อน VF แล้วชื่อสินค้าเลื่อนไปซ้ายสุด
+  const STICKYL={}; { let o=0; if(!window.flowHideVF){ STICKYL.vendor=0; STICKYL.factory=78; o=156; } if(window.flowShowCode){ STICKYL.code=o; o+=110; } STICKYL.name=o; }   // ตรึงซ้ายแบบไดนามิก (Vendor/Factory/รหัส/ชื่อ)
+  window._flowSL=STICKYL;   // ให้ flowItemRow ใช้ตำแหน่งตรึงเดียวกัน
   const salesTh = salesCols.map(c=>{ const key=(c.t==='y'?'sy:':'sm:')+c.k; return `<th onclick="flowSort('${key}')" title="คลิกเพื่อเรียงตามยอดขายเดือนนี้" style="cursor:pointer;user-select:none;padding:7px 9px;text-align:right;font-size:12px;color:#c2410c;white-space:nowrap;border-bottom:2px solid var(--line);border-left:1px solid #fde6cf;background:#fff4ea;position:sticky;top:0;z-index:6;">${flowSalesHead(c)} ${flowSortArrow(key)}</th>`; }).join('');
   const fixedTh = TH.map((h,i)=>{ const key=KEYS[i]; if(key==='__sales__') return salesTh;   // แทรกคอลัมน์ยอดขาย (ปี/เดือน) ไว้หน้า "คงเหลือ"
     if(key==='__gap__') return '<th style="width:16px;min-width:16px;padding:0;border:none;background:var(--bg);position:sticky;top:0;z-index:5;"></th>';   // ช่องว่างคั่นกลุ่ม
@@ -10006,7 +10013,7 @@ function renderFlowchart(){
       </th>`; }
     const cbg=COLBG[key]?`background:${COLBG[key]};${key==='suggest'?'color:#fff;':''}`:'background:var(--bg);';
     const sl=STICKYL[key];
-    const w = (key==='vendor'||key==='factory')?'width:78px;min-width:78px;max-width:78px;':(key==='name'?'min-width:150px;':'');
+    const w = (key==='vendor'||key==='factory')?'width:78px;min-width:78px;max-width:78px;':(key==='code'?'width:110px;min-width:110px;max-width:110px;':(key==='name'?'min-width:150px;':''));
     const sticky = (sl!=null)
       ? `position:sticky;left:${sl}px;top:0;z-index:7;box-shadow:2px 0 4px -2px rgba(0,0,0,.18);`   // มุม: ตรึงทั้งซ้าย+บน
       : `position:sticky;top:0;z-index:6;`;                                                          // หัวปกติ: ตรึงบน
@@ -10014,7 +10021,7 @@ function renderFlowchart(){
     return `<th onclick="flowSort('${key}')" title="คลิกเพื่อเรียง" style="cursor:pointer;user-select:none;padding:7px 8px;text-align:${RIGHT_KEYS.has(key)?'right':'left'};font-size:10.5px;line-height:1.25;color:var(--muted);white-space:normal;word-break:break-word;vertical-align:top;border-bottom:2px solid var(--line);${gtop}${flowGrpBorder(key)}${cbg}${sticky}${w}">${h} ${flowSortArrow(key)}</th>`; }).join('');
   const theadHtml = `<thead><tr style="background:var(--bg);">${fixedTh}</tr></thead>`;
   // ความกว้างคอลัมน์คงที่ (เท่ากันทุกหมวด → คอลัมน์ตรงกัน) · table-layout:fixed
-  const CW={vendor:78,factory:78,name:186,price:78,costdiy:102,npstore:120,status:104,c1:88,c2:88,c3:102,onhand:152,podiy:74,production:76,packed:78,container:134,po:200,cover36:150,covplus:160,covdiyin:150,covdiyout:174,suggest:114,moqplan:172,avg36:120,exdiyavg:132,diyinavg:122,storeavg:122,diyrisk:152};
+  const CW={vendor:78,factory:78,code:110,name:186,price:78,costdiy:102,npstore:120,status:104,c1:88,c2:88,c3:102,onhand:152,podiy:74,production:76,packed:78,container:134,po:200,cover36:150,covplus:160,covdiyin:150,covdiyout:174,suggest:114,moqplan:172,avg36:120,exdiyavg:132,diyinavg:122,storeavg:122,diyrisk:152};
   const SALESW=76;
   let tableW=0, colHtml='';
   KEYS.forEach(k=>{ if(k==='__sales__'){ (salesCols||[]).forEach(()=>{ colHtml+=`<col style="width:${SALESW}px">`; tableW+=SALESW; }); } else if(k==='__gap__'){ colHtml+='<col style="width:16px">'; tableW+=16; } else { const w=CW[k]||100; colHtml+=`<col style="width:${w}px">`; tableW+=w; } });
@@ -10034,8 +10041,10 @@ function renderFlowchart(){
     <span style="width:1px;height:20px;background:var(--line);"></span>
     <button onclick="flowSort('default')" title="เรียง: ควรสั่งซื้อขึ้นก่อน แล้วยอดขายมาก→น้อย" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--brand);background:${isDefaultSort?'var(--brand)':'var(--card)'};color:${isDefaultSort?'#fff':'var(--brand)'};">🎯 เรียงตามความจำเป็น</button>
     <button onclick="flowToggleMon()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #ea580c;background:${window.flowMonExpand?'#ea580c':'var(--card)'};color:${window.flowMonExpand?'#fff':'#ea580c'};">${window.flowMonExpand?'🔽 ย่อยอดขายเป็นรายปี':'▶️ กางยอดขายรายเดือน (คอลัมน์)'}</button>
-    <button onclick="flowTogglePrice()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #0891b2;background:${window.flowHidePrice?'#0891b2':'var(--card)'};color:${window.flowHidePrice?'#fff':'#0891b2'};">${window.flowHidePrice?'👁️ แสดงคอลัมน์ราคา':'🙈 ซ่อนคอลัมน์ราคา'}</button>
+    <button onclick="flowTogglePrice()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #0891b2;background:${window.flowHidePrice?'#0891b2':'var(--card)'};color:${window.flowHidePrice?'#fff':'#0891b2'};">${window.flowHidePrice?'👁️ แสดงราคา':'🙈 ซ่อนราคา'}</button>
     <button onclick="flowToggleVF()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #7c3aed;background:${window.flowHideVF?'#7c3aed':'var(--card)'};color:${window.flowHideVF?'#fff':'#7c3aed'};">${window.flowHideVF?'👁️ แสดง Vendor/Factory':'🙈 ซ่อน Vendor/Factory'}</button>
+    <button onclick="flowToggleCode()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #0d9488;background:${window.flowShowCode?'#0d9488':'var(--card)'};color:${window.flowShowCode?'#fff':'#0d9488'};">${window.flowShowCode?'🙈 ซ่อนรหัสสินค้า':'🔖 แสดงรหัสสินค้า'}</button>
+    <button onclick="flowToggleDG()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #b45309;background:${window.flowDGOnly?'#b45309':'var(--card)'};color:${window.flowDGOnly?'#fff':'#b45309'};">${window.flowDGOnly?'⚠️ แสดงทุกสินค้า':'⚠️ เฉพาะ DG'}</button>
     <span class="muted" style="font-size:11px;">คลิกหัวคอลัมน์เพื่อเรียงมาก↔น้อย · ค่าเริ่มต้น: ควรสั่งซื้อขึ้นก่อน แล้วยอดขายมากสุดในหมวด</span>
   </div>`;
   gkeys.forEach(sub=>{
