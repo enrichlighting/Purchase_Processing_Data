@@ -9403,8 +9403,12 @@ function flowWhColor(w){ return FLOW_WH_COLORS[w]||'#64748b'; }
 const FLOW_ST={red:{t:'🔴 ควรสั่งซื้อ',c:'#dc2626',bg:'#fdeaea'},warn:{t:'⏰ ใกล้ถึงจุดสั่ง',c:'#b45309',bg:'#fdf1e0'},watch:{t:'👀 เฝ้าระวัง',c:'#a16207',bg:'#fef9c3'},noneed:{t:'🟢 ยังไม่ต้องสั่ง',c:'#16a34a',bg:'#e7f6ec'}};
 // สถานะ = ยึดสีจาก Cover Stock คงเหลือรวมสั่งเพิ่ม (3 เดือน) เทียบ Lead Time · เขียว≥LT · เหลือง≥50% · แดง<50%
 function flowRowStatus(it,rc){
-  const hasSales = (it.s365>0) || (typeof flowAvg6==='function'&&flowAvg6(it)>0) || (it.monthly && it.monthly.some(m=>m[1]>0));
-  if(!hasSales) return {key:'nosale', rank:99, t:'—', c:'var(--muted)', bg:'transparent', nostatus:true};   // ไม่มียอดขาย/สินค้าตัวอย่าง → ไม่คิดสถานะ
+  // หาเดือนล่าสุดที่มียอดขาย (>0) จากประวัติทั้งหมด
+  let lastSale=''; (it.monthly||[]).forEach(m=>{ if(m[1]>0 && m[0]>lastSale) lastSale=m[0]; });
+  if(!lastSale) return {key:'nosale', rank:99, t:'—', c:'var(--muted)', bg:'transparent', nostatus:true};   // ไม่เคยมียอดขาย/สินค้าตัวอย่าง → ไม่คิดสถานะ
+  const cy=APP_TODAY.getFullYear(), cm=APP_TODAY.getMonth()+1;
+  const gapMo=(cy*12+cm)-(+lastSale.slice(0,4)*12 + (+lastSale.slice(5,7)));   // เดือนนับจากขายครั้งล่าสุด
+  if(gapMo>=12) return {key:'dead', rank:50, t:'💀 Dead Stock', c:'#374151', bg:'#e5e7eb', dead:true, sub:'ไม่มียอดขาย ≥ 12 เดือน (ล่าสุด '+lastSale+')'};   // ไม่ขายมา ≥12 เดือน
   const q=(rc.c3||0)+flowSugExCarton(it,rc).pieces, a3=flowAvg3(it);
   const cover=a3>0?q/a3:(q>0?Infinity:0), lm=(+it.leadTime||0)/30;
   let band;
@@ -9864,7 +9868,7 @@ function flowItemRow(it, basis, grp, salesCols){
     <td style="padding:7px 10px;white-space:nowrap;vertical-align:top;position:sticky;left:${window.flowHideVF?0:156}px;z-index:3;background:${stickyBg};box-shadow:2px 0 4px -2px rgba(0,0,0,.18);min-width:150px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st.c};margin-right:6px;"></span><b style="font-size:12px;">${flowShort(it.no)}</b> <span class="muted" style="font-size:9px;">${iOpen?'▼':'▶'}</span>${leadMoq?`<div style="font-size:12px;font-weight:700;color:var(--muted);margin-top:2px;">${leadMoq}</div>`:''}</td>
     ${window.flowHidePrice?'':`<td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;font-size:12px;">${priceTxt}</td>`}
     ${(window.flowVersion==='diy' && !window.flowHidePrice) ? flowDiyPriceCells(it) : ''}
-    <td style="padding:7px 8px;vertical-align:top;">${st.nostatus?'<span class="muted" style="font-size:11px;">—</span>':`<span style="font-size:10.5px;font-weight:700;color:${st.c};background:${st.bg};padding:2px 7px;border-radius:5px;white-space:nowrap;">${st.t}</span>`}</td>
+    <td style="padding:7px 8px;vertical-align:top;">${st.nostatus?'<span class="muted" style="font-size:11px;">—</span>':`<span title="${st.sub||''}" style="font-size:10.5px;font-weight:700;color:${st.c};background:${st.bg};padding:2px 7px;border-radius:5px;white-space:nowrap;">${st.t}</span>`}</td>
     ${flowSalesCellsHtml(it, salesCols)}
     <td style="padding:7px 10px;vertical-align:top;"><b style="font-size:13px;">${fmtNum(rc.onHand)}</b> <span class="muted" style="font-size:10px;">${it.uom}</span><div style="margin-top:2px;">${whChips}</div></td>
     <td style="padding:0;border:0;"></td>
