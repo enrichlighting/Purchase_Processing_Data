@@ -466,6 +466,13 @@
       <div id="po-follow"></div>
     </div>
 
+    <!-- ===== ตู้ที่ถึงคลังแล้ว (สรุปตาม ETA) ===== -->
+    <div class="card" id="pk-arrived-card">
+      <h2>🏭 ตู้ที่ถึงคลังแล้ว (สรุปตาม ETA)</h2>
+      <p class="hint">สรุปตู้ที่ของถึงคลังแล้ว แยกเป็น <b>ปี × เดือน</b> (ยึดเดือนจาก ETA ถึงคลัง) · แสดงจำนวนตู้ + มูลค่ารวม · คลิกช่องเดือนเพื่อกางดูว่าแต่ละตู้ ETA วันไหน มูลค่าเท่าไหร่</p>
+      <div id="pk-arrived-matrix"></div>
+    </div>
+
     <!-- ===== ส่วนที่ 2: วางแผนสั่งซื้อรายสินค้า ===== -->
     <div class="card" id="planner-card">
       <h2>📦 วางแผนสั่งซื้อรายสินค้า (Lead Time &amp; Reorder)</h2>
@@ -5309,7 +5316,7 @@ window.BC_PACKING = {
 "R-ENR-000123":{"L":123,"W":20.5,"H":16.5,"pcs":30,"cn":"LED灯管","desc":"ENRICH ชุดรางLED T5 รุ่น Join 18w แสงขาว 1.2เมตร","model":"JOIN"},
 "R-ENR-000124":{"L":123,"W":20.5,"H":16.5,"pcs":30,"cn":"LED灯管","desc":"ENRICH ชุดรางLED T5 รุ่น Join 18w แสงเหลือง 1.2เมตร","model":"JOIN"},
 "R-ENR-000125":{"L":43,"W":13.5,"H":59,"pcs":1,"cn":"太阳能路灯","desc":"STREETLIGHT Solar MAXNUM RICH 300W  DL"},
-"R-ENR-000126":{"L":43,"W":13.5,"H":59,"pcs":1,"cn":"太阳能路灯","desc":"STREETLIGHT Solar MAXNUM RICH 400W  DL"},
+"R-ENR-000126":{"L":43,"W":13.5,"H":59,"pcs":1,"cn":"太阳能路灯","desc":"STREETLIGHT Solar MAXNUM RICH 400W  DL","dg":1},
 "R-ENR-000127":{"L":44.6,"W":37.5,"H":46,"pcs":5,"cn":"太阳能庭院灯","desc":"Solar UFO Garden Space 200W 6500K"},
 "R-ENR-000128":{"L":44.6,"W":37.5,"H":46,"pcs":5,"cn":"太阳能庭院灯","desc":"Solar UFO Garden Space 200W 3000K"},
 "R-ENR-000129":{"L":49.5,"W":44.5,"H":30,"pcs":24,"cn":"太阳能庭院灯","desc":"SOLAR GARDEN SPY 12W DL 6500K"},
@@ -5317,7 +5324,7 @@ window.BC_PACKING = {
 "R-ENR-000131":{"L":24.7,"W":63.5,"H":9,"pcs":5,"cn":"路灯","desc":"STREETLIGHT NEXT  200w : 6500K"},
 "R-ENR-000132":{"L":69.5,"W":48.5,"H":30,"pcs":5,"cn":"路灯","desc":"STREETLIGHT NEXT  250w : 6500K"},
 "R-ENR-000133":{"L":52.2,"W":26.5,"H":50.5,"pcs":6,"cn":"工矿灯","desc":"HIGHBAY UFO CHARM 50W 6500K"},
-"R-ENR-000134":{"L":71,"W":48,"H":13,"pcs":1,"cn":"太阳能路灯","desc":"STREETLIGHT Solar Cell PROII 200W DL"},
+"R-ENR-000134":{"L":71,"W":48,"H":13,"pcs":1,"cn":"太阳能路灯","desc":"STREETLIGHT Solar Cell PROII 200W DL","dg":1},
 "R-ENR-000135":{"L":71,"W":48,"H":13,"pcs":1,"cn":"太阳能路灯","desc":"STREETLIGHT Solar Cell PROII 200W WW"},
 "R-ENR-000136":{"L":53,"W":25,"H":43.5,"pcs":120,"cn":"电源","desc":"ENRICH หม้อแปลง Switching 60-12V , 5A 60w","model":"POWER SUPPLY"},
 "R-ENR-000137":{"L":53,"W":25,"H":43.5,"pcs":50,"cn":"电源","desc":"ENRICH หม้อแปลง Switching 120-12V , 10A 120w","model":"POWER SUPPLY"},
@@ -5437,7 +5444,7 @@ window.BC_PACKING = {
 "R-ENR-000324":{"L":0,"W":0,"H":0,"pcs":0,"cn":"路灯","desc":"ENRICH LED STREETLIGHT NEXT(200W, 3000K)"},
 "R-ENR-000328":{"L":0,"W":0,"H":0,"pcs":0,"cn":"可调连接器","desc":"ENRICH ADJUSTABLE CONNECTOR(งานพี่เพ็ญ)"},
 "R-ENR-000330":{"L":0,"W":0,"H":0,"pcs":0,"cn":"转头一出二 转接头","desc":"RICH Cable for Brick Floodlight+connector 1 to 2 ways"},
-"R-ENR-000336":{"L":73,"W":29,"H":51,"pcs":2,"cn":"太阳能路灯","desc":"ENRICH SOLAR STREETLIGHT EN1500 W PANEL 60W 6500K GREY\n(งานพี่ก้อย 300 โคม, สำรอง 12 โคม, สำหรับติดตั้งคลังใหม่ 18 โคม)"},
+"R-ENR-000336":{"L":73,"W":29,"H":51,"pcs":2,"cn":"太阳能路灯","desc":"ENRICH SOLAR STREETLIGHT EN1500 W PANEL 60W 6500K GREY\n(งานพี่ก้อย 300 โคม, สำรอง 12 โคม, สำหรับติดตั้งคลังใหม่ 18 โคม)","dg":1},
 "R-ENR-000337":{"L":76,"W":45,"H":49,"pcs":20,"cn":"路灯","desc":"FILO-A 45W DL"},
 "R-ENR-000338":{"L":76,"W":45,"H":49,"pcs":0,"cn":"路灯","desc":"FILO-A 50W WW"},
 "R-ENR-000339":{"L":55.5,"W":20.5,"H":10,"pcs":1,"cn":"路灯","desc":"FILO-A 100W DL"},
@@ -5463,12 +5470,12 @@ window.BC_PACKING = {
 "R-ENR-000361":{"L":62,"W":32,"H":24,"pcs":100,"cn":"灯泡","desc":"ENRICH หลอด LED BULB รุ่น MY LITE 10W แสงขาว","model":"MY LITE"},
 "R-ENR-000362":{"L":62,"W":32,"H":24,"pcs":100,"cn":"灯泡","desc":"ENRICH หลอด LED BULB รุ่น MY LITE 10W แสงเหลือง","model":"MY LITE"},
 "R-ENR-000364":{"L":125.3,"W":26.5,"H":18,"pcs":20,"cn":"LED支架灯","desc":"ENRICH ชุดรางLED รุ่น BRIGHTER พร้อมหลอดT8 40w แสงขาว","model":"BRIGHTER"},
-"R-ENR-000365":{"L":38,"W":36,"H":54.5,"pcs":10,"cn":"太阳能投光灯","desc":"LED FLOODLIGHT SOLAR BUBBLE-B 1000W 6500K"},
-"R-ENR-000366":{"L":59,"W":43.5,"H":15,"pcs":1,"cn":"太阳能路灯","desc":"LED STREETLIGHT SOLAR CELL SUNSHINE 1000W 6500K-DG ทุนเดิม"},
+"R-ENR-000365":{"L":38,"W":36,"H":54.5,"pcs":10,"cn":"太阳能投光灯","desc":"LED FLOODLIGHT SOLAR BUBBLE-B 1000W 6500K","dg":1},
+"R-ENR-000366":{"L":59,"W":43.5,"H":15,"pcs":1,"cn":"太阳能路灯","desc":"LED STREETLIGHT SOLAR CELL SUNSHINE 1000W 6500K-DG ทุนเดิม","dg":1},
 "R-ENR-000367":{"L":77.5,"W":38.7,"H":46.8,"pcs":4,"cn":"太阳能路灯","desc":"LED STREETLIGHT SOLAR CELL NOVA 1000W 6500K (All in one)-NON DG"},
 "R-ENR-000372":{"L":0,"W":0,"H":0,"pcs":0,"cn":"GU10 灯座","desc":"ENRICH ขั้วหลอด GU10"},
 "R-ENR-000375":{"L":43,"W":13.5,"H":59,"pcs":1,"cn":"太阳能路灯","desc":"SOLAR STREETLIGHT MAXNUM+ (300W,6500K)"},
-"R-ENR-000376":{"L":43,"W":13.5,"H":59,"pcs":1,"cn":"太阳能路灯","desc":"SOLAR STREETLIGHT MAXNUM+ (400W,6500K)"},
+"R-ENR-000376":{"L":43,"W":13.5,"H":59,"pcs":1,"cn":"太阳能路灯","desc":"SOLAR STREETLIGHT MAXNUM+ (400W,6500K)","dg":1},
 "R-ENR-000377":{"L":43,"W":13.5,"H":59,"pcs":1,"cn":"太阳能路灯","desc":"SOLAR STREETLIGHT MAXNUM+ (400W,6500K)"},
 "R-ENR-000378":{"L":38,"W":32,"H":24,"pcs":200,"cn":"安装板和三角挂钩","desc":"ENRICH MOUNTING PLATE AND TRIANGLE HANGING HOOK"},
 "R-ENR-000379":{"L":58,"W":39,"H":21.5,"pcs":30,"cn":"投光灯","desc":"FLOODLIGHT COOLER+ 50W DL"},
@@ -5529,7 +5536,7 @@ window.BC_PACKING = {
 "R-ENR-000492":{"L":72,"W":31.5,"H":32,"pcs":50,"cn":"吸顶灯","desc":"ENRICH ชุดกึ่งดวงโคม LED รุ่น Oring 40W แสงขาว","model":"ORING"},
 "R-ENR-000496":{"L":50.5,"W":43,"H":37.8,"pcs":5,"cn":"太阳能投光灯","desc":"ENRICH LED FLOODLIGHT SOLAR OPTIMUS (200W,6500K)"},
 "R-ENR-000497":{"L":56,"W":46.3,"H":37.8,"pcs":4,"cn":"太阳能投光灯","desc":"ENRICH LED FLOODLIGHT SOLAR OPTIMUS (400W,6500K)"},
-"R-ENR-000498":{"L":67,"W":40,"H":42.5,"pcs":10,"cn":"太阳能投光灯","desc":"ENRICH LED FLOODLIGHT SOLAR OPTIMUS (600W,6500K)"},
+"R-ENR-000498":{"L":67,"W":40,"H":42.5,"pcs":10,"cn":"太阳能投光灯","desc":"ENRICH LED FLOODLIGHT SOLAR OPTIMUS (600W,6500K)","dg":1},
 "R-ENR-000506":{"L":46,"W":74,"H":12.5,"pcs":1,"cn":"投光灯","desc":"ENRICH LED FLOODLIGHT N-BRICK 1000W (6500K, 90 DEGREE), MEANWELL DRIVER"},
 "R-ENR-000510":{"L":127,"W":27,"H":20,"pcs":12,"cn":"线性灯","desc":"LINEAR LIGHT 1.2M-50W (BLACK)"},
 "R-ENR-000511":{"L":207,"W":27,"H":14,"pcs":8,"cn":"线性灯","desc":"LINEAR LIGHT 2.0M-80W (BLACK)"},
@@ -9100,7 +9107,7 @@ function itemMergedStatusKey(item, reorderStatus){ const m=itemMergedPO(item); r
 function setUrgentFilter(k){ window.urgentFilter=k; renderUrgent(); }
 function urgentItemPick(v){ window.urgentItemQuery = String(v||''); renderUrgent(); }
 function toggleUrgentCat(id){ window.urgentCatOpen=window.urgentCatOpen||{}; window.urgentCatOpen[id]=(window.urgentCatOpen[id]===false); renderUrgent(); }
-function poRefresh(){ if(typeof renderPoFollow==='function') renderPoFollow(); if(typeof renderUrgent==='function' && window.tabRendered && window.tabRendered.leadtime) renderUrgent(); }
+function poRefresh(){ if(typeof renderPoFollow==='function') renderPoFollow(); if(typeof renderArrivedMatrix==='function') renderArrivedMatrix(); if(typeof renderUrgent==='function' && window.tabRendered && window.tabRendered.leadtime) renderUrgent(); }
 // รายการ (PO, สินค้า) ที่กรอก Lead Time แล้ว → [{po,item,leadDays,status}]
 function poTrackedList(){
   const packed=poPackedMap(), rows=[];
@@ -9204,6 +9211,44 @@ function poTrkRowsHtml(){
   return html;
 }
 function poTrkFilter(){ window.poTrkQuery=(document.getElementById('po-trk-search')||{}).value||''; const c=document.getElementById('po-trk-rows'); if(c) c.innerHTML=poTrkRowsHtml(); }
+// ===== ตู้ที่ถึงคลังแล้ว (สรุปตาม ETA) — matrix ปี×เดือน + กางดูรายตู้ =====
+function pkArrivedContainers(){
+  const out=[];
+  (window.pkLog||[]).forEach(function(s){ if(typeof pkRoundArrived!=='function' || !pkRoundArrived(s)) return;
+    (s.containers||[]).forEach(function(ct,ci){ const d=ct.dates||{}; const eta=d.arrWh||d.arrTH||d.eta||''; const ym=(eta||pkRoundDate(s)||'').slice(0,7);
+      const ctv=(s.contTotals||[])[ci]||{}; out.push({ym:ym, name:ct.name||('ตู้ '+(ci+1)), eta:eta||pkRoundDate(s), valThb:ctv.valThb||0, valRmb:ctv.valRmb||0}); }); });
+  return out;
+}
+function pkArrSelect(ym){ window.pkArrSel=(window.pkArrSel===ym)?'':ym; renderArrivedMatrix(); }
+function renderArrivedMatrix(){
+  const el=document.getElementById('pk-arrived-matrix'); if(!el) return;
+  if(!window.pkLog||!window.pkLog.length){ if(typeof pkLoadLog==='function') pkLoadLog(); }
+  const cont=pkArrivedContainers();
+  if(!cont.length){ el.innerHTML='<p class="muted" style="font-size:12px;margin:4px 0;">ยังไม่มีตู้ที่ถึงคลัง</p>'; return; }
+  const MN=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const agg={}; const years=new Set();
+  cont.forEach(function(c){ if(!/^\d{4}-\d{2}$/.test(c.ym)) return; const y=c.ym.slice(0,4), m=+c.ym.slice(5,7); years.add(y); const k=y+'-'+m; if(!agg[k]) agg[k]={n:0,val:0}; agg[k].n++; agg[k].val+=c.valThb; });
+  const ys=[...years].sort();
+  let head='<tr><th style="text-align:left;">ปี \\ เดือน</th>'+MN.map(m=>`<th class="num">${m}</th>`).join('')+'<th class="num">รวมทั้งปี</th></tr>';
+  let body='';
+  ys.forEach(function(y){ let yn=0,yv=0,cells='';
+    for(let m=1;m<=12;m++){ const ym=y+'-'+String(m).padStart(2,'0'); const a=agg[y+'-'+m];
+      if(a){ yn+=a.n; yv+=a.val; const sel=window.pkArrSel===ym;
+        cells+=`<td class="num" onclick="pkArrSelect('${ym}')" title="คลิกดูรายตู้" style="cursor:pointer;background:#f0fdf4;${sel?'outline:2px solid var(--brand);outline-offset:-2px;':''}"><b>${a.n}</b><span class="muted" style="font-size:9px;"> ตู้</span><div class="muted" style="font-size:9px;">฿${pkMoney(a.val)}</div></td>`;
+      } else cells+='<td class="num" style="color:#e2e8f0;">·</td>'; }
+    body+=`<tr><td style="text-align:left;"><b>${y}</b></td>${cells}<td class="num"><b>${yn}</b><span class="muted" style="font-size:9px;"> ตู้</span><div class="muted" style="font-size:9px;">฿${pkMoney(yv)}</div></td></tr>`;
+  });
+  const gn=cont.length, gv=cont.reduce((s,c)=>s+c.valThb,0);
+  let html=`<div style="overflow-x:auto;"><table style="font-size:11.5px;width:100%;"><thead>${head}</thead><tbody>${body}<tr style="background:var(--brand-soft);"><td style="text-align:left;"><b>รวมทั้งหมด</b></td><td class="num" colspan="12" style="text-align:right;"><span class="muted">รวมทุกเดือน →</span></td><td class="num"><b>${gn}</b> ตู้<div class="muted" style="font-size:9px;">฿${pkMoney(gv)}</div></td></tr></tbody></table></div>`;
+  if(window.pkArrSel){ const list=cont.filter(c=>c.ym===window.pkArrSel).sort((a,b)=>(a.eta<b.eta?-1:1));
+    const y=window.pkArrSel.slice(0,4), m=+window.pkArrSel.slice(5,7);
+    html+=`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;"><div style="font-weight:700;font-size:12.5px;margin-bottom:5px;">📦 ตู้ที่ถึงคลัง ${MN[m-1]} ${y} · ${list.length} ตู้ · รวม ฿${pkMoney(list.reduce((s,c)=>s+c.valThb,0))}</div>`
+      +'<div style="overflow-x:auto;"><table style="font-size:11.5px;width:100%;"><tr><th style="text-align:left;">ตู้</th><th>ETA ถึงคลัง</th><th class="num">มูลค่า (฿)</th><th class="num">¥</th></tr>'
+      +list.map(c=>`<tr><td style="text-align:left;"><b>${c.name}</b></td><td style="text-align:center;">${c.eta?poThaiShort(c.eta):'-'}</td><td class="num">฿${pkMoney(c.valThb)}</td><td class="num">¥${pkMoney(c.valRmb)}</td></tr>`).join('')
+      +'</table></div></div>';
+  } else { html+='<div class="muted" style="font-size:11px;margin-top:6px;">👆 คลิกช่องเดือนในตารางเพื่อกางดูรายตู้ (ETA + มูลค่าแต่ละตู้)</div>'; }
+  el.innerHTML=html;
+}
 function renderPoFollow(){
   const el=document.getElementById('po-follow'); if(!el) return;
   if(!window.pkLog||!window.pkLog.length) pkLoadLog();
@@ -9865,7 +9910,7 @@ function flowItemRow(it, basis, grp, salesCols){
   const tr=`<tr onclick="flowToggleItem('${it.no}')" style="cursor:pointer;border-top:1px solid var(--line);${iOpen?'background:var(--bg);':''}">
     ${window.flowHideVF?'':`<td style="padding:6px 6px;vertical-align:top;position:sticky;left:0;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${vendorHtml}</td>
     <td style="padding:6px 6px;vertical-align:top;position:sticky;left:78px;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${factoryHtml}</td>`}
-    <td style="padding:7px 10px;white-space:normal;word-break:break-word;line-height:1.3;vertical-align:top;position:sticky;left:${window.flowHideVF?0:156}px;z-index:3;background:${stickyBg};box-shadow:2px 0 4px -2px rgba(0,0,0,.18);min-width:150px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st.c};margin-right:6px;"></span><b style="font-size:12px;">${flowShort(it.no)}</b> <span class="muted" style="font-size:9px;">${iOpen?'▼':'▶'}</span>${leadMoq?`<div style="font-size:12px;font-weight:700;color:var(--muted);margin-top:2px;">${leadMoq}</div>`:''}</td>
+    <td style="padding:7px 10px;white-space:normal;word-break:break-word;line-height:1.3;vertical-align:top;position:sticky;left:${window.flowHideVF?0:156}px;z-index:3;background:${stickyBg};box-shadow:2px 0 4px -2px rgba(0,0,0,.18);min-width:150px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${st.c};margin-right:6px;"></span><b style="font-size:12px;">${flowShort(it.no)}</b> <span class="muted" style="font-size:9px;">${iOpen?'▼':'▶'}</span>${leadMoq?`<div style="font-size:12px;font-weight:700;color:var(--muted);margin-top:2px;">${leadMoq}</div>`:''}${((window.BC_PACKING&&window.BC_PACKING[it.no]&&window.BC_PACKING[it.no].dg))?`<div style="font-size:11px;font-weight:700;color:#b45309;margin-top:2px;" title="สินค้าอันตราย (Dangerous Goods) — มีแบตเตอรี่/สารไวไฟ ต้องขนส่งแบบพิเศษ">⚠️ DG (สินค้าอันตราย)</div>`:''}</td>
     ${window.flowHidePrice?'':`<td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;font-size:12px;">${priceTxt}</td>`}
     ${(window.flowVersion==='diy' && !window.flowHidePrice) ? flowDiyPriceCells(it) : ''}
     <td style="padding:7px 8px;vertical-align:top;">${st.nostatus?'<span class="muted" style="font-size:11px;">—</span>':`<span title="${st.sub||''}" style="font-size:10.5px;font-weight:700;color:${st.c};background:${st.bg};padding:2px 7px;border-radius:5px;white-space:nowrap;">${st.t}</span>`}</td>
@@ -10012,7 +10057,7 @@ function renderFlowchart(){
 function renderTab(tab){
   if(tab==='flowchart'){ if(typeof poLoadFollow==='function') poLoadFollow(); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderFlowchart(); }
   else if(tab==='search'){ renderSearch(); renderItemList(); }   // หน้าค้นหารวมรายการสินค้าแล้ว
-  else if(tab==='leadtime'){ poLoadFollow(); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderUrgent(); renderLeadtime(); renderPoFollow(); }
+  else if(tab==='leadtime'){ poLoadFollow(); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderUrgent(); renderLeadtime(); renderPoFollow(); renderArrivedMatrix(); }
   else if(tab==='packing'){ renderPacking(); pkLoadLog(); renderPkLog(); }
   window.tabRendered[tab]=true;
 }
