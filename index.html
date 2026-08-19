@@ -341,8 +341,9 @@
         <button class="go" id="pk-export" style="background:var(--brand);">⬇️ สำรองข้อมูล (Export)</button>
         <button class="go" id="pk-dimexport" style="background:#ea580c;" title="ส่งออกเฉพาะ L/W/H/ชิ้นต่อกล่อง ที่แก้ไข เพื่ออัปเดตไฟล์กลางถาวร">📤 ส่งขนาดที่แก้</button>
         <button class="go" id="pk-import" style="background:var(--warn);">⬆️ โหลดข้อมูลกลับ (Import)</button>
-        <input type="file" id="pk-importfile" accept="application/json,.json" style="display:none;">
-        <span class="muted" id="pk-backupstatus" style="font-size:12px;">รวมทุก Packing รอบ + สถานะติดตาม PO ไว้ในไฟล์เดียว</span>
+        <input type="file" id="pk-importfile" accept="application/json,.json,text/csv,.csv" style="display:none;">
+        <button class="go" id="pk-template" style="background:#0d9488;" title="ดาวน์โหลดไฟล์ตัวอย่าง (CSV) สำหรับกรอกข้อมูลตู้เก่า แล้วนำเข้าด้วยปุ่ม Import">📄 ดาวน์โหลด Pattern ตู้เก่า (CSV)</button>
+        <span class="muted" id="pk-backupstatus" style="font-size:12px;">Import รับได้ 2 แบบ: ไฟล์สำรอง (.json = แทนที่ทั้งหมด) หรือ Pattern ตู้เก่า (.csv = เพิ่มเข้าไป)</span>
       </div>
       <div id="pk-log"></div>
     </div>
@@ -8471,23 +8472,161 @@ function pkImportBackup(file){
   if(!file) return;
   const rd = new FileReader();
   rd.onload = () => {
-    let data;
-    try { data = JSON.parse(rd.result); } catch(e){ pkToast('ไฟล์ไม่ถูกต้อง — อ่าน JSON ไม่ได้', 'bad'); return; }
-    if(!data || data.app!=='RICHEST-STOCK' || data.kind!=='backup'){ pkToast('ไม่ใช่ไฟล์สำรองของระบบนี้', 'bad'); return; }
-    const inLog = Array.isArray(data.packingLog) ? data.packingLog : [];
-    const inFollow = (data.poFollow && typeof data.poFollow==='object') ? data.poFollow : {};
-    pkLoadLog(); poLoadFollow();
-    const curLog = (window.pkLog||[]).length, curFollow = Object.keys(window.poFollow||{}).length;
-    const msg = `โหลดข้อมูลกลับ:\n• Packing: ไฟล์มี ${inLog.length} รอบ (ปัจจุบัน ${curLog})\n• สถานะ PO: ไฟล์มี ${Object.keys(inFollow).length} รายการ (ปัจจุบัน ${curFollow})\n\nสำรองเมื่อ: ${data.exportedAt||'-'}\n\n"ตกลง" = แทนที่ข้อมูลปัจจุบันทั้งหมดด้วยไฟล์นี้`;
-    pkConfirm(msg, ()=>{
-      window.pkLog = inLog; window.poFollow = inFollow;
-      pkSaveLogStore(); poSaveFollow();
-      renderPkLog(); if(typeof renderLeadtime==='function'){ try{ renderLeadtime(); }catch(e){} }
-      pkToast(`โหลดข้อมูลกลับสำเร็จ — Packing ${inLog.length} รอบ · สถานะ PO ${Object.keys(inFollow).length} รายการ`, 'good');
-    });
+    let txt = rd.result || '';
+    if(txt.charCodeAt(0)===0xFEFF) txt = txt.slice(1);   // strip BOM
+    const trimmed = txt.trim();
+    // ตรวจชนิดไฟล์: JSON (ไฟล์สำรอง) หรือ CSV (Pattern ตู้เก่า)
+    const isJson = trimmed.startsWith('{') || /\.json$/i.test(file.name||'');
+    if(isJson){ pkImportJsonBackup(trimmed); }
+    else { pkImportOldCsv(txt); }
   };
   rd.onerror = () => pkToast('อ่านไฟล์ไม่สำเร็จ', 'bad');
   rd.readAsText(file);
+}
+function pkImportJsonBackup(str){
+  let data;
+  try { data = JSON.parse(str); } catch(e){ pkToast('ไฟล์ไม่ถูกต้อง — อ่าน JSON ไม่ได้', 'bad'); return; }
+  if(!data || data.app!=='RICHEST-STOCK' || data.kind!=='backup'){ pkToast('ไม่ใช่ไฟล์สำรองของระบบนี้', 'bad'); return; }
+  const inLog = Array.isArray(data.packingLog) ? data.packingLog : [];
+  const inFollow = (data.poFollow && typeof data.poFollow==='object') ? data.poFollow : {};
+  pkLoadLog(); poLoadFollow();
+  const curLog = (window.pkLog||[]).length, curFollow = Object.keys(window.poFollow||{}).length;
+  const msg = `โหลดข้อมูลกลับ:\n• Packing: ไฟล์มี ${inLog.length} รอบ (ปัจจุบัน ${curLog})\n• สถานะ PO: ไฟล์มี ${Object.keys(inFollow).length} รายการ (ปัจจุบัน ${curFollow})\n\nสำรองเมื่อ: ${data.exportedAt||'-'}\n\n"ตกลง" = แทนที่ข้อมูลปัจจุบันทั้งหมดด้วยไฟล์นี้`;
+  pkConfirm(msg, ()=>{
+    window.pkLog = inLog; window.poFollow = inFollow;
+    pkSaveLogStore(); poSaveFollow();
+    renderPkLog(); if(typeof renderLeadtime==='function'){ try{ renderLeadtime(); }catch(e){} }
+    pkToast(`โหลดข้อมูลกลับสำเร็จ — Packing ${inLog.length} รอบ · สถานะ PO ${Object.keys(inFollow).length} รายการ`, 'good');
+  });
+}
+
+// ---------- Import ตู้เก่าจาก Excel/CSV (Pattern) ----------
+// แยกบรรทัด CSV (รองรับ field ที่มี comma อยู่ในเครื่องหมายคำพูด)
+function pkParseCSVLine(line){
+  const out=[]; let cur='', q=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(q){
+      if(ch==='"'){ if(line[i+1]==='"'){ cur+='"'; i++; } else q=false; }
+      else cur+=ch;
+    } else {
+      if(ch==='"') q=true;
+      else if(ch===','){ out.push(cur); cur=''; }
+      else cur+=ch;
+    }
+  }
+  out.push(cur);
+  return out.map(s=>s.trim());
+}
+// จับคู่หัวคอลัมน์ → field ภายใน (ยืดหยุ่น ไทย/อังกฤษ)
+function pkClassifyHeader(hRaw){
+  const h=(hRaw||'').toLowerCase().replace(/\s+/g,'');
+  if(h.indexOf('คลัง')>=0 || h.indexOf('arrwh')>=0 || h.indexOf('warehouse')>=0) return 'arrWh';
+  if(h.indexOf('ถึงไทย')>=0 || h.indexOf('arrth')>=0 || h.indexOf('thai')>=0) return 'arrTH';
+  if(h.indexOf('เรือ')>=0 || h.indexOf('etd')>=0 || h.indexOf('sail')>=0 || h.indexOf('ออกเรือ')>=0) return 'eta';
+  if(h.indexOf('ปิด')>=0 || h.indexOf('cls')>=0 || h.indexOf('clos')>=0) return 'cls';
+  if(h.indexOf('load')>=0 || h.indexOf('โหลด')>=0) return 'load';
+  if(h.indexOf('ตู้')>=0 || h.indexOf('container')>=0 || h.indexOf('cont')>=0) return 'container';
+  if(h.indexOf('รหัส')>=0 || h.indexOf('item')>=0 || h.indexOf('sku')>=0) return 'item';
+  if(h.indexOf('rmb')>=0 || h.indexOf('ต้นทุน')>=0 || h.indexOf('ราคา')>=0 || h.indexOf('cost')>=0) return 'rmb';
+  if(h.indexOf('จำนวน')>=0 || h.indexOf('qty')>=0 || h.indexOf('pcs')>=0 || h.indexOf('ชิ้น')>=0) return 'qty';
+  if(h==='po' || h.indexOf('po')>=0) return 'po';
+  if(h.indexOf('เรท')>=0 || h.indexOf('fx')>=0 || h.indexOf('rate')>=0 || h.indexOf('exchange')>=0 || h.indexOf('หยวน')>=0) return 'fx';
+  if(h.indexOf('eta')>=0) return 'arrWh';
+  return null;
+}
+// แปลงวันที่ให้เป็น YYYY-MM-DD (รองรับ d/m/y, y-m-d, ปี พ.ศ.)
+function pkNormDate(v){
+  if(v==null) return '';
+  let s=String(v).trim(); if(!s || s==='-') return '';
+  let m=s.match(/^(\d{1,4})[\/\-.](\d{1,2})[\/\-.](\d{1,4})$/);
+  if(!m) return s;   // รูปแบบอื่น เก็บตามเดิม
+  let a=+m[1], b=+m[2], c=+m[3], y,mo,d;
+  if(m[1].length===4){ y=a; mo=b; d=c; }        // YYYY-MM-DD
+  else { d=a; mo=b; y=c; }                        // DD/MM/YYYY
+  if(y>2500) y-=543;                              // พ.ศ. → ค.ศ.
+  if(y<100) y+=2000;
+  const p=n=>String(n).padStart(2,'0');
+  return `${y}-${p(mo)}-${p(d)}`;
+}
+function pkImportOldCsv(text){
+  const rawLines = text.split(/\r\n|\r|\n/).filter(l=>l.trim().length);
+  if(rawLines.length<2){ pkToast('ไฟล์ CSV ว่าง หรือไม่มีข้อมูล', 'bad'); return; }
+  const header = pkParseCSVLine(rawLines[0]);
+  const colMap = {}; header.forEach((h,i)=>{ const k=pkClassifyHeader(h); if(k && colMap[k]===undefined) colMap[k]=i; });
+  if(colMap.container===undefined || colMap.item===undefined || colMap.qty===undefined){
+    pkToast('หัวคอลัมน์ไม่ครบ — ต้องมีอย่างน้อย: เลขตู้, รหัสสินค้า, จำนวน', 'bad'); return;
+  }
+  const get=(cells,k)=> (colMap[k]===undefined?'':(cells[colMap[k]]||'').trim());
+  const groups={}, order=[]; let skipped=0, badItem=[];
+  for(let r=1;r<rawLines.length;r++){
+    const cells=pkParseCSVLine(rawLines[r]);
+    const cont=get(cells,'container');
+    let item=get(cells,'item').toUpperCase();
+    const qty=Math.round(parseFloat((get(cells,'qty')||'0').replace(/,/g,''))||0);
+    if(!cont || !item){ skipped++; continue; }
+    if(!/^R-ENR-\d+/.test(item)){ badItem.push(item); }
+    if(!groups[cont]){ groups[cont]={name:cont, dates:{}, rows:[], fx:null}; order.push(cont); }
+    const g=groups[cont];
+    // วันที่: ใช้ค่าล่าสุดที่เจอในกลุ่ม
+    ['load','cls','eta','arrTH','arrWh'].forEach(dk=>{ const dv=pkNormDate(get(cells,dk)); if(dv) g.dates[dk]=dv; });
+    const fxv=parseFloat(get(cells,'fx')); if(!isNaN(fxv)&&fxv>0) g.fx=fxv;
+    g.rows.push({item, qty, po:get(cells,'po'), rmb: parseFloat((get(cells,'rmb')||'0').replace(/,/g,''))||0});
+  }
+  if(!order.length){ pkToast('ไม่พบข้อมูลตู้ที่อ่านได้', 'bad'); return; }
+  const defFx=pkFxVal()||5, CAP=pkCap();
+  const newRounds=order.map(cn=>{
+    const g=groups[cn]; const fx=g.fx||defFx;
+    let gp=0,gb=0,gc=0,gvr=0,gvt=0;
+    const rows=g.rows.map(o=>{
+      const d=pkItem(o.item)||{}; const cc=pkCell(o.item,o.qty);
+      const rmb=o.rmb||0, valRmb=o.qty*rmb, valThb=valRmb*fx;
+      gp+=o.qty; gb+=cc.boxes; gc+=cc.cbm; gvr+=valRmb; gvt+=valThb;
+      return {item:o.item, custom:false, desc:d.desc||'', L:d.L||0, W:d.W||0, H:d.H||0, pcsPerBox:d.pcs||0,
+        po:o.po||'', costIdx:null, lotMax:o.qty, costLot:'', rmb, thb:rmb*fx,
+        per:[{pcs:o.qty, lot:'', boxes:cc.boxes, cbm:cc.cbm, valRmb}],
+        pcs:o.qty, boxes:cc.boxes, cbm:cc.cbm, valRmb, valThb};
+    });
+    const tot={pcs:gp, boxes:gb, cbm:gc, valRmb:gvr, valThb:gvt};
+    const ts=(g.dates.arrWh||g.dates.eta||g.dates.load||'') ? ((g.dates.arrWh||g.dates.eta||g.dates.load)+' 12:00:00') : pkNowStr();
+    return {ts, mode:'released', cap:CAP, fx, imported:true,
+      containers:[{name:g.name, dates:g.dates, dateLog:[]}],
+      rows, contTotals:[tot], grand:{pcs:gp,boxes:gb,cbm:gc,valRmb:gvr,valThb:gvt}};
+  });
+  pkLoadLog();
+  const cur=(window.pkLog||[]).length;
+  const totItems=newRounds.reduce((s,r)=>s+r.rows.length,0);
+  const totVal=newRounds.reduce((s,r)=>s+r.grand.valThb,0);
+  let warn='';
+  if(badItem.length){ const u=[...new Set(badItem)].slice(0,5); warn+=`\n\n⚠️ รหัสสินค้าที่รูปแบบผิดปกติ (${badItem.length}): ${u.join(', ')}${badItem.length>5?' …':''}`; }
+  if(skipped) warn+=`\n⚠️ ข้ามแถวว่าง/ไม่ครบ ${skipped} แถว`;
+  const msg=`นำเข้าตู้เก่าจาก CSV:\n• ตู้ใหม่ ${newRounds.length} ตู้ · รวม ${totItems} รายการสินค้า\n• มูลค่ารวม ฿${Math.round(totVal).toLocaleString()}\n\nจะ "เพิ่ม" เข้าไปในประวัติ Packing เดิม (ปัจจุบัน ${cur} รอบ) โดยไม่ลบของเดิม${warn}\n\nกด "ตกลง" เพื่อนำเข้า`;
+  pkConfirm(msg, ()=>{
+    window.pkLog = (window.pkLog||[]).concat(newRounds);
+    pkSaveLogStore();
+    renderPkLog(); if(typeof renderLeadtime==='function'){ try{ renderLeadtime(); }catch(e){} }
+    if(typeof renderFlowchart==='function'){ try{ renderFlowchart(); }catch(e){} }
+    pkToast(`นำเข้าตู้เก่าสำเร็จ — เพิ่ม ${newRounds.length} ตู้ (${totItems} รายการ)`, 'good');
+  });
+}
+// ดาวน์โหลดไฟล์ Pattern (CSV) สำหรับกรอกข้อมูลตู้เก่า
+function pkDownloadTemplate(){
+  const headers=['เลขตู้','รหัสสินค้า','จำนวน(ชิ้น)','PO','ต้นทุน RMB/ชิ้น','เรทเงิน(บาท/หยวน)','วันที่ LOAD','วันปิดตู้','วันเรือออก','วันถึงไทย','ETA ถึงคลัง'];
+  const sample=[
+    ['CONT-320','R-ENR-000009','500','POA240001','1.90','5.05','2025-02-01','2025-02-05','2025-02-10','2025-03-01','2025-03-10'],
+    ['CONT-320','R-ENR-000012','300','POA240001','2.35','5.05','2025-02-01','2025-02-05','2025-02-10','2025-03-01','2025-03-10'],
+    ['CONT-321','R-ENR-000021','800','POA240007','0.85','5.05','2025-03-10','2025-03-14','2025-03-20','2025-04-05','2025-04-14']
+  ];
+  const esc=v=>{ v=String(v==null?'':v); return /[",\n]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v; };
+  const lines=[headers.map(esc).join(',')].concat(sample.map(r=>r.map(esc).join(',')));
+  const csv='﻿'+lines.join('\r\n');   // BOM เพื่อให้ Excel เปิดภาษาไทยถูก
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='pattern-import-ตู้เก่า.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+  pkToast('ดาวน์โหลด Pattern แล้ว — กรอกใน Excel แล้ว Save As CSV UTF-8 → Import', 'good');
 }
 
 // สร้างสแนปช็อตของการจัดตู้รอบปัจจุบัน
@@ -10100,6 +10239,7 @@ document.getElementById('pk-setdir').onclick = pkSetDir;
 document.getElementById('pk-export').onclick = pkExportBackup;
 document.getElementById('pk-dimexport').onclick = pkDimEditExport;
 document.getElementById('pk-import').onclick = ()=>document.getElementById('pk-importfile').click();
+{ const _pt=document.getElementById('pk-template'); if(_pt) _pt.onclick = pkDownloadTemplate; }
 document.getElementById('pk-importfile').onchange = function(){ pkImportBackup(this.files[0]); this.value=''; };
 pkLoadLog(); pkLoadDraft(); pkRestoreDir(); pkDimEditLoad();   // กู้แบบร่างการจัดตู้ + ขนาดที่แก้ไว้ (ถ้ามี)
 document.getElementById('s-type').onchange = ()=>{ populateSearchItems(); renderSearch(); };
