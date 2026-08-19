@@ -8565,7 +8565,7 @@ function pkImportOldCsv(text){
     let item=get(cells,'item').toUpperCase();
     const qty=Math.round(parseFloat((get(cells,'qty')||'0').replace(/,/g,''))||0);
     if(!cont || !item){ skipped++; continue; }
-    if(!/^R-ENR-\d+/.test(item)){ badItem.push(item); }
+    if(!/^R-[A-Z]+-\d+/i.test(item)){ badItem.push(item); }   // รับทุก prefix (R-ENR/R-PWM/R-OTH/R-ENL ฯลฯ)
     if(!groups[cont]){ groups[cont]={name:cont, dates:{}, rows:[], fx:null}; order.push(cont); }
     const g=groups[cont];
     // วันที่: ใช้ค่าล่าสุดที่เจอในกลุ่ม
