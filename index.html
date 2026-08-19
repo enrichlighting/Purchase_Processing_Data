@@ -8933,7 +8933,8 @@ function invExport(idx, ci){
   ci=ci||0; const cont=(s.containers||[])[ci]||{};
   const items=[], venCount={};
   (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; const q=per?(+per.pcs||0):0; if(q<=0) return;
-    items.push({no:r.item, name:invItemName(r.item), L:r.L, W:r.W, H:r.H, qty:q, pcsBox:r.pcsPerBox, ctns:(per&&per.boxes)||0, rmb:r.rmb, lot:(per&&per.lot)||r.costLot||''});
+    const enName=(typeof flowItemDesc2==='function'?flowItemDesc2(r.item):'')||invItemName(r.item);   // Detail = Description2 (ชื่ออังกฤษ) · fallback ชื่อเดิมถ้ายังไม่มี
+    items.push({no:r.item, name:enName, L:r.L, W:r.W, H:r.H, qty:q, pcsBox:r.pcsPerBox, ctns:(per&&per.boxes)||0, rmb:r.rmb, lot:(per&&per.lot)||r.costLot||''});
     const v=invPoVendor(r.po); if(v) venCount[v]=(venCount[v]||0)+1;
   });
   if(!items.length){ pkToast('ตู้นี้ไม่มีรายการสินค้า','bad'); return; }
