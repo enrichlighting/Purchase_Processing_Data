@@ -9890,6 +9890,25 @@ function flowToggleVF(){ window.flowHideVF=!window.flowHideVF; try{ localStorage
 function flowToggleCode(){ window.flowShowCode=!window.flowShowCode; try{ localStorage.setItem('flowShowCodeV1', window.flowShowCode?'1':'0'); }catch(e){} renderFlowchart(); }
 function flowToggleDesc2(){ window.flowShowDesc2=!window.flowShowDesc2; try{ localStorage.setItem('flowShowDesc2V1', window.flowShowDesc2?'1':'0'); }catch(e){} renderFlowchart(); }
 function flowToggleDG(){ window.flowDGOnly=!window.flowDGOnly; renderFlowchart(); }
+function flowToggleColMenu(){ window.flowColMenuOpen=!window.flowColMenuOpen; renderFlowchart(); }
+// dropdown เลือกซ่อน/แสดงคอลัมน์ (หลายรายการ) — ต่อยอดเพิ่มคอลัมน์ได้ที่ list นี้
+function flowColMenuHtml(){
+  const items=[
+    {on:!window.flowHidePrice, fn:'flowTogglePrice()', label:'ราคา'},
+    {on:!window.flowHideVF,    fn:'flowToggleVF()',    label:'Vendor / Factory'},
+    {on:window.flowShowCode,   fn:'flowToggleCode()',  label:'รหัสสินค้า'},
+    {on:window.flowShowDesc2,  fn:'flowToggleDesc2()', label:'ชื่อ/สเปก (EN)'},
+  ];
+  const hidden=items.filter(i=>!i.on).length;
+  const rows=items.map(i=>`<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:12.5px;cursor:pointer;border-radius:6px;" onmouseover="this.style.background='var(--brand-soft)'" onmouseout="this.style.background='transparent'"><input type="checkbox" ${i.on?'checked':''} onchange="${i.fn}" style="cursor:pointer;width:15px;height:15px;"> ${i.label}</label>`).join('');
+  return `<div style="position:relative;display:inline-block;">
+    <button onclick="flowToggleColMenu()" title="เลือกซ่อน/แสดงคอลัมน์ (เลือกได้หลายรายการ)" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #0891b2;background:${window.flowColMenuOpen?'#0891b2':'var(--card)'};color:${window.flowColMenuOpen?'#fff':'#0891b2'};">👁️ ซ่อน/แสดงคอลัมน์${hidden?` (ซ่อน ${hidden})`:''} ▾</button>
+    ${window.flowColMenuOpen?`<div style="position:absolute;top:100%;left:0;margin-top:5px;background:var(--card);border:1px solid var(--line);border-radius:9px;box-shadow:0 6px 18px rgba(0,0,0,.16);padding:6px;z-index:50;min-width:210px;">
+      <div style="font-size:10.5px;font-weight:700;color:var(--muted);padding:3px 8px 5px;">ติ๊กเพื่อแสดง · เอาติ๊กออกเพื่อซ่อน</div>
+      ${rows}
+    </div>`:''}
+  </div>`;
+}
 // Description2 จาก BC_ITEMS (Automate) — รับหลายชื่อฟิลด์เผื่อรูปแบบต่างกัน · แคชเป็น map (สร้างใหม่ทุกเรนเดอร์)
 function flowItemDesc2(no){
   let m=window._bcDesc2Map;
@@ -10354,10 +10373,7 @@ function renderFlowchart(){
     <span style="width:1px;height:20px;background:var(--line);"></span>
     <button onclick="flowSort('default')" title="เรียง: ควรสั่งซื้อขึ้นก่อน แล้วยอดขายมาก→น้อย" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--brand);background:${isDefaultSort?'var(--brand)':'var(--card)'};color:${isDefaultSort?'#fff':'var(--brand)'};">🎯 เรียงตามความจำเป็น</button>
     <button onclick="flowToggleMon()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #ea580c;background:${window.flowMonExpand?'#ea580c':'var(--card)'};color:${window.flowMonExpand?'#fff':'#ea580c'};">${window.flowMonExpand?'🔽 ย่อยอดขายเป็นรายปี':'▶️ กางยอดขายรายเดือน (คอลัมน์)'}</button>
-    <button onclick="flowTogglePrice()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #0891b2;background:${window.flowHidePrice?'#0891b2':'var(--card)'};color:${window.flowHidePrice?'#fff':'#0891b2'};">${window.flowHidePrice?'👁️ แสดงราคา':'🙈 ซ่อนราคา'}</button>
-    <button onclick="flowToggleVF()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #7c3aed;background:${window.flowHideVF?'#7c3aed':'var(--card)'};color:${window.flowHideVF?'#fff':'#7c3aed'};">${window.flowHideVF?'👁️ แสดง Vendor/Factory':'🙈 ซ่อน Vendor/Factory'}</button>
-    <button onclick="flowToggleCode()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #0d9488;background:${window.flowShowCode?'#0d9488':'var(--card)'};color:${window.flowShowCode?'#fff':'#0d9488'};">${window.flowShowCode?'🙈 ซ่อนรหัสสินค้า':'🔖 แสดงรหัสสินค้า'}</button>
-    <button onclick="flowToggleDesc2()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #4f46e5;background:${window.flowShowDesc2?'#4f46e5':'var(--card)'};color:${window.flowShowDesc2?'#fff':'#4f46e5'};">${window.flowShowDesc2?'🙈 ซ่อนชื่อ/สเปก (EN)':'🏷️ แสดงชื่อ/สเปก (EN)'}</button>
+    ${flowColMenuHtml()}
     <button onclick="flowToggleDG()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid #b45309;background:${window.flowDGOnly?'#b45309':'var(--card)'};color:${window.flowDGOnly?'#fff':'#b45309'};">${window.flowDGOnly?'⚠️ แสดงทุกสินค้า':'⚠️ เฉพาะ DG'}</button>
     <span class="muted" style="font-size:11px;">คลิกหัวคอลัมน์เพื่อเรียงมาก↔น้อย · ค่าเริ่มต้น: ควรสั่งซื้อขึ้นก่อน แล้วยอดขายมากสุดในหมวด</span>
   </div>`;
