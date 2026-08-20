@@ -236,6 +236,7 @@
     <div class="tab" data-tab="leadtime" title="ต้องรีบสั่ง &amp; วางแผน Lead Time">🚨</div>
     <div class="tab" data-tab="search" title="ค้นหาสต๊อก &amp; รายการสินค้า">🔎</div>
     <div class="tab" data-tab="packing" title="Packing List">📦 Packing List</div>
+    <div class="tab" data-tab="payment" title="Payment — อัพเดทการโอนเงินรายเดือน">💰 Payment</div>
   </div>
 
   <!-- ============ PAGE: FLOWCHART ============ -->
@@ -349,6 +350,19 @@
         <span class="muted" id="pk-backupstatus" style="font-size:12px;">Import รับได้ 2 แบบ: ไฟล์สำรอง (.json = แทนที่ทั้งหมด) หรือ Pattern ตู้เก่า (.csv = เพิ่มเข้าไป)</span>
       </div>
       <div id="pk-log"></div>
+    </div>
+  </div>
+
+  <!-- ============ PAGE: PAYMENT ============ -->
+  <div class="page" id="page-payment">
+    <div class="card">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-size:16px;font-weight:800;">
+        <span>📅 อัพเดท Payment ประจำเดือน</span>
+        <select id="pay-month" onchange="renderPayment()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;"></select>
+        <span>ปี</span>
+        <select id="pay-year" onchange="renderPayment()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;"></select>
+      </div>
+      <div id="pay-body"></div>
     </div>
   </div>
 
@@ -10441,11 +10455,79 @@ function renderFlowchart(){
   flowBindScroll();
   flowRestoreScroll();          // คืนตำแหน่งเลื่อนเดิม (ไม่เด้งขึ้นบนสุด)
 }
+/* ============ หน้า Payment (อัพเดทการโอนเงินรายเดือน) ============ */
+const PAY_MONTHS_TH=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const PAY_HOLIDAYS=new Set([   // วันหยุดธนาคาร/นักขัตฤกษ์ (รูปแบบ 'YYYY-MM-DD') — เพิ่มได้ภายหลัง
+]);
+function payIsHoliday(y,m,d){ const w=new Date(y,m-1,d).getDay(); if(w===0||w===6) return true; return PAY_HOLIDAYS.has(y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0')); }
+// สัปดาห์ของเดือน: Week1 เริ่มวันที่ 1 (ถ้าเป็นวันหยุด/เสาร์-อาทิตย์ → เลื่อนวันถัดไป) · ทุกวีคจบวันอาทิตย์ · วีคสุดท้ายจบสิ้นเดือน
+function payWeeks(y,m){
+  const dim=new Date(y,m,0).getDate(); const dow=d=>new Date(y,m-1,d).getDay();
+  let ws=1; while(ws<=dim && payIsHoliday(y,m,ws)) ws++; if(ws>dim) ws=1;
+  const weeks=[]; while(ws<=dim){ let we=ws; while(we<dim && dow(we)!==0) we++; weeks.push({start:ws,end:we}); ws=we+1; }
+  return weeks;
+}
+function payFillSelectors(){
+  const ms=document.getElementById('pay-month'), ys=document.getElementById('pay-year');
+  if(ms && !ms.options.length){ ms.innerHTML=PAY_MONTHS_TH.map((n,i)=>`<option value="${i+1}">${n}</option>`).join(''); ms.value=(APP_TODAY.getMonth()+1); }
+  if(ys && !ys.options.length){ const beNow=APP_TODAY.getFullYear()+543; let o=''; for(let yy=beNow-2;yy<=beNow+3;yy++) o+=`<option value="${yy}">${yy}</option>`; ys.innerHTML=o; ys.value=beNow; }
+}
+function payCalendarHtml(y,m){
+  const dim=new Date(y,m,0).getDate(); const lead=(new Date(y,m-1,1).getDay()+6)%7;   // Mon=0
+  const dn=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']; const T=APP_TODAY;
+  let cells=dn.map((d,i)=>`<div style="text-align:center;font-weight:800;font-size:12px;color:${i>=5?'#dc2626':'var(--muted)'};padding:2px 0;">${d}</div>`).join('');
+  for(let i=0;i<lead;i++) cells+='<div></div>';
+  for(let d=1;d<=dim;d++){ const wd=new Date(y,m-1,d).getDay(); const wknd=(wd===0||wd===6);
+    const isToday=(y===T.getFullYear() && m===T.getMonth()+1 && d===T.getDate());
+    cells+=`<div style="display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:${isToday?'800':'600'};border-radius:8px;${isToday?'background:var(--brand);color:#fff;':(wknd?'color:#dc2626;':'color:var(--ink);')}">${d}</div>`;
+  }
+  return `<div style="flex:0 0 auto;width:14cm;height:14cm;box-sizing:border-box;border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:var(--card);display:flex;flex-direction:column;">
+    <div style="text-align:center;font-weight:800;font-size:22px;letter-spacing:1px;margin-bottom:8px;text-transform:uppercase;">${PAY_MONTHS_TH[m-1]} ${y+543}</div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;gap:3px;flex:1;">${cells}</div>
+  </div>`;
+}
+function renderPayment(){
+  const el=document.getElementById('pay-body'); if(!el) return;
+  payFillSelectors();
+  const m=+document.getElementById('pay-month').value || (APP_TODAY.getMonth()+1);
+  const be=+document.getElementById('pay-year').value || (APP_TODAY.getFullYear()+543);
+  const y=be-543; const weeks=payWeeks(y,m);
+  const LEFT=['WEEK','วันที่โอน','SUPPLIER (VENDOR+FACTORY)','TERM','Loading date','CT NO.','AMOUNT','TOTAL AMOUNT (SUPPLIER - RMB)','TOTAL AMOUNT (SUPPLIER - BAHT)'];
+  const RIGHT=['TOTAL AMOUNT (1-15)','TOTAL AMOUNT (16-31)','บัญชี CF','SUPPLIER CF','BANK SLIP'];
+  const bTh='border:1px solid var(--line);padding:6px 8px;white-space:nowrap;background:var(--brand-soft);text-align:center;font-size:11.5px;';
+  const bTd='border:1px solid var(--line);height:28px;min-width:96px;';
+  const gapTh='<th style="background:var(--bg);border:none;width:14px;min-width:14px;"></th>';
+  const gapTd='<td style="background:var(--bg);border:none;width:14px;min-width:14px;"></td>';
+  const head='<tr>'+LEFT.map(h=>`<th style="${bTh}">${h}</th>`).join('')+gapTh
+    + weeks.map((w,i)=>`<th style="${bTh}">WEEK ${i+1}<br><span style="font-weight:400;font-size:10px;">(${w.start}-${w.end})</span></th>`).join('')
+    + gapTh + RIGHT.map(h=>`<th style="${bTh}">${h}</th>`).join('')+'</tr>';
+  const ROWS_PER_WEEK=5; let body='';
+  weeks.forEach((w,wi)=>{ for(let r=0;r<ROWS_PER_WEEK;r++){ body+='<tr>';
+    if(r===0) body+=`<td rowspan="${ROWS_PER_WEEK}" style="border:1px solid var(--line);font-weight:800;background:var(--brand-soft);white-space:nowrap;text-align:center;padding:4px 8px;">WEEK ${wi+1}<div class="muted" style="font-weight:400;font-size:10px;">(${w.start}-${w.end})</div></td>`;
+    for(let c=1;c<LEFT.length;c++) body+=`<td style="${bTd}"></td>`;
+    body+=gapTd; for(let i=0;i<weeks.length;i++) body+=`<td style="${bTd}"></td>`;
+    body+=gapTd; for(let i=0;i<RIGHT.length;i++) body+=`<td style="${bTd}"></td>`;
+    body+='</tr>'; } });
+  const totals=`<div style="margin-top:14px;display:inline-block;border:1px solid var(--line);border-radius:10px;overflow:hidden;">
+    <table style="margin:0;font-size:13px;border-collapse:collapse;">
+      <tr><td style="text-align:right;font-weight:800;padding:8px 14px;border:1px solid var(--line);">TOTAL (RMB)</td><td style="text-align:right;padding:8px 14px;border:1px solid var(--line);background:#fee2e2;color:#111;">¥ <b id="pay-tot-rmb">0.00</b></td><td style="text-align:right;font-weight:700;padding:8px 14px;border:1px solid var(--line);">BAHT</td><td style="text-align:right;padding:8px 14px;border:1px solid var(--line);">฿<b id="pay-tot-rmb-baht">0.00</b></td></tr>
+      <tr><td style="text-align:right;font-weight:800;padding:8px 14px;border:1px solid var(--line);">TOTAL (USD)</td><td style="text-align:right;padding:8px 14px;border:1px solid var(--line);background:#fef9c3;color:#111;">$ <b id="pay-tot-usd">0.00</b></td><td style="text-align:right;font-weight:700;padding:8px 14px;border:1px solid var(--line);">BAHT</td><td style="text-align:right;padding:8px 14px;border:1px solid var(--line);">฿<b id="pay-tot-usd-baht">0.00</b></td></tr>
+      <tr><td colspan="2" style="border:none;"></td><td style="text-align:right;font-weight:800;padding:8px 14px;border:1px solid var(--line);background:#cffafe;color:#111;">TOTAL BAHT</td><td style="text-align:right;padding:8px 14px;border:1px solid var(--line);background:#cffafe;color:#111;">฿<b id="pay-tot-baht">0.00</b></td></tr>
+    </table></div>`;
+  el.innerHTML=`<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+    <div style="flex:1;min-width:0;overflow-x:auto;">
+      <table style="border-collapse:collapse;font-size:12px;">${head}${body}</table>
+      ${totals}
+    </div>
+    ${payCalendarHtml(y,m)}
+  </div>`;
+}
 function renderTab(tab){
   if(tab==='flowchart'){ if(typeof poLoadFollow==='function') poLoadFollow(); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderFlowchart(); }
   else if(tab==='search'){ renderSearch(); renderItemList(); }   // หน้าค้นหารวมรายการสินค้าแล้ว
   else if(tab==='leadtime'){ poLoadFollow(); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderUrgent(); renderLeadtime(); renderPoFollow(); renderArrivedMatrix(); }
   else if(tab==='packing'){ renderPacking(); pkLoadLog(); renderPkLog(); }
+  else if(tab==='payment'){ renderPayment(); }
   window.tabRendered[tab]=true;
 }
 document.querySelectorAll('.tab').forEach(t=>{
