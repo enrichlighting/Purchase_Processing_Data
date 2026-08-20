@@ -10563,6 +10563,28 @@ function payEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/<
 function payThaiDate(s){ const m=String(s||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!m) return payEsc(s||'-'); return `${+m[3]}/${+m[2]}/${(+m[1])+543}`; }
 function payVendorForFactory(item, factory){ const lt=(window.BC_LEADTIME&&window.BC_LEADTIME[item]); if(lt&&Array.isArray(lt.opts)){ const o=lt.opts.find(x=>((x&&x.f)||'')===factory); if(o&&o.v) return o.v; } return ''; }
 function payCreditTerm(vendor, factory){ const C=window.BC_CREDITTERM||{}; if(C.pair&&C.pair[vendor+'|'+factory]) return C.pair[vendor+'|'+factory]; if(C.vendor&&C.vendor[vendor]) return C.vendor[vendor]; return ''; }
+// วันที่โอน คำนวณจาก Term + Loading date
+function payDkey(dt){ return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+function payAddBusinessDays(y,m,d,n){   // +n วันทำการ (ข้ามเสาร์อาทิตย์/วันหยุดธนาคาร ไม่นับ)
+  let dt=new Date(y,m-1,d), added=0;
+  while(added<n){ dt.setDate(dt.getDate()+1); if(!payIsHoliday(dt.getFullYear(),dt.getMonth()+1,dt.getDate())) added++; }
+  return dt;
+}
+function payNextPayDay(y,m,d){   // จ่ายทุกวันที่ 5/15/25 · เริ่มนับจาก LOAD · ถ้าห่าง ≤5 วัน เลื่อนไปงวดถัดไป · แล้วเลื่อนพ้นวันหยุด
+  const load=new Date(y,m-1,d); const cands=[];
+  for(let k=0;k<4;k++){ const idx=m-1+k, yy=y+Math.floor(idx/12), mo=idx%12; [5,15,25].forEach(day=>cands.push(new Date(yy,mo,day))); }
+  cands.sort((a,b)=>a-b);
+  for(const c of cands){ const gap=Math.round((c-load)/86400000); if(gap>5){ let dt=new Date(c); while(payIsHoliday(dt.getFullYear(),dt.getMonth()+1,dt.getDate())) dt.setDate(dt.getDate()+1); return dt; } }
+  return null;
+}
+function payTransferDate(term, loadStr){
+  const mm=String(loadStr||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!mm) return ''; const y=+mm[1],m=+mm[2],d=+mm[3]; const t=String(term||'');
+  let dt=null;
+  if(/5\s*,\s*15\s*,\s*25/.test(t) || /pay every/i.test(t)) dt=payNextPayDay(y,m,d);
+  else if(/45\s*days?\s*after\s*shipment/i.test(t)) dt=payAddBusinessDays(y,m,d,45);
+  else return '';
+  return dt?payDkey(dt):'';
+}
 // ดึงจากประวัติ Packing (pkLog): เฉพาะสินค้าที่กรอก Factory · group ตาม (ตู้ × factory) = 1 แถว
 function payRowsData(){
   pkLoadLog(); const out=[];
@@ -10572,8 +10594,8 @@ function payRowsData(){
         const g=groups[f]||(groups[f]={factory:f, vendor:payVendorForFactory(r.item,f)||'', rmb:0});
         g.rmb+=(+per.valRmb||0); if(!g.vendor){ const v=payVendorForFactory(r.item,f); if(v) g.vendor=v; }
       });
-      Object.keys(groups).forEach(f=>{ const g=groups[f];
-        out.push({cont:ct.name||('ตู้'+(ci+1)), load:(ct.dates&&ct.dates.load)||'', factory:g.factory, vendor:g.vendor||'(ไม่ทราบ vendor)', term:payCreditTerm(g.vendor,g.factory), amtRmb:g.rmb});
+      Object.keys(groups).forEach(f=>{ const g=groups[f]; const load=(ct.dates&&ct.dates.load)||''; const term=payCreditTerm(g.vendor,g.factory);
+        out.push({cont:ct.name||('ตู้'+(ci+1)), load, factory:g.factory, vendor:g.vendor||'(ไม่ทราบ vendor)', term, amtRmb:g.rmb, xfer:payTransferDate(term,load)});
       });
     });
   });
@@ -10595,22 +10617,27 @@ function renderPayment(){
     + weeks.map((w,i)=>`<th style="${bTh}">WEEK ${i+1}<br><span style="font-weight:400;font-size:10px;">(${w.start}-${w.end})</span></th>`).join('')
     + gapTh + RIGHT.map(h=>`<th style="${bTh}">${h}</th>`).join('')+'</tr>';
   const totCols=LEFT.length+1+weeks.length+1+RIGHT.length;
-  // ---- data rows จาก Packing (จัดเข้าวีคตาม Loading date · จนกว่าจะผูกวันที่โอน) ----
+  // ---- data rows จาก Packing (จัดเข้าวีคตาม "วันที่โอน" ที่คำนวณจาก Term) ----
   const data=payRowsData();
   const f2=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const venTot={}; data.forEach(r=> venTot[r.vendor]=(venTot[r.vendor]||0)+r.amtRmb);
-  const grand=data.reduce((a,r)=>a+r.amtRmb,0);
-  function wkIndex(loadStr){ const mm=String(loadStr||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!mm) return -1; if(+mm[1]!==y || +mm[2]!==m) return -1; const d=+mm[3];
-    for(let i=0;i<weeks.length;i++){ if(d>=weeks[i].start && d<=weeks[i].end) return i; if(d>weeks[i].end && (i+1>=weeks.length || d<weeks[i+1].start)) return i; } return -1; }
+  function wkIndex(dstr){ const mm=String(dstr||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!mm) return -2; if(+mm[1]!==y || +mm[2]!==m) return -2; const d=+mm[3];
+    for(let i=0;i<weeks.length;i++){ if(d>=weeks[i].start && d<=weeks[i].end) return i; if(d>weeks[i].end && (i+1>=weeks.length || d<weeks[i+1].start)) return i; } return -2; }
+  const inMonth=(dstr)=>{ const mm=String(dstr||'').match(/^(\d{4})-(\d{1,2})/); return mm && +mm[1]===y && +mm[2]===m; };
   const byWeek=weeks.map(()=>[]), other=[];
-  data.forEach(r=>{ const wi=wkIndex(r.load); if(wi>=0) byWeek[wi].push(r); else other.push(r); });
+  data.forEach(r=>{
+    if(r.xfer){ const wi=wkIndex(r.xfer); if(wi>=0) byWeek[wi].push(r); /* วันโอนอยู่เดือนอื่น → ไปแสดงในเดือนนั้น */ }
+    else if(inMonth(r.load)) other.push(r);   // Term ยังคำนวณวันโอนไม่ได้ → กองไว้ "อื่นๆ" (อิงเดือน load)
+  });
+  const shown=byWeek.reduce((a,x)=>a.concat(x),[]).concat(other);
+  const venTot={}; shown.forEach(r=> venTot[r.vendor]=(venTot[r.vendor]||0)+r.amtRmb);
+  const grand=shown.reduce((a,r)=>a+r.amtRmb,0);
   const bySort=(a,b)=> String(a.vendor).localeCompare(String(b.vendor)) || String(a.cont).localeCompare(String(b.cont));
   byWeek.forEach(a=>a.sort(bySort)); other.sort(bySort);
   let prevVen=null;
   function restCells(r){   // เซลล์หลังคอลัมน์ WEEK (r=null = แถวว่างสำรอง)
     let c;
     if(r){ const firstVen=(r.vendor!==prevVen); prevVen=r.vendor;
-      c=`<td style="${bTd}"></td>`
+      c=`<td style="${bTd}text-align:center;white-space:nowrap;font-weight:700;color:#b45309;">${r.xfer?payThaiDate(r.xfer):'<span style="color:var(--muted);font-weight:400;">-</span>'}</td>`
        + `<td style="${bTd}text-align:left;white-space:normal;"><b>${payEsc(r.vendor)}</b><div style="font-size:10.5px;color:var(--muted);">${payEsc(r.factory)}</div></td>`
        + `<td style="${bTd}text-align:left;white-space:normal;font-size:11px;line-height:1.3;min-width:150px;">${payEsc(r.term)||'<span style="color:var(--muted);">-</span>'}</td>`
        + `<td style="${bTd}text-align:center;white-space:nowrap;">${payThaiDate(r.load)}</td>`
