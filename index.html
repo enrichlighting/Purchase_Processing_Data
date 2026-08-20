@@ -10595,27 +10595,41 @@ function renderPayment(){
     + weeks.map((w,i)=>`<th style="${bTh}">WEEK ${i+1}<br><span style="font-weight:400;font-size:10px;">(${w.start}-${w.end})</span></th>`).join('')
     + gapTh + RIGHT.map(h=>`<th style="${bTh}">${h}</th>`).join('')+'</tr>';
   const totCols=LEFT.length+1+weeks.length+1+RIGHT.length;
-  // ---- data rows จาก Packing ----
+  // ---- data rows จาก Packing (จัดเข้าวีคตาม Loading date · จนกว่าจะผูกวันที่โอน) ----
   const data=payRowsData();
-  data.sort((a,b)=> String(a.vendor).localeCompare(String(b.vendor)) || String(a.cont).localeCompare(String(b.cont)));
-  const venTot={}; data.forEach(r=> venTot[r.vendor]=(venTot[r.vendor]||0)+r.amtRmb);
   const f2=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  let body='', prevVen=null, grand=0;
-  if(!data.length){ body=`<tr><td colspan="${totCols}" style="border:1px solid var(--line);text-align:center;padding:16px;color:var(--muted);">ยังไม่มีตู้ที่กรอก Factory ในประวัติ Packing List — ไปกรอก Factory (โหมด Released) แล้วบันทึกก่อน</td></tr>`; }
-  else data.forEach(r=>{ const firstVen=(r.vendor!==prevVen); prevVen=r.vendor; grand+=r.amtRmb;
-    body+='<tr>'
-      + `<td style="${bTd}"></td><td style="${bTd}"></td>`
-      + `<td style="${bTd}text-align:left;white-space:normal;"><b>${payEsc(r.vendor)}</b><div style="font-size:10.5px;color:var(--muted);">${payEsc(r.factory)}</div></td>`
-      + `<td style="${bTd}text-align:left;white-space:normal;font-size:11px;line-height:1.3;min-width:150px;">${payEsc(r.term)||'<span style="color:var(--muted);">-</span>'}</td>`
-      + `<td style="${bTd}text-align:center;white-space:nowrap;">${payThaiDate(r.load)}</td>`
-      + `<td style="${bTd}text-align:center;white-space:nowrap;">${payEsc(r.cont)}</td>`
-      + `<td style="${bTd}text-align:right;white-space:nowrap;">¥${f2(r.amtRmb)}</td>`
-      + `<td style="${bTd}text-align:right;white-space:nowrap;font-weight:700;">${firstVen?('¥'+f2(venTot[r.vendor])):''}</td>`
-      + `<td style="${bTd}text-align:right;white-space:nowrap;font-weight:700;">${firstVen?('฿'+f2(venTot[r.vendor]*fx)):''}</td>`
-      + gapTd + weeks.map(()=>`<td style="${bTd}"></td>`).join('')
-      + gapTd + RIGHT.map(()=>`<td style="${bTd}"></td>`).join('')
-      + '</tr>';
+  const venTot={}; data.forEach(r=> venTot[r.vendor]=(venTot[r.vendor]||0)+r.amtRmb);
+  const grand=data.reduce((a,r)=>a+r.amtRmb,0);
+  function wkIndex(loadStr){ const mm=String(loadStr||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!mm) return -1; if(+mm[1]!==y || +mm[2]!==m) return -1; const d=+mm[3];
+    for(let i=0;i<weeks.length;i++){ if(d>=weeks[i].start && d<=weeks[i].end) return i; if(d>weeks[i].end && (i+1>=weeks.length || d<weeks[i+1].start)) return i; } return -1; }
+  const byWeek=weeks.map(()=>[]), other=[];
+  data.forEach(r=>{ const wi=wkIndex(r.load); if(wi>=0) byWeek[wi].push(r); else other.push(r); });
+  const bySort=(a,b)=> String(a.vendor).localeCompare(String(b.vendor)) || String(a.cont).localeCompare(String(b.cont));
+  byWeek.forEach(a=>a.sort(bySort)); other.sort(bySort);
+  let prevVen=null;
+  function restCells(r){   // เซลล์หลังคอลัมน์ WEEK (r=null = แถวว่างสำรอง)
+    let c;
+    if(r){ const firstVen=(r.vendor!==prevVen); prevVen=r.vendor;
+      c=`<td style="${bTd}"></td>`
+       + `<td style="${bTd}text-align:left;white-space:normal;"><b>${payEsc(r.vendor)}</b><div style="font-size:10.5px;color:var(--muted);">${payEsc(r.factory)}</div></td>`
+       + `<td style="${bTd}text-align:left;white-space:normal;font-size:11px;line-height:1.3;min-width:150px;">${payEsc(r.term)||'<span style="color:var(--muted);">-</span>'}</td>`
+       + `<td style="${bTd}text-align:center;white-space:nowrap;">${payThaiDate(r.load)}</td>`
+       + `<td style="${bTd}text-align:center;white-space:nowrap;">${payEsc(r.cont)}</td>`
+       + `<td style="${bTd}text-align:right;white-space:nowrap;">¥${f2(r.amtRmb)}</td>`
+       + `<td style="${bTd}text-align:right;white-space:nowrap;font-weight:700;">${firstVen?('¥'+f2(venTot[r.vendor])):''}</td>`
+       + `<td style="${bTd}text-align:right;white-space:nowrap;font-weight:700;">${firstVen?('฿'+f2(venTot[r.vendor]*fx)):''}</td>`;
+    } else { c=`<td style="${bTd}"></td>`.repeat(8); }
+    return c + gapTd + weeks.map(()=>`<td style="${bTd}"></td>`).join('') + gapTd + RIGHT.map(()=>`<td style="${bTd}"></td>`).join('');
+  }
+  const wkLabel=(no,rng,n)=>`<td rowspan="${n}" style="border:1px solid var(--line);font-weight:800;background:var(--brand-soft);text-align:center;white-space:nowrap;padding:4px 8px;">WEEK ${no}<div class="muted" style="font-weight:400;font-size:10px;">${rng}</div></td>`;
+  let body='';
+  weeks.forEach((w,wi)=>{ const rows=byWeek[wi]; const n=Math.max(1,rows.length);
+    if(!rows.length){ body+='<tr>'+wkLabel(wi+1,'('+w.start+'-'+w.end+')',1)+restCells(null)+'</tr>'; }
+    else rows.forEach((r,ri)=>{ body+='<tr>'+(ri===0?wkLabel(wi+1,'('+w.start+'-'+w.end+')',n):'')+restCells(r)+'</tr>'; });
   });
+  if(other.length){ const n=other.length;
+    other.forEach((r,ri)=>{ body+='<tr>'+(ri===0?`<td rowspan="${n}" style="border:1px solid var(--line);font-weight:800;background:#fee2e2;text-align:center;white-space:nowrap;padding:4px 8px;color:#991b1b;">อื่นๆ<div style="font-weight:400;font-size:9px;">นอกเดือน/ยังไม่กำหนด</div></td>`:'')+restCells(r)+'</tr>'; });
+  }
   const tdT='text-align:right;padding:8px 14px;border:1px solid var(--line);';
   const totals=`<div style="margin-top:14px;display:inline-block;border:1px solid var(--line);border-radius:10px;overflow:hidden;">
     <table style="margin:0;font-size:15px;border-collapse:collapse;">
