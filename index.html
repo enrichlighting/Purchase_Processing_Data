@@ -8056,7 +8056,7 @@ function pkShortName(desc, model){
   return parts.filter(Boolean).join(' ').trim() || mdl || s;
 }
 // ชื่อย่อที่กำหนดเอง (override รายสินค้า) — ใช้ทับชื่อที่ระบบตัดอัตโนมัติ
-const NAME_OVERRIDE={'R-ENR-000523':'ขั้วหลอด MR16 (GU5.3)','R-ENR-000017':'Lucky 45w 3 colors','R-SAMPLE-0017':'SAMPLE PCR 7w','R-SAMPLE-0018':'SAMPLE PCR 9w','R-SAMPLE-0019':'SAMPLE PCR 12w'};
+const NAME_OVERRIDE={'R-ENR-000523':'ขั้วหลอด MR16 (GU5.3)','R-ENR-000017':'Lucky 45w 3 colors','R-SAMPLE-0017':'SAMPLE PCR 7w','R-SAMPLE-0018':'SAMPLE PCR 9w','R-SAMPLE-0019':'SAMPLE PCR 12w','R-ENR-000323':'Trio 9w 3 colors','R-ENR-000018':'Protect ไล่ยุง 18w'};
 function pkDisplayName(code){ if(NAME_OVERRIDE[code]) return NAME_OVERRIDE[code]; const d=pkItem(code)||{}; const desc=d.desc||pkFullDesc(code); return pkShortName(desc, d.model) || code; }
 function pkItemDatalist(){
   const set=new Set(Object.keys(window.BC_PACKING||{}));
