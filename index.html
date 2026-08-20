@@ -10502,11 +10502,17 @@ const PAY_MONTHS_TH=['มกราคม','กุมภาพันธ์','ม�
 const PAY_HOLIDAYS=new Set([   // วันหยุดธนาคาร/นักขัตฤกษ์ (รูปแบบ 'YYYY-MM-DD') — เพิ่มได้ภายหลัง
 ]);
 function payIsHoliday(y,m,d){ const w=new Date(y,m-1,d).getDay(); if(w===0||w===6) return true; return PAY_HOLIDAYS.has(y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0')); }
-// สัปดาห์ของเดือน: Week1 เริ่มวันที่ 1 (ถ้าเป็นวันหยุด/เสาร์-อาทิตย์ → เลื่อนวันถัดไป) · ทุกวีคจบวันอาทิตย์ · วีคสุดท้ายจบสิ้นเดือน
+// สัปดาห์ของเดือน (จันทร์–ศุกร์ · ไม่นับเสาร์-อาทิตย์): Week1 เริ่มวันที่ 1 (ถ้าหยุด/เสาร์-อาทิตย์ → เลื่อนวันทำการถัดไป) · จบวันศุกร์ · วีคสุดท้ายจบสิ้นเดือน
 function payWeeks(y,m){
   const dim=new Date(y,m,0).getDate(); const dow=d=>new Date(y,m-1,d).getDay();
   let ws=1; while(ws<=dim && payIsHoliday(y,m,ws)) ws++; if(ws>dim) ws=1;
-  const weeks=[]; while(ws<=dim){ let we=ws; while(we<dim && dow(we)!==0) we++; weeks.push({start:ws,end:we}); ws=we+1; }
+  const weeks=[];
+  while(ws<=dim){
+    let we=ws; while(we<dim && dow(we)!==5) we++;   // จบวันศุกร์ หรือสิ้นเดือน
+    weeks.push({start:ws,end:we});
+    let ns=we+1; while(ns<=dim && payIsHoliday(y,m,ns)) ns++;   // ข้ามเสาร์-อาทิตย์/วันหยุด ไปวันทำการถัดไป
+    ws=ns;
+  }
   return weeks;
 }
 function payFillSelectors(){
@@ -10514,27 +10520,37 @@ function payFillSelectors(){
   if(ms && !ms.options.length){ ms.innerHTML=PAY_MONTHS_TH.map((n,i)=>`<option value="${i+1}">${n}</option>`).join(''); ms.value=(APP_TODAY.getMonth()+1); }
   if(ys && !ys.options.length){ const beNow=APP_TODAY.getFullYear()+543; let o=''; for(let yy=beNow-2;yy<=beNow+3;yy++) o+=`<option value="${yy}">${yy}</option>`; ys.innerHTML=o; ys.value=beNow; }
 }
-function paySelectDate(key){ window.paySelDate=(window.paySelDate===key)?'':key; renderPayment(); }   // TODO: ลิงก์วันที่เลือก → คอลัมน์ "วันที่โอน" (ขั้นต่อไป)
+function payDatesToSet(){ return new Set(window.paySelDates||[]); }
+function payClearDates(){ window.paySelDates=[]; window._payLastClick=null; renderPayment(); }
+function paySelectDate(key, ev){   // เลือกได้หลายวัน · Shift+คลิก = เลือกช่วง (between)
+  const set=payDatesToSet();
+  if(ev && ev.shiftKey && window._payLastClick){
+    const pa=window._payLastClick.split('-').map(Number), pb=key.split('-').map(Number);
+    let a=new Date(pa[0],pa[1]-1,pa[2]), b=new Date(pb[0],pb[1]-1,pb[2]); if(a>b){ const t=a;a=b;b=t; }
+    for(let dt=new Date(a); dt<=b; dt.setDate(dt.getDate()+1)) set.add(dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'));
+  } else { if(set.has(key)) set.delete(key); else set.add(key); }
+  window.paySelDates=[...set].sort(); window._payLastClick=key; renderPayment();   // TODO: ลิงก์วันที่เลือก → คอลัมน์ "วันที่โอน"
+}
 function payCalendarHtml(y,m){
   const dim=new Date(y,m,0).getDate(); const lead=(new Date(y,m-1,1).getDay()+6)%7;   // Mon=0
-  const dn=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']; const T=APP_TODAY; const sel=window.paySelDate||'';
-  const p2=n=>String(n).padStart(2,'0');
-  let cells=dn.map((d,i)=>`<div style="text-align:center;font-weight:800;font-size:11px;color:${i>=5?'#dc2626':'var(--muted)'};padding:1px 0;">${d}</div>`).join('');
+  const dn=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']; const T=APP_TODAY; const sel=payDatesToSet(); const p2=n=>String(n).padStart(2,'0');
+  const LY='#fde68a', DY='#eab308';   // เหลืองอ่อน (จ–ศ) · เหลืองเข้ม (ส–อา)
+  let cells=dn.map((d,i)=>`<div style="text-align:center;font-weight:800;font-size:11px;color:${i>=5?DY:LY};padding:1px 0;">${d}</div>`).join('');
   for(let i=0;i<lead;i++) cells+='<div></div>';
   for(let d=1;d<=dim;d++){ const wd=new Date(y,m-1,d).getDay(); const wknd=(wd===0||wd===6);
     const key=y+'-'+p2(m)+'-'+p2(d);
-    const isToday=(y===T.getFullYear() && m===T.getMonth()+1 && d===T.getDate());
-    const isSel=(key===sel);
-    let st='display:flex;align-items:center;justify-content:center;font-size:14px;border-radius:7px;cursor:pointer;transition:background .1s;';
-    if(isSel) st+='background:#f59e0b;color:#fff;font-weight:800;box-shadow:0 0 0 2px #b45309 inset;';
-    else if(isToday) st+='background:var(--brand);color:#fff;font-weight:800;';
-    else st+=(wknd?'color:#dc2626;':'color:var(--ink);')+'font-weight:600;';
-    cells+=`<div onclick="paySelectDate('${key}')" title="เลือกวันที่ ${d} ${PAY_MONTHS_TH[m-1]} ${y+543}" onmouseover="if(!this.getAttribute('data-sel'))this.style.outline='1.5px solid var(--brand)'" onmouseout="this.style.outline='none'" ${isSel?'data-sel="1"':''} style="${st}">${d}</div>`;
+    const isToday=(y===T.getFullYear() && m===T.getMonth()+1 && d===T.getDate()); const isSel=sel.has(key);
+    let st='display:flex;align-items:center;justify-content:center;font-size:14px;border-radius:7px;cursor:pointer;user-select:none;';
+    if(isSel) st+='background:'+LY+';color:#111;font-weight:800;';
+    else st+='color:'+(wknd?DY:LY)+';font-weight:'+(wknd?'800':'600')+';';
+    if(isToday && !isSel) st+='box-shadow:0 0 0 2px #38bdf8 inset;';
+    cells+=`<div onclick="paySelectDate('${key}',event)" title="${d} ${PAY_MONTHS_TH[m-1]} ${y+543}${isToday?' (วันนี้)':''}" style="${st}">${d}</div>`;
   }
-  const selTxt = sel ? (function(){ const p=sel.split('-'); return `${+p[2]} ${PAY_MONTHS_TH[+p[1]-1]} ${+p[0]+543}`; })() : '—';
-  return `<div style="flex:0 0 auto;width:12cm;height:12cm;box-sizing:border-box;border:1px solid var(--line);border-radius:12px;padding:11px 13px;background:var(--card);display:flex;flex-direction:column;">
-    <div style="text-align:center;font-weight:800;font-size:18px;letter-spacing:.5px;text-transform:uppercase;">${PAY_MONTHS_TH[m-1]} ${y+543}</div>
-    <div style="text-align:center;font-size:11px;color:var(--muted);margin-bottom:6px;">เลือกวันที่โอน: <b style="color:#b45309;">${selTxt}</b>${sel?` <a href="#" onclick="paySelectDate('${sel}');return false;" style="font-size:10px;">✕ ล้าง</a>`:''}</div>
+  const selArr=(window.paySelDates||[]); let selTxt='—';
+  if(selArr.length){ const cur=selArr.filter(k=>{const p=k.split('-');return +p[0]===y && +p[1]===m;}).map(k=>+k.split('-')[2]); selTxt=selArr.length+' วัน'+(cur.length?(' — '+cur.join(', ')):''); }
+  return `<div style="flex:0 0 auto;width:12cm;height:12cm;box-sizing:border-box;border:1px solid #333;border-radius:12px;padding:11px 13px;background:#0b0b0b;display:flex;flex-direction:column;">
+    <div style="text-align:center;font-weight:800;font-size:18px;letter-spacing:.5px;text-transform:uppercase;color:${LY};">${PAY_MONTHS_TH[m-1]} ${y+543}</div>
+    <div style="text-align:center;font-size:10.5px;color:#d4d4d4;margin-bottom:5px;">เลือกวันที่โอน: <b style="color:${LY};">${selTxt}</b>${selArr.length?` <a href="#" onclick="payClearDates();return false;" style="font-size:10px;color:#fca5a5;">✕ ล้าง</a>`:''}<div style="font-size:9px;color:#9ca3af;">คลิกเลือกหลายวัน · Shift+คลิก = เลือกช่วง</div></div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;gap:2px;flex:1;">${cells}</div>
   </div>`;
 }
@@ -10546,11 +10562,11 @@ function renderPayment(){
   const y=be-543; const weeks=payWeeks(y,m);
   const LEFT=['WEEK','วันที่โอน','SUPPLIER (VENDOR+FACTORY)','TERM','Loading date','CT NO.','AMOUNT','TOTAL AMOUNT (SUPPLIER - RMB)','TOTAL AMOUNT (SUPPLIER - BAHT)'];
   const RIGHT=['TOTAL AMOUNT (1-15)','TOTAL AMOUNT (16-31)','บัญชี CF','SUPPLIER CF','BANK SLIP'];
-  const bTh='border:1px solid var(--line);padding:6px 8px;white-space:nowrap;background:var(--brand-soft);text-align:center;font-size:11.5px;';
-  const bTd='border:1px solid var(--line);height:28px;min-width:78px;';
-  const gapTh='<th style="background:var(--bg);border:none;width:14px;min-width:14px;"></th>';
-  const gapTd='<td style="background:var(--bg);border:none;width:14px;min-width:14px;"></td>';
-  const head='<tr>'+LEFT.map(h=>`<th style="${bTh}">${h}</th>`).join('')+gapTh
+  const bTh='border:1px solid var(--line);padding:3px 3px;white-space:normal;word-break:break-word;line-height:1.15;background:var(--brand-soft);text-align:center;font-size:9.5px;';
+  const bTd='border:1px solid var(--line);height:26px;overflow:hidden;';
+  const gapTh='<th style="background:var(--bg);border:none;width:8px;"></th>';
+  const gapTd='<td style="background:var(--bg);border:none;width:8px;"></td>';
+  const head='<tr>'+LEFT.map((h,idx)=>`<th style="${bTh}${idx===0?'width:52px;':''}">${h}</th>`).join('')+gapTh
     + weeks.map((w,i)=>`<th style="${bTh}">WEEK ${i+1}<br><span style="font-weight:400;font-size:10px;">(${w.start}-${w.end})</span></th>`).join('')
     + gapTh + RIGHT.map(h=>`<th style="${bTh}">${h}</th>`).join('')+'</tr>';
   const ROWS_PER_WEEK=5; let body='';
@@ -10568,7 +10584,7 @@ function renderPayment(){
     </table></div>`;
   el.innerHTML=`<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:nowrap;">
     <div style="flex:1 1 auto;min-width:0;overflow-x:auto;">
-      <table style="border-collapse:collapse;font-size:12px;">${head}${body}</table>
+      <table style="table-layout:fixed;width:100%;border-collapse:collapse;font-size:10px;">${head}${body}</table>
       ${totals}
     </div>
     ${payCalendarHtml(y,m)}
