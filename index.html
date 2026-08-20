@@ -10587,8 +10587,8 @@ function renderPayment(){
   const y=be-543; const weeks=payWeeks(y,m); const fx=payFx();
   const LEFT=['WEEK','วันที่โอน','SUPPLIER (VENDOR+FACTORY)','TERM','Loading date','CT NO.','AMOUNT','TOTAL AMOUNT (SUPPLIER - RMB)','TOTAL AMOUNT (SUPPLIER - BAHT)'];
   const RIGHT=['TOTAL AMOUNT (1-15)','TOTAL AMOUNT (16-31)','บัญชี CF','SUPPLIER CF','BANK SLIP'];
-  const bTh='border:1px solid var(--line);padding:3px 3px;white-space:normal;word-break:break-word;line-height:1.15;background:var(--brand-soft);text-align:center;font-size:9.5px;';
-  const bTd='border:1px solid var(--line);height:26px;overflow:hidden;padding:2px 4px;';
+  const bTh='border:1px solid var(--line);padding:4px 6px;white-space:normal;word-break:break-word;line-height:1.2;background:var(--brand-soft);text-align:center;font-size:11.5px;';
+  const bTd='border:1px solid var(--line);height:28px;padding:3px 7px;white-space:nowrap;';
   const gapTh='<th style="background:var(--bg);border:none;width:8px;"></th>';
   const gapTd='<td style="background:var(--bg);border:none;width:8px;"></td>';
   const head='<tr>'+LEFT.map((h,idx)=>`<th style="${bTh}${idx===0?'width:52px;':''}">${h}</th>`).join('')+gapTh
@@ -10605,8 +10605,8 @@ function renderPayment(){
   else data.forEach(r=>{ const firstVen=(r.vendor!==prevVen); prevVen=r.vendor; grand+=r.amtRmb;
     body+='<tr>'
       + `<td style="${bTd}"></td><td style="${bTd}"></td>`
-      + `<td style="${bTd}text-align:left;"><b>${payEsc(r.vendor)}</b><div style="font-size:9px;color:var(--muted);">${payEsc(r.factory)}</div></td>`
-      + `<td style="${bTd}text-align:left;font-size:9px;line-height:1.25;">${payEsc(r.term)||'<span style="color:var(--muted);">-</span>'}</td>`
+      + `<td style="${bTd}text-align:left;white-space:normal;"><b>${payEsc(r.vendor)}</b><div style="font-size:10.5px;color:var(--muted);">${payEsc(r.factory)}</div></td>`
+      + `<td style="${bTd}text-align:left;white-space:normal;font-size:11px;line-height:1.3;min-width:150px;">${payEsc(r.term)||'<span style="color:var(--muted);">-</span>'}</td>`
       + `<td style="${bTd}text-align:center;white-space:nowrap;">${payThaiDate(r.load)}</td>`
       + `<td style="${bTd}text-align:center;white-space:nowrap;">${payEsc(r.cont)}</td>`
       + `<td style="${bTd}text-align:right;white-space:nowrap;">¥${f2(r.amtRmb)}</td>`
@@ -10618,14 +10618,14 @@ function renderPayment(){
   });
   const tdT='text-align:right;padding:8px 14px;border:1px solid var(--line);';
   const totals=`<div style="margin-top:14px;display:inline-block;border:1px solid var(--line);border-radius:10px;overflow:hidden;">
-    <table style="margin:0;font-size:13px;border-collapse:collapse;">
+    <table style="margin:0;font-size:15px;border-collapse:collapse;">
       <tr><td style="${tdT}font-weight:800;">TOTAL (RMB)</td><td style="${tdT}background:#fee2e2;color:#111;">¥ <b>${f2(grand)}</b></td><td style="${tdT}font-weight:700;">BAHT</td><td style="${tdT}">฿<b>${f2(grand*fx)}</b></td></tr>
       <tr><td style="${tdT}font-weight:800;">TOTAL (USD)</td><td style="${tdT}background:#fef9c3;color:#111;">$ <b>0.00</b></td><td style="${tdT}font-weight:700;">BAHT</td><td style="${tdT}">฿<b>0.00</b></td></tr>
       <tr><td colspan="2" style="border:none;"></td><td style="${tdT}font-weight:800;background:#cffafe;color:#111;">TOTAL BAHT</td><td style="${tdT}background:#cffafe;color:#111;">฿<b>${f2(grand*fx)}</b></td></tr>
     </table></div>`;
   el.innerHTML=`<div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:nowrap;">
     <div style="flex:1 1 auto;min-width:0;overflow-x:auto;">
-      <table style="table-layout:fixed;width:100%;border-collapse:collapse;font-size:10px;">${head}${body}</table>
+      <table style="border-collapse:collapse;font-size:12px;min-width:100%;">${head}${body}</table>
       ${totals}
     </div>
     ${payCalendarHtml(y,m)}
