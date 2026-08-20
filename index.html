@@ -349,6 +349,10 @@
         <button class="go" id="pk-template" style="background:#0d9488;" title="ดาวน์โหลดไฟล์ตัวอย่าง (CSV) สำหรับกรอกข้อมูลตู้เก่า แล้วนำเข้าด้วยปุ่ม Import">📄 ดาวน์โหลด Pattern ตู้เก่า (CSV)</button>
         <span class="muted" id="pk-backupstatus" style="font-size:12px;">Import รับได้ 2 แบบ: ไฟล์สำรอง (.json = แทนที่ทั้งหมด) หรือ Pattern ตู้เก่า (.csv = เพิ่มเข้าไป)</span>
       </div>
+      <div style="margin:6px 0 12px;padding:10px 12px;border:1px dashed #dc2626;border-radius:10px;background:#fef2f2;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="go" onclick="pkRecalcAllValues()" style="background:#dc2626;">🔄 อัปเดตมูลค่าทุกตู้ตามต้นทุนล่าสุด</button>
+        <span class="muted" style="font-size:12px;color:#991b1b;">⚠️ ปุ่มชั่วคราว — คำนวณ ¥/฿ ของทุกตู้ในประวัติใหม่ตามต้นทุน RMB ล่าสุด (แก้ค่าที่บันทึกไว้ตอนต้นทุนยังผิด) · ใช้เสร็จแล้วแจ้งให้เอาปุ่มออก</span>
+      </div>
       <div id="pk-log"></div>
     </div>
   </div>
@@ -7920,6 +7924,44 @@ function pkRowCost(r){
   if(!list.length || r.costIdx==null || r.costIdx==='' || !list[r.costIdx]) return {lot:'', po:'', rmb:null, thb:null, out:null};
   const e=list[r.costIdx];
   return {lot:e.lot, po:e.po, rmb:e.rmb, thb:e.rmb*pkFxVal(), out:e.out};
+}
+// ต้นทุน RMB ปัจจุบันของ (สินค้า+PO+Lot) — ใช้ recompute snapshot: BC_POREL (ค้างรับ) ก่อน แล้ว BC_POCOST (ปิดแล้ว)
+function pkCurrentRmbFor(item, po, lot){
+  const rel=(window.BC_POREL&&window.BC_POREL[item])||[];
+  let e=(po?rel.find(x=>x[0]===po && (lot? x[1]===lot : true)):null) || (po?rel.find(x=>x[0]===po):null);
+  if(e && e[2]!=null) return +e[2];
+  const pc=(window.BC_POCOST&&window.BC_POCOST[item])||[];
+  let f=(po?pc.find(x=>x[2]===po && (lot? x[0]===lot : true)):null) || (po?pc.find(x=>x[2]===po):null) || (lot?pc.find(x=>x[0]===lot):null);
+  if(f && f[1]!=null) return +f[1];
+  return null;
+}
+// อัปเดตมูลค่าทุก snapshot ในประวัติ ตามต้นทุน RMB ล่าสุด (คูณเรทของรอบนั้น) — ใช้แก้ค่าที่ freeze ตอนต้นทุนผิด
+function pkRecalcAllValues(){
+  pkLoadLog(); const log=window.pkLog||[];
+  if(!log.length){ pkToast('ยังไม่มีข้อมูลในประวัติ','muted'); return; }
+  let rounds=0, fixed=0, unmatched=0, beforeVr=0, afterVr=0;
+  log.forEach(s=>{ beforeVr+=(s.grand&&s.grand.valRmb)||0; rounds++;
+    (s.rows||[]).forEach(r=>{ let rmb=(r.rmb!=null?+r.rmb:0);
+      if(!r.custom){ const nr=pkCurrentRmbFor(r.item,r.po,r.costLot); if(nr!=null&&nr>0){ if(Math.abs(nr-rmb)>1e-9) fixed++; rmb=nr; } else unmatched++; }
+      afterVr+=(r.per||[]).reduce((a,p)=>a+(+p.pcs||0)*rmb,0);
+    });
+  });
+  const msg=`อัปเดตมูลค่าทุกตู้ตามต้นทุนล่าสุด:\n• รอบทั้งหมด ${rounds} รอบ\n• แถวที่ต้นทุนเปลี่ยน ${fixed} แถว\n• แถวที่จับคู่ PO ไม่ได้ (คงค่าเดิม) ${unmatched} แถว\n\nมูลค่ารวม ¥: ${Math.round(beforeVr).toLocaleString()} → ${Math.round(afterVr).toLocaleString()}\n\n"ตกลง" = เขียนทับค่าที่บันทึกในประวัติทั้งหมด`;
+  pkConfirm(msg, ()=>{
+    log.forEach(s=>{ const fx=s.fx||pkFxVal()||5;
+      (s.rows||[]).forEach(r=>{ let rmb=(r.rmb!=null?+r.rmb:0);
+        if(!r.custom){ const nr=pkCurrentRmbFor(r.item,r.po,r.costLot); if(nr!=null&&nr>0) rmb=nr; }
+        (r.per||[]).forEach(p=>{ p.valRmb=(+p.pcs||0)*rmb; });
+        r.rmb=rmb; r.thb=rmb*fx;
+        const rvr=(r.per||[]).reduce((a,p)=>a+(+p.valRmb||0),0); r.valRmb=rvr; r.valThb=rvr*fx;
+      });
+      const nc=(s.containers||[]).length; s.contTotals=[];
+      for(let c=0;c<nc;c++){ let pcs=0,box=0,cbm=0,vr=0; (s.rows||[]).forEach(r=>{ const p=(r.per||[])[c]; if(p){ pcs+=+p.pcs||0; box+=+p.boxes||0; cbm+=+p.cbm||0; vr+=+p.valRmb||0; } }); s.contTotals[c]={pcs,boxes:box,cbm,valRmb:vr,valThb:vr*fx}; }
+      let gp=0,gb=0,gc=0,gvr=0,gvt=0; (s.rows||[]).forEach(r=>{ gp+=+r.pcs||0; gb+=+r.boxes||0; gc+=+r.cbm||0; gvr+=+r.valRmb||0; gvt+=+r.valThb||0; }); s.grand={pcs:gp,boxes:gb,cbm:gc,valRmb:gvr,valThb:gvt};
+    });
+    pkSaveLogStore(); if(typeof renderPkLog==='function') renderPkLog(); if(typeof renderArrivedMatrix==='function'){ try{ renderArrivedMatrix(); }catch(e){} }
+    pkToast(`อัปเดตมูลค่าแล้ว ${rounds} รอบ (แก้ต้นทุน ${fixed} แถว${unmatched?' · จับคู่ไม่ได้ '+unmatched+' แถว':''})`,'good');
+  });
 }
 function pkUpdateConvertVis(){ const w=document.getElementById('pk-convert-wrap'); if(w) w.style.display=(window.pkMode==='forecast')?'':'none'; }   // ปุ่มจับคู่ PO เฉพาะโหมด Forecast
 function pkSetMode(m){
