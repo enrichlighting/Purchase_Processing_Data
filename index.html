@@ -8312,9 +8312,16 @@ function renderShipPanel(){
   </div>`;
 }
 
+// ตัวเลือก Factory ต่อสินค้า (จาก Lead Time · BC_LEADTIME[item].opts) — ใช้เฉพาะโหมด Released
+function pkFactoryOptions(item){
+  const lt=(window.BC_LEADTIME&&window.BC_LEADTIME[item]); if(!lt||!Array.isArray(lt.opts)) return [];
+  const seen=new Set(), out=[]; lt.opts.forEach(o=>{ const f=((o&&o.f)||'').trim(); if(f && !seen.has(f)){ seen.add(f); out.push(f); } }); return out;
+}
+function pkSetFactory(i, v){ const r=window.packingRows[i]; if(r) r.factory=v; }
 function renderPacking(){
   if(typeof pkUpdateConvertVis==='function') pkUpdateConvertVis();   // ปุ่มจับคู่ PO เฉพาะโหมด Forecast
   const conts=window.pkContainers;
+  const REL = window.pkMode==='released';   // คอลัมน์ Factory เฉพาะ Released PO
   // header
   let contTh=''; conts.forEach((ct,c)=>{ contTh+=`<th class="num" style="min-width:110px;"><input type="text" value="${(ct.name||pkDefName(c)).replace(/"/g,'&quot;')}" onchange="pkSetContName(${c},this.value)" style="width:90px;text-align:center;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-weight:700;"><br><a href="#" style="font-size:11px;" onclick="pkDelCont(${c});return false;">ลบตู้</a></th>`; });
   // rows
@@ -8353,6 +8360,17 @@ function renderPacking(){
       costSel=`<input list="pk-lotdl-${i}" value="${curLot.replace(/"/g,'&quot;')}" onchange="pkPickLot(${i},this.value)" onfocus="this.select()" placeholder="🔍 ค้นหา Lot" autocomplete="off" title="เลือก Lot No" style="max-width:230px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`+lotDl;
       if(window.pkMode==='released') capNote=`<div id="pk-warn-${i}">${pkRowWarn(i)}</div>`;
     }
+    let facTd='';
+    if(REL){
+      if(!r.item){ facTd='<td><span class="muted">—</span></td>'; }
+      else { const fops=pkFactoryOptions(r.item);
+        if(r.factory===undefined && fops.length===1) r.factory=fops[0];   // มีโรงงานเดียว → เลือกให้อัตโนมัติ
+        const cur=r.factory||'';
+        let o='<option value="">— เลือกโรงงาน —</option>'+fops.map(f=>`<option value="${f.replace(/"/g,'&quot;')}" ${f===cur?'selected':''}>${f}</option>`).join('');
+        if(cur && fops.indexOf(cur)<0) o+=`<option value="${cur.replace(/"/g,'&quot;')}" selected>${cur}</option>`;
+        facTd=`<td><select onchange="pkSetFactory(${i},this.value)" title="เลือกโรงงาน (ตัวเลือกจาก Lead Time)" style="max-width:150px;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">${o}</select>${fops.length?'':'<div class="muted" style="font-size:10px;margin-top:2px;">ไม่มีใน Lead Time</div>'}</td>`;
+      }
+    }
     rows += `<tr>
       <td style="white-space:nowrap;"><input type="checkbox" ${(window.pkRowSel&&window.pkRowSel.has(i))?'checked':''} onchange="pkToggleRow(${i},this.checked)" title="เลือกเพื่อลบหลายแถว" style="vertical-align:middle;margin-right:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${pkColor(i)};vertical-align:middle;"></span> <b>${i+1}</b></td>
       <td>${cust?`<span class="tag" style="background:#ecfeff;color:#0e7490;font-size:11px;white-space:nowrap;">✎ กรอกเอง (นอก PO)</span>`:`<div style="min-width:230px;"><input list="pk-itemdl" value="${pkItemLabel(r.item).replace(/"/g,'&quot;')}" onchange="pkPickItem(${i},this.value)" onfocus="this.select()" placeholder="🔍 ชื่อย่อ (Item เลือก)" autocomplete="off" style="width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"><input list="pk-itemno-dl" value="${(r.item||'').replace(/"/g,'&quot;')}" onchange="pkPickItemByNo(${i},this.value)" onfocus="this.select()" placeholder="🔢 Item No. (รหัส)" autocomplete="off" style="width:100%;box-sizing:border-box;font-size:11.5px;margin-top:3px;padding:4px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--muted);">${r.item?`<div class="muted" style="font-size:10.5px;margin-top:3px;line-height:1.35;">${(pkFullDesc(r.item)||'').replace(/</g,'&lt;')}</div>`:''}</div>`}</td>
@@ -8364,6 +8382,7 @@ function renderPacking(){
       <td>${costSel}${capNote}</td>
       <td class="num" id="pk-rmb-${i}">${rc.rmb==null?'<span class="muted">-</span>':('¥'+pkYuan(rc.rmb))}</td>
       <td class="num" id="pk-thb-${i}">${rc.thb==null?'<span class="muted">-</span>':('฿'+rc.thb.toLocaleString('en-US',{maximumFractionDigits:2}))}</td>
+      ${facTd}
       ${cells}
       <td class="num" id="pk-rpcs-${i}">${fmtNum(rs.pcs)}</td>
       <td class="num" id="pk-rbox-${i}">${fmt1(rs.box)}</td>
@@ -8384,11 +8403,11 @@ function renderPacking(){
   });
   let gp=0,gb=0,gc=0,gvr=0,gvt=0; window.packingRows.forEach(r=>{ const s=pkRowSum(r); gp+=s.pcs;gb+=s.box;gc+=s.cbm;gvr+=s.valRmb;gvt+=s.valThb; });
   const html = pkItemDatalist() + pkItemNoDatalist() + `<table>
-    <tr><th>#</th><th>Item (เลือก)</th><th>Subtype</th><th class="num">L</th><th class="num">W</th><th class="num">H</th><th class="num">ชิ้น/กล่อง</th><th>Lot (ต้นทุน)</th><th class="num">RMB Cost</th><th class="num">THB Cost</th>${contTh}<th class="num">รวมชิ้น</th><th class="num">รวมกล่อง</th><th class="num">รวม CBM</th><th class="num">มูลค่ารวม ¥</th><th class="num">มูลค่ารวม ฿</th><th></th></tr>
+    <tr><th>#</th><th>Item (เลือก)</th><th>Subtype</th><th class="num">L</th><th class="num">W</th><th class="num">H</th><th class="num">ชิ้น/กล่อง</th><th>Lot (ต้นทุน)</th><th class="num">RMB Cost</th><th class="num">THB Cost</th>${REL?'<th>Factory</th>':''}${contTh}<th class="num">รวมชิ้น</th><th class="num">รวมกล่อง</th><th class="num">รวม CBM</th><th class="num">มูลค่ารวม ¥</th><th class="num">มูลค่ารวม ฿</th><th></th></tr>
     ${rows}
-    <tr style="border-top:2px solid var(--line)"><td colspan="10" class="num"><b>รวม CBM ต่อตู้ →</b></td>${footCbm}<td class="num" id="pk-gpcs"><b>${fmtNum(gp)}</b></td><td class="num" id="pk-gbox"><b>${fmt1(gb)}</b></td><td class="num" id="pk-gcbm"><b>${gc.toFixed(3)}</b></td><td class="num" id="pk-gvr"><b>¥${pkYuan(gvr)}</b></td><td class="num" id="pk-gvt"><b>฿${pkMoney(gvt)}</b></td><td></td></tr>
-    <tr><td colspan="10" class="num"><b>มูลค่าต่อตู้ (¥) →</b></td>${footVr}<td class="num" colspan="6"></td></tr>
-    <tr><td colspan="10" class="num"><b>มูลค่าต่อตู้ (฿) →</b></td>${footVt}<td class="num" colspan="6"></td></tr>
+    <tr style="border-top:2px solid var(--line)"><td colspan="${REL?11:10}" class="num"><b>รวม CBM ต่อตู้ →</b></td>${footCbm}<td class="num" id="pk-gpcs"><b>${fmtNum(gp)}</b></td><td class="num" id="pk-gbox"><b>${fmt1(gb)}</b></td><td class="num" id="pk-gcbm"><b>${gc.toFixed(3)}</b></td><td class="num" id="pk-gvr"><b>¥${pkYuan(gvr)}</b></td><td class="num" id="pk-gvt"><b>฿${pkMoney(gvt)}</b></td><td></td></tr>
+    <tr><td colspan="${REL?11:10}" class="num"><b>มูลค่าต่อตู้ (¥) →</b></td>${footVr}<td class="num" colspan="6"></td></tr>
+    <tr><td colspan="${REL?11:10}" class="num"><b>มูลค่าต่อตู้ (฿) →</b></td>${footVt}<td class="num" colspan="6"></td></tr>
   </table>`;
   document.getElementById('pk-result').innerHTML = html;
   renderContainers();
@@ -8642,7 +8661,7 @@ function pkSnapshot(){
     const d=pkItem(r.item), rs=pkRowSum(r), rc=pkRowCost(r);
     const rmb=rc.rmb||0;
     const per = window.pkContainers.map((ct,c)=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p); const cellLot=(window.pkMode==='released')?(rc.lot||''):((r.lots||[])[c]||''); return {pcs:p, lot:cellLot, boxes:cc.boxes, cbm:cc.cbm, valRmb:p*rmb}; });
-    return {item:r.item, custom:!!r.custom, desc:d?d.desc:'', L:d?d.L:0, W:d?d.W:0, H:d?d.H:0, pcsPerBox:d?d.pcs:0, po:rc.po||'', costIdx:(r.costIdx==null?null:r.costIdx), lotMax:(r.lotMax==null?null:r.lotMax), costLot:rc.lot||'', rmb:rc.rmb, thb:rc.thb, per, pcs:rs.pcs, boxes:rs.box, cbm:rs.cbm, valRmb:rs.valRmb, valThb:rs.valThb};
+    return {item:r.item, custom:!!r.custom, desc:d?d.desc:'', L:d?d.L:0, W:d?d.W:0, H:d?d.H:0, pcsPerBox:d?d.pcs:0, po:rc.po||'', factory:r.factory||'', costIdx:(r.costIdx==null?null:r.costIdx), lotMax:(r.lotMax==null?null:r.lotMax), costLot:rc.lot||'', rmb:rc.rmb, thb:rc.thb, per, pcs:rs.pcs, boxes:rs.box, cbm:rs.cbm, valRmb:rs.valRmb, valThb:rs.valThb};
   }).filter(r=>r.item);
   const contTotals = window.pkContainers.map((ct,c)=>{ const cs=pkContSum(c); return {pcs:cs.pcs, boxes:cs.box, cbm:cs.cbm, valRmb:cs.valRmb, valThb:cs.valThb}; });
   let gp=0,gb=0,gc=0,gvr=0,gvt=0; rows.forEach(r=>{gp+=r.pcs;gb+=r.boxes;gc+=r.cbm;gvr+=r.valRmb;gvt+=r.valThb;});
@@ -8785,7 +8804,7 @@ function pkLoadRound(idx){
     // สินค้าผูก PO แต่ไม่มีมิติกล่องในระบบ → กู้มิติที่กรอกไว้กลับมาใน overlay
     if(r.item && !(window.BC_PACKING&&window.BC_PACKING[r.item])){ window.pkCustomDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1), desc:r.desc||'', rmb:(window.pkCustomDims[r.item]&&window.pkCustomDims[r.item].rmb)||''}; }
     if(s.mode==='released' && r.po){ const cp=pkPackCap(r.po,r.item); if(cp.cap!=null){ let others=0; (window.pkLog||[]).forEach((ss,i)=>{ if(i===idx) return; (ss.rows||[]).forEach(rr=>{ if(rr.po===r.po && rr.item===r.item) others+=(rr.pcs||0); }); }); lm=Math.max(0,cp.cap-others); } }   // เหลือจัดได้ = จำนวนสั่งผลิต/ค้างรับ − ที่จัดในรอบอื่น
-    return {item:r.item, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:(r.costIdx==null?null:r.costIdx), lotMax:lm};
+    return {item:r.item, factory:r.factory||undefined, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:(r.costIdx==null?null:r.costIdx), lotMax:lm};
   });
   if(!window.packingRows.length) window.packingRows=[{item:'',loads:[],lots:[],costIdx:null}];
   if(s.mode){ window.pkMode=s.mode; const rb=document.querySelector('input[name="pk-mode"][value="'+s.mode+'"]'); if(rb) rb.checked=true; }
