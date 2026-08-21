@@ -10591,6 +10591,8 @@ function payTransferDate(term, loadStr){
   else if(/45\s*days?\s*after\s*shipment/i.test(t)) dt=payCalShift(y,m,d,45);
   else if(/50\s*days?\s*after\s*loading/i.test(t)) dt=payCalShift(y,m,d,50);   // 100% 50days after loading
   else if(/after\s*delivery\s*40\s*days?/i.test(t)) dt=payCalShift(y,m,d,40);   // After delivery 40days
+  else if(/40\s*days?\s*from\s*the\s*on\s*board/i.test(t)) dt=payCalShift(y,m,d,40);   // 100% 40days from the on board date
+  else if(/o\/?a\s*30\s*days?/i.test(t)) dt=payCalShift(y,m,d,30);   // OA 30DAYS
   else return '';
   return dt?payDkey(dt):'';
 }
