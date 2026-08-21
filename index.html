@@ -6340,6 +6340,7 @@ window.BC_DIYMON = {
 };
 </script>
 <script src="bc-diymon.js" onerror="void 0"></script>
+<script src="bc-diymopo.js" onerror="void 0"></script>
 
 <script>
 /* =====================================================================
@@ -9998,7 +9999,8 @@ function flowSalesDIY(it){
   const offs=[0.27,0.47,0.67];
   rows.forEach((r,i)=>{ const gx=L+i*gw, cx=gx+gw/2;
     [['si',r.si],['st',r.st],['so',r.so]].forEach(([k,v],j)=>{ const bx=gx+gw*offs[j]-bw/2, h=v/maxV*PH, by=y0-h;
-      bars+=`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,h).toFixed(1)}" rx="2.5" fill="${COL[k]}"/>`;
+      const poYM=selY+'-'+p(r.m); const poTxt=(k==='si'&&window.BC_DIYMON_PO&&window.BC_DIYMON_PO[it.no]&&window.BC_DIYMON_PO[it.no][poYM])?String(window.BC_DIYMON_PO[it.no][poYM]).replace(/&/g,'&amp;').replace(/</g,'&lt;'):'';
+      bars+=`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,h).toFixed(1)}" rx="2.5" fill="${COL[k]}">${poTxt?'<title>'+poTxt+'</title>':''}</rect>`;
       if(v>0) labels+=chip(bx+bw/2,by-1,fmtK(v),LBG[k],LTX[k]); });
     const ty=TOP+PH*(1-r.to/(maxT*1.45)); pts.push([cx,ty]);
     if(r.to>0) tolab+=chip(cx,ty-1,r.to.toFixed(1)+'%','#fde3cf','#c2410c');
