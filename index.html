@@ -10784,24 +10784,28 @@ function renderPayment(){
   let phys1=0, phys2=0; weeks.forEach((w,wi)=>{ if(halfOf(wi)===1) phys1+=weekPhys(wi); else phys2+=weekPhys(wi); });
   const gapRs=n=>`<td rowspan="${n}" style="background:var(--bg);border:none;width:8px;"></td>`;
   const totCell=(n,v)=>`<td rowspan="${n}" style="${bTd}text-align:right;vertical-align:middle;white-space:nowrap;font-weight:800;color:#7f1d1d;${v?'background:#fbe0e0;':''}">${v||''}</td>`;
-  const chkCell=(n,key)=>`<td rowspan="${n}" style="${bTd}text-align:center;vertical-align:middle;"><input type="checkbox" ${payChk(key)?'checked':''} onchange="payToggleCheck('${key}',this.checked)" style="width:17px;height:17px;cursor:pointer;"></td>`;
-  const rightGroup=(half,n)=>{ const kp=be+'|'+m+'|'+half; return gapRs(n)+totCell(n,half===1?('฿'+f2(tot1)):'')+totCell(n,half===2?('฿'+f2(tot2)):'')+chkCell(n,kp+'|cf')+chkCell(n,kp+'|supcf')+chkCell(n,kp+'|slip'); };
-  const rightBlank=n=>gapRs(n)+`<td rowspan="${n}" style="${bTd}"></td>`.repeat(5);
+  const rightGroup=(half,n)=> gapRs(n)+totCell(n,half===1?('฿'+f2(tot1)):'')+totCell(n,half===2?('฿'+f2(tot2)):'');   // gap2 + TOTAL(1-15) + TOTAL(16-31) merge ต่อครึ่งเดือน
+  const rightBlank=n=> gapRs(n)+`<td rowspan="${n}" style="${bTd}"></td>`.repeat(2);   // "อื่นๆ": gap2 + 2 total ว่าง
+  const cfTypes=['cf','supcf','slip'];
+  const cfCells=(r)=> r ? cfTypes.map(t=>`<td style="${bTd}text-align:center;vertical-align:middle;"><input type="checkbox" ${payChk(r._key+'|'+t)?'checked':''} onchange="payToggleCheck('${r._key+'|'+t}',this.checked)" style="width:17px;height:17px;cursor:pointer;"></td>`).join('') : `<td style="${bTd}"></td>`.repeat(3);   // CF/SUPPLIER CF/BANK SLIP ต่อบรรทัด
+  const cfBlank3=`<td style="${bTd}"></td>`.repeat(3);
   let body=''; const divColspan=LEFT.length+1+weeks.length;   // WEEK..คอลัมน์วีคสุดท้าย (ไม่รวมฝั่งขวา)
-  const wkDivider='<tr><td colspan="'+divColspan+'" style="height:5px;padding:0;border:0;background:#7f1d1d;"></td></tr>';   // เส้นคั่นวีค (เฉพาะฝั่งซ้าย ไม่ล้ำฝั่งขวา)
+  const wkDivider='<tr><td colspan="'+divColspan+'" style="height:5px;padding:0;border:0;background:#7f1d1d;"></td>'+cfBlank3+'</tr>';   // เส้นคั่นวีค (ฝั่งซ้าย) + ช่อง CF ว่าง (ฝั่งขวาไม่มีเส้น)
   const emitted={};
   weeks.forEach((w,wi)=>{ const rows=byWeek[wi]; const rng='('+w.start+'-'+w.end+')'; const half=halfOf(wi);
+    const dataRows = rows.length ? rows : [null];
     const cells = rows.length ? groupCells(rows,wi) : [restCells(null,null,wi,wkTotBaht[wi],1,true)];
     const wl = rows.length ? wkLabel(wi+1,rng,rows.length) : wkLabel(wi+1,rng,1);
     cells.forEach((cc,ri)=>{ let tr='<tr>'+(ri===0?wl:'')+cc;
       if(ri===0 && !emitted[half]){ tr+=rightGroup(half, half===1?phys1:phys2); emitted[half]=true; }
+      tr+=cfCells(dataRows[ri]||null);   // checkbox CF ต่อบรรทัด (แถวว่าง=blank)
       body+=tr+'</tr>';
     });
     body+=wkDivider;
   });
   if(other.length){ const oc=groupCells(other,-1);
     oc.forEach((cc,ri)=>{ let tr='<tr>'+(ri===0?`<td rowspan="${other.length}" style="border:1px solid #5c0f0f;font-weight:800;background:#a33;text-align:center;white-space:nowrap;padding:4px 8px;color:#ffe;">อื่นๆ<div style="font-weight:500;font-size:9px;color:#ffd9d9;">นอกเดือน/ยังไม่กำหนด</div></td>`:'')+cc;
-      if(ri===0) tr+=rightBlank(other.length); body+=tr+'</tr>'; });
+      if(ri===0) tr+=rightBlank(other.length); tr+=cfCells(other[ri]||null); body+=tr+'</tr>'; });
   }
   const usd=payUsd(), usdTot=0;   // ยังไม่มีรายการสกุล USD (เผื่อไว้ · ปรับเรทได้)
   const tdT='text-align:right;padding:8px 14px;border:1px solid #a8801f;color:#111;';
