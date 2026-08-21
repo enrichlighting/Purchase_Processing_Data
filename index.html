@@ -7924,7 +7924,10 @@ function pkLotList(item){
 function pkRowCost(r){
   if(r && r.custom){ const cd=(window.pkCustomDims||{})[r.item]||{}; const rmb=(cd.rmb!=null&&cd.rmb!=='')?+cd.rmb:null; return {lot:'', po:'', rmb, thb:(rmb!=null?rmb*pkFxVal():null), out:null}; }
   const list=pkLotList(r.item);
-  if(!list.length || r.costIdx==null || r.costIdx==='' || !list[r.costIdx]) return {lot:'', po:'', rmb:null, thb:null, out:null};
+  if(!list.length || r.costIdx==null || r.costIdx==='' || !list[r.costIdx]){
+    if(r && r.rmbFixed!=null && r.rmbFixed!==''){ const rf=+r.rmbFixed; return {lot:r.costLot||'', po:r.po||'', rmb:rf, thb:rf*pkFxVal(), out:(r.lotMax!=null?r.lotMax:null)}; }   // ตู้ import: ใช้ต้นทุนที่กรอกมา (ไม่มี Lot ในระบบ)
+    return {lot:'', po:'', rmb:null, thb:null, out:null};
+  }
   const e=list[r.costIdx];
   return {lot:e.lot, po:e.po, rmb:e.rmb, thb:e.rmb*pkFxVal(), out:e.out};
 }
@@ -8665,7 +8668,7 @@ function pkImportOldCsv(text){
       const rmb=o.rmb||0, valRmb=o.qty*rmb, valThb=valRmb*fx;
       gp+=o.qty; gb+=cc.boxes; gc+=cc.cbm; gvr+=valRmb; gvt+=valThb;
       return {item:o.item, custom:false, desc:d.desc||'', L:d.L||0, W:d.W||0, H:d.H||0, pcsPerBox:d.pcs||0,
-        po:o.po||'', costIdx:null, lotMax:o.qty, costLot:'', rmb, thb:rmb*fx,
+        po:o.po||'', costIdx:null, lotMax:o.qty, costLot:'', rmb, thb:rmb*fx, rmbFixed:rmb,
         per:[{pcs:o.qty, lot:'', boxes:cc.boxes, cbm:cc.cbm, valRmb}],
         pcs:o.qty, boxes:cc.boxes, cbm:cc.cbm, valRmb, valThb};
     });
@@ -8720,7 +8723,7 @@ function pkSnapshot(){
     const d=pkItem(r.item), rs=pkRowSum(r), rc=pkRowCost(r);
     const rmb=rc.rmb||0;
     const per = window.pkContainers.map((ct,c)=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p); const cellLot=(window.pkMode==='released')?(rc.lot||''):((r.lots||[])[c]||''); return {pcs:p, lot:cellLot, boxes:cc.boxes, cbm:cc.cbm, valRmb:p*rmb}; });
-    return {item:r.item, custom:!!r.custom, desc:d?d.desc:'', L:d?d.L:0, W:d?d.W:0, H:d?d.H:0, pcsPerBox:d?d.pcs:0, po:rc.po||'', factory:r.factory||'', costIdx:(r.costIdx==null?null:r.costIdx), lotMax:(r.lotMax==null?null:r.lotMax), costLot:rc.lot||'', rmb:rc.rmb, thb:rc.thb, per, pcs:rs.pcs, boxes:rs.box, cbm:rs.cbm, valRmb:rs.valRmb, valThb:rs.valThb};
+    return {item:r.item, custom:!!r.custom, desc:d?d.desc:'', L:d?d.L:0, W:d?d.W:0, H:d?d.H:0, pcsPerBox:d?d.pcs:0, po:rc.po||'', factory:r.factory||'', costIdx:(r.costIdx==null?null:r.costIdx), lotMax:(r.lotMax==null?null:r.lotMax), costLot:rc.lot||'', rmb:rc.rmb, thb:rc.thb, rmbFixed:(r.rmbFixed!=null&&r.rmbFixed!==''?+r.rmbFixed:undefined), per, pcs:rs.pcs, boxes:rs.box, cbm:rs.cbm, valRmb:rs.valRmb, valThb:rs.valThb};
   }).filter(r=>r.item);
   const contTotals = window.pkContainers.map((ct,c)=>{ const cs=pkContSum(c); return {pcs:cs.pcs, boxes:cs.box, cbm:cs.cbm, valRmb:cs.valRmb, valThb:cs.valThb}; });
   let gp=0,gb=0,gc=0,gvr=0,gvt=0; rows.forEach(r=>{gp+=r.pcs;gb+=r.boxes;gc+=r.cbm;gvr+=r.valRmb;gvt+=r.valThb;});
@@ -8863,7 +8866,7 @@ function pkLoadRound(idx){
     // สินค้าผูก PO แต่ไม่มีมิติกล่องในระบบ → กู้มิติที่กรอกไว้กลับมาใน overlay
     if(r.item && !(window.BC_PACKING&&window.BC_PACKING[r.item])){ window.pkCustomDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1), desc:r.desc||'', rmb:(window.pkCustomDims[r.item]&&window.pkCustomDims[r.item].rmb)||''}; }
     if(s.mode==='released' && r.po){ const cp=pkPackCap(r.po,r.item); if(cp.cap!=null){ let others=0; (window.pkLog||[]).forEach((ss,i)=>{ if(i===idx) return; (ss.rows||[]).forEach(rr=>{ if(rr.po===r.po && rr.item===r.item) others+=(rr.pcs||0); }); }); lm=Math.max(0,cp.cap-others); } }   // เหลือจัดได้ = จำนวนสั่งผลิต/ค้างรับ − ที่จัดในรอบอื่น
-    return {item:r.item, factory:r.factory||undefined, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:(r.costIdx==null?null:r.costIdx), lotMax:lm};
+    return {item:r.item, factory:r.factory||undefined, rmbFixed:(r.rmbFixed!=null&&r.rmbFixed!==''?+r.rmbFixed:undefined), loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:(r.costIdx==null?null:r.costIdx), lotMax:lm};
   });
   if(!window.packingRows.length) window.packingRows=[{item:'',loads:[],lots:[],costIdx:null}];
   if(s.mode){ window.pkMode=s.mode; const rb=document.querySelector('input[name="pk-mode"][value="'+s.mode+'"]'); if(rb) rb.checked=true; }
