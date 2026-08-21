@@ -289,6 +289,12 @@
       <button onclick="setUIFont(11)" style="padding:4px 10px;font-size:12px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--muted);cursor:pointer;">รีเซ็ต</button>
       <span class="muted" style="font-size:11px;">(ปรับได้ 1–20 pt · จำค่าไว้อัตโนมัติ)</span>
     </div>
+    <!-- ===== ตู้ที่ถึงคลังแล้ว (สรุปตาม ETA) — ตารางบนสุด ===== -->
+    <div class="card" id="pk-arrived-card">
+      <h2>🚢 สรุปตู้ทั้งหมด (ตาม ETA)</h2>
+      <p class="hint">สรุป<b>ทุกตู้ที่บันทึกไว้</b> แยกเป็น <b>ปี × เดือน</b> (ยึดเดือนจาก ETA ถึงคลัง) · แสดงจำนวนตู้ + มูลค่ารวม · คลิกช่องเดือนเพื่อกางดูแต่ละตู้ (<b>สถานะ</b> · ETA · มูลค่า)</p>
+      <div id="pk-arrived-matrix"></div>
+    </div>
     <div class="card" id="sec-packing">
       <h2>📦 Packing List (คำนวณกล่อง &amp; CBM)</h2>
       <p class="hint">เลือกสินค้าในแต่ละแถว → ข้อมูลขนาดกล่อง (L/W/H) และจำนวนชิ้น/กล่อง จะเติมให้อัตโนมัติ · กรอก "จำนวนชิ้นที่โหลด" แล้วระบบคำนวณ จำนวนกล่อง · CBM · Total CBM · มูลค่า (¥/฿) ให้</p>
@@ -355,12 +361,6 @@
         <span class="muted" id="pk-backupstatus" style="font-size:12px;">Import รับได้ 2 แบบ: ไฟล์สำรอง (.json = แทนที่ทั้งหมด) หรือ Pattern ตู้เก่า (.csv = เพิ่มเข้าไป)</span>
       </div>
       <div id="pk-log"></div>
-    </div>
-    <!-- ===== ตู้ที่ถึงคลังแล้ว (สรุปตาม ETA) — ย้ายมาจากหน้า 🚨 ===== -->
-    <div class="card" id="pk-arrived-card">
-      <h2>🚢 สรุปตู้ทั้งหมด (ตาม ETA)</h2>
-      <p class="hint">สรุป<b>ทุกตู้ที่บันทึกไว้</b> แยกเป็น <b>ปี × เดือน</b> (ยึดเดือนจาก ETA ถึงคลัง) · แสดงจำนวนตู้ + มูลค่ารวม · คลิกช่องเดือนเพื่อกางดูแต่ละตู้ (<b>สถานะ</b> · ETA · มูลค่า)</p>
-      <div id="pk-arrived-matrix"></div>
     </div>
   </div>
 
