@@ -10583,11 +10583,14 @@ function payNextPayDay(y,m,d){   // จ่ายทุกวันที่ 5/15
   for(const c of cands){ const gap=Math.round((c-load)/86400000); if(gap>5){ let dt=new Date(c); while(payIsHoliday(dt.getFullYear(),dt.getMonth()+1,dt.getDate())) dt.setDate(dt.getDate()+1); return dt; } }
   return null;
 }
+function payCalShift(y,m,d,n){ let x=new Date(y,m-1,d); x.setDate(x.getDate()+n); while(payIsHoliday(x.getFullYear(),x.getMonth()+1,x.getDate())) x.setDate(x.getDate()+1); return x; }   // +n วันปฏิทิน (รวมเสาร์อาทิตย์) แล้วถ้าตกเสาร์อาทิตย์/วันหยุด → เลื่อนเป็นวันทำการถัดไป
 function payTransferDate(term, loadStr){
   const mm=String(loadStr||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!mm) return ''; const y=+mm[1],m=+mm[2],d=+mm[3]; const t=String(term||'');
   let dt=null;
   if(/5\s*,\s*15\s*,\s*25/.test(t) || /pay every/i.test(t)) dt=payNextPayDay(y,m,d);
-  else if(/45\s*days?\s*after\s*shipment/i.test(t)){ let x=new Date(y,m-1,d); x.setDate(x.getDate()+45); while(payIsHoliday(x.getFullYear(),x.getMonth()+1,x.getDate())) x.setDate(x.getDate()+1); dt=x; }   // +45 วันปฏิทิน (รวมเสาร์อาทิตย์) แล้วถ้าตกวันหยุด → เลื่อนเป็นวันทำการถัดไป
+  else if(/45\s*days?\s*after\s*shipment/i.test(t)) dt=payCalShift(y,m,d,45);
+  else if(/50\s*days?\s*after\s*loading/i.test(t)) dt=payCalShift(y,m,d,50);   // 100% 50days after loading
+  else if(/after\s*delivery\s*40\s*days?/i.test(t)) dt=payCalShift(y,m,d,40);   // After delivery 40days
   else return '';
   return dt?payDkey(dt):'';
 }
