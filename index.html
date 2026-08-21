@@ -6340,7 +6340,6 @@ window.BC_DIYMON = {
 };
 </script>
 <script src="bc-diymon.js" onerror="void 0"></script>
-<script src="bc-diymopo.js" onerror="void 0"></script>
 
 <script>
 /* =====================================================================
@@ -7910,6 +7909,7 @@ function pkCell(code, pieces){ pieces=+pieces||0; const d=pkItem(code); if(!d||!
 function pkRowSum(r){ const rmb=pkRowCost(r).rmb||0, fx=pkFxVal(); let pcs=0,box=0,cbm=0; window.pkContainers.forEach((ct,c)=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p); pcs+=p; box+=cc.boxes; cbm+=cc.cbm; }); const vr=pcs*rmb; return {pcs,box,cbm,valRmb:vr,valThb:vr*fx}; }
 function pkContSum(c){ const fx=pkFxVal(); let pcs=0,box=0,cbm=0,vr=0; window.packingRows.forEach(r=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p); const rmb=pkRowCost(r).rmb||0; pcs+=p; box+=cc.boxes; cbm+=cc.cbm; vr+=p*rmb; }); return {pcs,box,cbm,valRmb:vr,valThb:vr*fx}; }
 function pkMoney(v){ return (Math.round(v)).toLocaleString('en-US'); }
+function pkMoney2(v){ return (+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function pkYuan(v){ return Number(v).toLocaleString('en-US',{maximumFractionDigits:2}); }
 
 /* ===== โหมด + ต้นทุนจาก Purchase Order Line (Direct Unit Cost / Lot) ===== */
@@ -9679,9 +9679,9 @@ function renderArrivedMatrix(){
   let html=`<div style="overflow-x:auto;"><table style="font-size:11.5px;width:100%;"><thead>${head}</thead><tbody>${body}<tr style="background:var(--brand-soft);"><td style="text-align:left;"><b>รวมทั้งหมด</b></td><td class="num" colspan="12" style="text-align:right;"><span class="muted">รวมทุกเดือน →</span></td><td class="num"><b>${gn}</b> ตู้<div class="muted" style="font-size:9px;">฿${pkMoney(gv)}</div></td></tr></tbody></table></div>`;
   if(window.pkArrSel){ const list=cont.filter(c=>c.ym===window.pkArrSel).sort((a,b)=>(a.eta<b.eta?-1:1));
     const y=window.pkArrSel.slice(0,4), m=+window.pkArrSel.slice(5,7);
-    html+=`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;"><div style="font-weight:700;font-size:12.5px;margin-bottom:5px;">📦 ตู้ที่ ETA ${MN[m-1]} ${y} · ${list.length} ตู้ · รวม ฿${pkMoney(list.reduce((s,c)=>s+c.valThb,0))}</div>`
+    html+=`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;"><div style="font-weight:700;font-size:12.5px;margin-bottom:5px;">📦 ตู้ที่ ETA ${MN[m-1]} ${y} · ${list.length} ตู้ · รวม ฿${pkMoney2(list.reduce((s,c)=>s+c.valThb,0))}</div>`
       +'<div style="overflow-x:auto;"><table style="font-size:11.5px;width:100%;"><tr><th style="text-align:center;">ตู้</th><th style="text-align:center;">สถานะ</th><th style="text-align:center;">ETA</th><th class="num">มูลค่า (฿)</th><th class="num">¥</th></tr>'
-      +list.map(c=>`<tr><td style="text-align:center;"><b>${c.name}</b></td><td style="text-align:center;"><span style="font-size:10.5px;font-weight:700;color:${c.stColor};white-space:nowrap;">${c.stLabel}</span></td><td style="text-align:center;">${c.eta?poThaiShort(c.eta):'-'}</td><td class="num">฿${pkMoney(c.valThb)}</td><td class="num">¥${pkMoney(c.valRmb)}</td></tr>`).join('')
+      +list.map(c=>`<tr><td style="text-align:center;"><b>${c.name}</b></td><td style="text-align:center;"><span style="font-size:10.5px;font-weight:700;color:${c.stColor};white-space:nowrap;">${c.stLabel}</span></td><td style="text-align:center;">${c.eta?poThaiShort(c.eta):'-'}</td><td class="num">฿${pkMoney2(c.valThb)}</td><td class="num">¥${pkMoney2(c.valRmb)}</td></tr>`).join('')
       +'</table></div></div>';
   } else { html+='<div class="muted" style="font-size:11px;margin-top:6px;">👆 คลิกช่องเดือนในตารางเพื่อกางดูรายตู้ (ETA + มูลค่าแต่ละตู้)</div>'; }
   el.innerHTML=html;
@@ -10791,7 +10791,8 @@ function renderPayment(){
   const cfCells=(r)=> r ? cfTypes.map(t=>`<td style="${bTd}text-align:center;vertical-align:middle;"><input type="checkbox" ${payChk(r._key+'|'+t)?'checked':''} onchange="payToggleCheck('${r._key+'|'+t}',this.checked)" style="width:17px;height:17px;cursor:pointer;"></td>`).join('') : `<td style="${bTd}"></td>`.repeat(3);   // CF/SUPPLIER CF/BANK SLIP ต่อบรรทัด
   const cfBlank3=`<td style="${bTd}"></td>`.repeat(3);
   let body=''; const divColspan=LEFT.length+1+weeks.length;   // WEEK..คอลัมน์วีคสุดท้าย (ไม่รวมฝั่งขวา)
-  const wkDivider='<tr><td colspan="'+divColspan+'" style="height:2px;line-height:2px;font-size:0;padding:0;border:0;background:#7f1d1d;"></td>'+cfBlank3+'</tr>';   // เส้นคั่นวีค (ฝั่งซ้าย) + ช่อง CF ว่าง (ฝั่งขวาไม่มีเส้น)
+  const divBlank3=`<td style="height:2px;line-height:2px;font-size:0;padding:0;border:0;"></td>`.repeat(3);
+  const wkDivider='<tr style="height:2px;"><td colspan="'+divColspan+'" style="height:2px;line-height:2px;font-size:0;padding:0;border:0;background:#7f1d1d;"></td>'+divBlank3+'</tr>';   // เส้นคั่นวีค (ฝั่งซ้าย) + ช่อง CF ว่าง (ฝั่งขวาไม่มีเส้น)
   const emitted={};
   weeks.forEach((w,wi)=>{ const rows=byWeek[wi]; const rng='('+w.start+'-'+w.end+')'; const half=halfOf(wi);
     const dataRows = rows.length ? rows : [null];
@@ -10821,7 +10822,10 @@ function renderPayment(){
       <table style="border-collapse:collapse;font-size:12px;min-width:100%;">${head}${body}</table>
       ${totals}
     </div>
-    ${payCalendarHtml(y,m)}
+    <div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;">
+      ${payCalendarHtml(y,m)}
+      <div title="ปีมังกร · ความมั่งคั่ง" style="width:8cm;text-align:center;font-size:120px;line-height:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,.25));user-select:none;">🐉</div>
+    </div>
   </div>`;
 }
 function renderTab(tab){
