@@ -370,9 +370,9 @@
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-size:16px;font-weight:800;">
         <span>📅 อัพเดท Payment</span>
         <span>ปี</span>
-        <select id="pay-year" onchange="renderPayment()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;"></select>
+        <select id="pay-year" onchange="renderPayment()" style="width:150px;max-width:150px;font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;"></select>
         <span>เดือน</span>
-        <select id="pay-month" onchange="renderPayment()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;"></select>
+        <select id="pay-month" onchange="renderPayment()" style="width:170px;max-width:170px;font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;"></select>
         <span>Vendor</span>
         <select id="pay-vendor" onchange="renderPayment()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;max-width:220px;"></select>
         <span style="width:1px;height:22px;background:var(--line);margin:0 4px;"></span>
@@ -10611,6 +10611,35 @@ function payFx(){ const e=document.getElementById('pay-fx'); const v=e?+e.value:
 function payUsd(){ const e=document.getElementById('pay-usd'); const v=e?+e.value:34; return (v>0)?v:34; }
 function payEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function payThaiDate(s){ const m=String(s||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!m) return payEsc(s||'-'); return `${+m[3]}/${+m[2]}/${(+m[1])+543}`; }
+// ---- แก้ไขวันที่โอนเอง + เหตุผล (เก็บใน localStorage) ----
+function payLoadOv(){ if(window.payXferOv) return; try{ window.payXferOv=JSON.parse(localStorage.getItem('payXferOvV1')||'{}'); }catch(e){ window.payXferOv={}; } }
+function paySaveOv(){ try{ localStorage.setItem('payXferOvV1', JSON.stringify(window.payXferOv||{})); }catch(e){} }
+function payEditXfer(enc){
+  const key=decodeURIComponent(enc); const meta=(window._payRowMeta||{})[key]||{}; payLoadOv();
+  const ovd=(window.payXferOv[key]||{}); const cur=ovd.date||meta.cur||meta.auto||''; const reason=ovd.reason||'';
+  let ov=document.getElementById('pay-xfer-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='pay-xfer-ov';
+  ov.style.cssText='position:fixed;inset:0;z-index:100005;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:18px 20px;max-width:430px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);">
+    <div style="font-weight:800;font-size:15px;margin-bottom:4px;">✎ แก้ไขวันที่โอน</div>
+    <div class="muted" style="font-size:12px;margin-bottom:12px;line-height:1.5;">${payEsc(meta.cont||'')} · ${payEsc(meta.vendor||'')}${meta.seg?(' · '+payEsc(meta.seg)):''}<br>วันที่คำนวณอัตโนมัติ: <b>${meta.auto?payThaiDate(meta.auto):'-'}</b></div>
+    <label style="font-size:13px;font-weight:700;">วันที่โอนใหม่<br><input type="date" id="pay-xfer-date" value="${cur}" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:14px;"></label>
+    <label style="font-size:13px;font-weight:700;display:block;margin-top:12px;">เหตุผลในการแก้ไข<br><textarea id="pay-xfer-reason" rows="2" placeholder="ระบุเหตุผล..." style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;resize:vertical;">${payEsc(reason)}</textarea></label>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;">
+      <button onclick="document.getElementById('pay-xfer-ov').remove()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:700;">ยกเลิก</button>
+      ${ovd.date?`<button onclick="payResetXfer('${enc}')" style="padding:7px 14px;border-radius:8px;border:1px solid #b45309;background:var(--card);color:#b45309;cursor:pointer;font-weight:700;">↩︎ คืนค่าอัตโนมัติ</button>`:''}
+      <button onclick="paySaveXfer('${enc}')" style="padding:7px 14px;border-radius:8px;border:0;background:var(--brand);color:#fff;cursor:pointer;font-weight:800;">บันทึก</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+function paySaveXfer(enc){ const key=decodeURIComponent(enc); const d=document.getElementById('pay-xfer-date').value; const reason=(document.getElementById('pay-xfer-reason').value||'').trim();
+  if(!d){ pkToast('กรุณาระบุวันที่โอน','bad'); return; }
+  if(!reason){ pkToast('กรุณาระบุเหตุผลในการแก้ไข','bad'); return; }
+  payLoadOv(); window.payXferOv[key]={date:d, reason:reason}; paySaveOv();
+  const ov=document.getElementById('pay-xfer-ov'); if(ov) ov.remove(); renderPayment(); pkToast('บันทึกวันที่โอนแล้ว','good');
+}
+function payResetXfer(enc){ const key=decodeURIComponent(enc); payLoadOv(); delete window.payXferOv[key]; paySaveOv(); const ov=document.getElementById('pay-xfer-ov'); if(ov) ov.remove(); renderPayment(); pkToast('คืนค่าวันที่โอนอัตโนมัติแล้ว','good'); }
 function payVendorForFactory(item, factory){ const lt=(window.BC_LEADTIME&&window.BC_LEADTIME[item]); if(lt&&Array.isArray(lt.opts)){ const o=lt.opts.find(x=>((x&&x.f)||'')===factory); if(o&&o.v) return o.v; } return ''; }
 function payCreditTerm(item, vendor, factory){ const C=window.BC_CREDITTERM||{};
   const bi=C.item&&C.item[item];
@@ -10695,11 +10724,17 @@ function renderPayment(){
   let data=payRowsData();
   // เติมตัวเลือก Vendor (จากข้อมูลทั้งหมด) + กรองตามที่เลือก
   const vsel=document.getElementById('pay-vendor');
-  if(vsel){ const vs=[...new Set(data.map(r=>r.vendor).filter(Boolean))].sort(); const cur=window.paySelVendor||vsel.value||'__all__';
+  if(vsel){ const vs=[...new Set(data.map(r=>r.vendor).filter(Boolean))].sort(); const cur=vsel.value||window.paySelVendor||'__all__';   // อ่านค่าที่ผู้ใช้เพิ่งเลือกก่อน
     vsel.innerHTML='<option value="__all__">ทุก Vendor</option>'+vs.map(v=>`<option value="${payEsc(v)}">${payEsc(v)}</option>`).join('');
     vsel.value=(cur!=='__all__'&&vs.indexOf(cur)<0)?'__all__':cur; window.paySelVendor=vsel.value;
   }
   if(window.paySelVendor && window.paySelVendor!=='__all__') data=data.filter(r=>r.vendor===window.paySelVendor);
+  // ใช้วันที่โอนที่แก้เอง (ถ้ามี) + เก็บ meta ไว้ให้ modal
+  payLoadOv(); window._payRowMeta={};
+  data.forEach(r=>{ const key=r.cont+'|'+r.vendor+'|'+r.factory+'|'+(r.seg||''); r._key=key; const auto=r.xfer; const ov=window.payXferOv[key];
+    if(ov&&ov.date){ r.xfer=ov.date; r.xferReason=ov.reason||''; r.xferManual=true; }
+    window._payRowMeta[key]={cont:r.cont,vendor:r.vendor,factory:r.factory,seg:r.seg,auto:auto,cur:r.xfer,reason:(ov&&ov.reason)||''};
+  });
   const f2=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   function wkIndex(dstr){ const mm=String(dstr||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!mm) return -2; if(+mm[1]!==y || +mm[2]!==m) return -2; const d=+mm[3];
     for(let i=0;i<weeks.length;i++){ if(d>=weeks[i].start && d<=weeks[i].end) return i; if(d>weeks[i].end && (i+1>=weeks.length || d<weeks[i+1].start)) return i; } return -2; }
@@ -10717,7 +10752,7 @@ function renderPayment(){
   function restCells(r, venShow, gwi, wkTot, n, isFirst){   // gwi=index วีคของกลุ่ม · เซลล์ยอดรวม Week merge (rowspan=n) ตรงแนวทแยง · r=null แถวว่าง
     let c;
     if(r){
-      c=`<td style="${bTd}text-align:center;white-space:nowrap;font-weight:800;color:#7f1d1d;">${r.xfer?payThaiDate(r.xfer):'<span style="color:#9ca3af;font-weight:400;">-</span>'}</td>`
+      c=`<td onclick="payEditXfer('${encodeURIComponent(r._key||'')}')" title="${r.xferManual?('แก้เอง: '+payEsc(r.xferReason||'(ไม่ระบุเหตุผล)')):'คลิกเพื่อแก้ไขวันที่โอน'}" style="${bTd}text-align:center;white-space:nowrap;font-weight:800;color:#7f1d1d;cursor:pointer;${r.xferManual?'background:#ffe8a3;':''}">${r.xfer?payThaiDate(r.xfer):'<span style="color:#9ca3af;font-weight:400;">-</span>'}${r.xferManual?' ✎':''}</td>`
        + `<td style="${bTd}text-align:left;white-space:normal;"><b style="color:#111;">${payEsc(r.vendor)}</b><div style="font-size:10.5px;color:#6b7280;">${payEsc(r.factory)}</div></td>`
        + `<td style="${bTd}text-align:left;white-space:normal;font-size:11px;line-height:1.3;min-width:150px;color:#4b5563;">${payEsc(r.term)||'<span style="color:#9ca3af;">-</span>'}</td>`
        + `<td style="${bTd}text-align:center;white-space:nowrap;color:#374151;">${payThaiDate(r.load)}</td>`
@@ -10738,10 +10773,11 @@ function renderPayment(){
     return rows.map((r,ri)=>{ const show=seen[r.vendor]?null:wv[r.vendor]; seen[r.vendor]=1; return restCells(r,show,gwi,wkTot,n,ri===0); });
   }
   const wkLabel=(no,rng,n)=>`<td rowspan="${n}" style="border:1px solid #5c0f0f;font-weight:800;background:#7f1d1d;color:#f5d67a;text-align:center;white-space:nowrap;padding:4px 8px;">WEEK ${no}<div style="font-weight:600;font-size:10px;color:#e7c877;">${rng}</div></td>`;
-  let body='';
+  let body=''; const wkDivider='<tr><td colspan="'+totCols+'" style="height:5px;padding:0;border:0;background:#7f1d1d;"></td></tr>';   // เส้นคั่นวีคสีแดงเลือดหมู
   weeks.forEach((w,wi)=>{ const rows=byWeek[wi]; const rng='('+w.start+'-'+w.end+')';
     if(!rows.length){ body+='<tr>'+wkLabel(wi+1,rng,1)+restCells(null,null,wi,wkTotBaht[wi],1,true)+'</tr>'; }
     else { groupCells(rows,wi).forEach((cc,ri)=>{ body+='<tr>'+(ri===0?wkLabel(wi+1,rng,rows.length):'')+cc+'</tr>'; }); }
+    body+=wkDivider;
   });
   if(other.length){ groupCells(other,-1).forEach((cc,ri)=>{ body+='<tr>'+(ri===0?`<td rowspan="${other.length}" style="border:1px solid #5c0f0f;font-weight:800;background:#a33;text-align:center;white-space:nowrap;padding:4px 8px;color:#ffe;">อื่นๆ<div style="font-weight:500;font-size:9px;color:#ffd9d9;">นอกเดือน/ยังไม่กำหนด</div></td>`:'')+cc+'</tr>'; }); }
   const usd=payUsd(), usdTot=0;   // ยังไม่มีรายการสกุล USD (เผื่อไว้ · ปรับเรทได้)
