@@ -6340,7 +6340,6 @@ window.BC_DIYMON = {
 };
 </script>
 <script src="bc-diymon.js" onerror="void 0"></script>
-<script src="bc-diymopo.js" onerror="void 0"></script>
 
 <script>
 /* =====================================================================
@@ -7910,6 +7909,7 @@ function pkCell(code, pieces){ pieces=+pieces||0; const d=pkItem(code); if(!d||!
 function pkRowSum(r){ const rmb=pkRowCost(r).rmb||0, fx=pkFxVal(); let pcs=0,box=0,cbm=0; window.pkContainers.forEach((ct,c)=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p); pcs+=p; box+=cc.boxes; cbm+=cc.cbm; }); const vr=pcs*rmb; return {pcs,box,cbm,valRmb:vr,valThb:vr*fx}; }
 function pkContSum(c){ const fx=pkFxVal(); let pcs=0,box=0,cbm=0,vr=0; window.packingRows.forEach(r=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p); const rmb=pkRowCost(r).rmb||0; pcs+=p; box+=cc.boxes; cbm+=cc.cbm; vr+=p*rmb; }); return {pcs,box,cbm,valRmb:vr,valThb:vr*fx}; }
 function pkMoney(v){ return (Math.round(v)).toLocaleString('en-US'); }
+function pkMoney2(v){ return (+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function pkYuan(v){ return Number(v).toLocaleString('en-US',{maximumFractionDigits:2}); }
 
 /* ===== โหมด + ต้นทุนจาก Purchase Order Line (Direct Unit Cost / Lot) ===== */
@@ -8386,6 +8386,13 @@ function pkFactoryOptions(item){
   const seen=new Set(), out=[]; lt.opts.forEach(o=>{ const f=((o&&o.f)||'').trim(); if(f && !seen.has(f)){ seen.add(f); out.push(f); } }); return out;
 }
 function pkSetFactory(i, v){ const r=window.packingRows[i]; if(r) r.factory=v; }
+function pkSetVendor(i, v){ const r=window.packingRows[i]; if(r) r.vendor=v; }
+// ค่าเริ่มต้น Vendor/Factory/Term ตามรหัสสินค้า (โหมด Forecast) — เพิ่มกลุ่มใหม่ได้ที่นี่
+function pkDefaultVendorFactory(item){
+  const c=String(item||'').toUpperCase();
+  if(/^R-OSR/.test(c)) return {vendor:'Star Lighting (SUP24-322)', factory:'Osram', term:'100% after closing date, pay every 5, 15, 25'};
+  return null;
+}
 function renderPacking(){
   if(typeof pkUpdateConvertVis==='function') pkUpdateConvertVis();   // ปุ่มจับคู่ PO เฉพาะโหมด Forecast
   const conts=window.pkContainers;
@@ -8438,6 +8445,13 @@ function renderPacking(){
         if(cur && fops.indexOf(cur)<0) o+=`<option value="${cur.replace(/"/g,'&quot;')}" selected>${cur}</option>`;
         facTd=`<td><select onchange="pkSetFactory(${i},this.value)" title="เลือกโรงงาน (ตัวเลือกจาก Lead Time)" style="max-width:150px;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">${o}</select>${fops.length?'':'<div class="muted" style="font-size:10px;margin-top:2px;">ไม่มีใน Lead Time</div>'}</td>`;
       }
+    } else {   // โหมด Forecast: คอลัมน์ Vendor + Factory (กรอกเอง · เติมอัตโนมัติตามรหัส เช่น R-OSR)
+      if(r.item){ const def=pkDefaultVendorFactory(r.item);
+        if(def){ if(r.vendor===undefined) r.vendor=def.vendor; if(r.factory===undefined) r.factory=def.factory; if(r.term===undefined) r.term=def.term; } }
+      const inpSt='width:100%;box-sizing:border-box;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);';
+      const vv=(r.vendor||'').replace(/"/g,'&quot;'), ff=(r.factory||'').replace(/"/g,'&quot;');
+      facTd=`<td style="min-width:150px;"><input type="text" value="${vv}" onchange="pkSetVendor(${i},this.value)" placeholder="Vendor (กรอกเอง)" title="Vendor${r.term?(' · TERM: '+r.term.replace(/"/g,'&quot;')):''}" style="${inpSt}"></td>`
+        +`<td style="min-width:120px;"><input type="text" value="${ff}" onchange="pkSetFactory(${i},this.value)" placeholder="Factory (กรอกเอง)" title="Factory" style="${inpSt}"></td>`;
     }
     rows += `<tr>
       <td style="white-space:nowrap;"><input type="checkbox" ${(window.pkRowSel&&window.pkRowSel.has(i))?'checked':''} onchange="pkToggleRow(${i},this.checked)" title="เลือกเพื่อลบหลายแถว" style="vertical-align:middle;margin-right:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${pkColor(i)};vertical-align:middle;"></span> <b>${i+1}</b></td>
@@ -8471,11 +8485,11 @@ function renderPacking(){
   });
   let gp=0,gb=0,gc=0,gvr=0,gvt=0; window.packingRows.forEach(r=>{ const s=pkRowSum(r); gp+=s.pcs;gb+=s.box;gc+=s.cbm;gvr+=s.valRmb;gvt+=s.valThb; });
   const html = pkItemDatalist() + pkItemNoDatalist() + `<table>
-    <tr><th>#</th><th>Item (เลือก)</th><th>Subtype</th><th class="num">L</th><th class="num">W</th><th class="num">H</th><th class="num">ชิ้น/กล่อง</th><th>Lot (ต้นทุน)</th><th class="num">RMB Cost</th><th class="num">THB Cost</th>${REL?'<th>Factory</th>':''}${contTh}<th class="num">รวมชิ้น</th><th class="num">รวมกล่อง</th><th class="num">รวม CBM</th><th class="num">มูลค่ารวม ¥</th><th class="num">มูลค่ารวม ฿</th><th></th></tr>
+    <tr><th>#</th><th>Item (เลือก)</th><th>Subtype</th><th class="num">L</th><th class="num">W</th><th class="num">H</th><th class="num">ชิ้น/กล่อง</th><th>Lot (ต้นทุน)</th><th class="num">RMB Cost</th><th class="num">THB Cost</th>${REL?'<th>Factory</th>':'<th>Vendor</th><th>Factory</th>'}${contTh}<th class="num">รวมชิ้น</th><th class="num">รวมกล่อง</th><th class="num">รวม CBM</th><th class="num">มูลค่ารวม ¥</th><th class="num">มูลค่ารวม ฿</th><th></th></tr>
     ${rows}
-    <tr style="border-top:2px solid var(--line)"><td colspan="${REL?11:10}" class="num"><b>รวม CBM ต่อตู้ →</b></td>${footCbm}<td class="num" id="pk-gpcs"><b>${fmtNum(gp)}</b></td><td class="num" id="pk-gbox"><b>${fmt1(gb)}</b></td><td class="num" id="pk-gcbm"><b>${gc.toFixed(3)}</b></td><td class="num" id="pk-gvr"><b>¥${pkYuan(gvr)}</b></td><td class="num" id="pk-gvt"><b>฿${pkMoney(gvt)}</b></td><td></td></tr>
-    <tr><td colspan="${REL?11:10}" class="num"><b>มูลค่าต่อตู้ (¥) →</b></td>${footVr}<td class="num" colspan="6"></td></tr>
-    <tr><td colspan="${REL?11:10}" class="num"><b>มูลค่าต่อตู้ (฿) →</b></td>${footVt}<td class="num" colspan="6"></td></tr>
+    <tr style="border-top:2px solid var(--line)"><td colspan="${REL?11:12}" class="num"><b>รวม CBM ต่อตู้ →</b></td>${footCbm}<td class="num" id="pk-gpcs"><b>${fmtNum(gp)}</b></td><td class="num" id="pk-gbox"><b>${fmt1(gb)}</b></td><td class="num" id="pk-gcbm"><b>${gc.toFixed(3)}</b></td><td class="num" id="pk-gvr"><b>¥${pkYuan(gvr)}</b></td><td class="num" id="pk-gvt"><b>฿${pkMoney(gvt)}</b></td><td></td></tr>
+    <tr><td colspan="${REL?11:12}" class="num"><b>มูลค่าต่อตู้ (¥) →</b></td>${footVr}<td class="num" colspan="6"></td></tr>
+    <tr><td colspan="${REL?11:12}" class="num"><b>มูลค่าต่อตู้ (฿) →</b></td>${footVt}<td class="num" colspan="6"></td></tr>
   </table>`;
   document.getElementById('pk-result').innerHTML = html;
   renderContainers();
@@ -8769,7 +8783,7 @@ function pkSnapshot(){
     const d=pkItem(r.item), rs=pkRowSum(r), rc=pkRowCost(r);
     const rmb=rc.rmb||0;
     const per = window.pkContainers.map((ct,c)=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p); const cellLot=(window.pkMode==='released')?(rc.lot||''):((r.lots||[])[c]||''); return {pcs:p, lot:cellLot, boxes:cc.boxes, cbm:cc.cbm, valRmb:p*rmb}; });
-    return {item:r.item, custom:!!r.custom, desc:d?d.desc:'', L:d?d.L:0, W:d?d.W:0, H:d?d.H:0, pcsPerBox:d?d.pcs:0, po:rc.po||'', factory:r.factory||'', costIdx:(r.costIdx==null?null:r.costIdx), lotMax:(r.lotMax==null?null:r.lotMax), costLot:rc.lot||'', rmb:rc.rmb, thb:rc.thb, rmbFixed:(r.rmbFixed!=null&&r.rmbFixed!==''?+r.rmbFixed:undefined), per, pcs:rs.pcs, boxes:rs.box, cbm:rs.cbm, valRmb:rs.valRmb, valThb:rs.valThb};
+    return {item:r.item, custom:!!r.custom, desc:d?d.desc:'', L:d?d.L:0, W:d?d.W:0, H:d?d.H:0, pcsPerBox:d?d.pcs:0, po:rc.po||'', vendor:r.vendor||'', factory:r.factory||'', term:r.term||'', costIdx:(r.costIdx==null?null:r.costIdx), lotMax:(r.lotMax==null?null:r.lotMax), costLot:rc.lot||'', rmb:rc.rmb, thb:rc.thb, rmbFixed:(r.rmbFixed!=null&&r.rmbFixed!==''?+r.rmbFixed:undefined), per, pcs:rs.pcs, boxes:rs.box, cbm:rs.cbm, valRmb:rs.valRmb, valThb:rs.valThb};
   }).filter(r=>r.item);
   const contTotals = window.pkContainers.map((ct,c)=>{ const cs=pkContSum(c); return {pcs:cs.pcs, boxes:cs.box, cbm:cs.cbm, valRmb:cs.valRmb, valThb:cs.valThb}; });
   let gp=0,gb=0,gc=0,gvr=0,gvt=0; rows.forEach(r=>{gp+=r.pcs;gb+=r.boxes;gc+=r.cbm;gvr+=r.valRmb;gvt+=r.valThb;});
@@ -8908,12 +8922,12 @@ function pkLoadRound(idx){
   window.pkCustomDims = window.pkCustomDims || {};
   window.packingRows  = s.rows.map(r=>{
     let lm=(r.lotMax==null?null:r.lotMax);
-    if(r.custom){ window.pkCustomDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1), desc:r.desc||'', rmb:(r.rmb==null?'':r.rmb)}; return {item:r.item, custom:true, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:null, lotMax:null}; }
+    if(r.custom){ window.pkCustomDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1), desc:r.desc||'', rmb:(r.rmb==null?'':r.rmb)}; return {item:r.item, custom:true, vendor:r.vendor||undefined, factory:r.factory||undefined, term:r.term||undefined, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:null, lotMax:null}; }
     // สินค้าผูก PO แต่ไม่มีมิติกล่องในระบบ → กู้มิติที่กรอกไว้กลับมาใน overlay
     if(r.item && !(window.BC_PACKING&&window.BC_PACKING[r.item])){ window.pkCustomDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1), desc:r.desc||'', rmb:(window.pkCustomDims[r.item]&&window.pkCustomDims[r.item].rmb)||''}; }
     if(s.mode==='released' && r.po){ const cp=pkPackCap(r.po,r.item); if(cp.cap!=null){ let others=0; (window.pkLog||[]).forEach((ss,i)=>{ if(i===idx) return; (ss.rows||[]).forEach(rr=>{ if(rr.po===r.po && rr.item===r.item) others+=(rr.pcs||0); }); }); lm=Math.max(0,cp.cap-others); } }   // เหลือจัดได้ = จำนวนสั่งผลิต/ค้างรับ − ที่จัดในรอบอื่น
     const _rf=(r.rmbFixed!=null&&r.rmbFixed!=='')?+r.rmbFixed:((r.rmb!=null&&r.rmb!=='')?+r.rmb:undefined);   // fallback ต้นทุนล่าสุดที่บันทึกไว้ (กันหายตอนแก้ไขตู้ปิด/import ที่ Lot ไม่อยู่ในระบบแล้ว)
-    return {item:r.item, factory:r.factory||undefined, rmbFixed:_rf, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:(r.costIdx==null?null:r.costIdx), lotMax:lm};
+    return {item:r.item, vendor:r.vendor||undefined, factory:r.factory||undefined, term:r.term||undefined, rmbFixed:_rf, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:(r.costIdx==null?null:r.costIdx), lotMax:lm};
   });
   if(!window.packingRows.length) window.packingRows=[{item:'',loads:[],lots:[],costIdx:null}];
   if(s.mode){ window.pkMode=s.mode; const rb=document.querySelector('input[name="pk-mode"][value="'+s.mode+'"]'); if(rb) rb.checked=true; }
@@ -9679,9 +9693,9 @@ function renderArrivedMatrix(){
   let html=`<div style="overflow-x:auto;"><table style="font-size:11.5px;width:100%;"><thead>${head}</thead><tbody>${body}<tr style="background:var(--brand-soft);"><td style="text-align:left;"><b>รวมทั้งหมด</b></td><td class="num" colspan="12" style="text-align:right;"><span class="muted">รวมทุกเดือน →</span></td><td class="num"><b>${gn}</b> ตู้<div class="muted" style="font-size:9px;">฿${pkMoney(gv)}</div></td></tr></tbody></table></div>`;
   if(window.pkArrSel){ const list=cont.filter(c=>c.ym===window.pkArrSel).sort((a,b)=>(a.eta<b.eta?-1:1));
     const y=window.pkArrSel.slice(0,4), m=+window.pkArrSel.slice(5,7);
-    html+=`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;"><div style="font-weight:700;font-size:12.5px;margin-bottom:5px;">📦 ตู้ที่ ETA ${MN[m-1]} ${y} · ${list.length} ตู้ · รวม ฿${pkMoney(list.reduce((s,c)=>s+c.valThb,0))}</div>`
+    html+=`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;"><div style="font-weight:700;font-size:12.5px;margin-bottom:5px;">📦 ตู้ที่ ETA ${MN[m-1]} ${y} · ${list.length} ตู้ · รวม ฿${pkMoney2(list.reduce((s,c)=>s+c.valThb,0))}</div>`
       +'<div style="overflow-x:auto;"><table style="font-size:11.5px;width:100%;"><tr><th style="text-align:center;">ตู้</th><th style="text-align:center;">สถานะ</th><th style="text-align:center;">ETA</th><th class="num">มูลค่า (฿)</th><th class="num">¥</th></tr>'
-      +list.map(c=>`<tr><td style="text-align:center;"><b>${c.name}</b></td><td style="text-align:center;"><span style="font-size:10.5px;font-weight:700;color:${c.stColor};white-space:nowrap;">${c.stLabel}</span></td><td style="text-align:center;">${c.eta?poThaiShort(c.eta):'-'}</td><td class="num">฿${pkMoney(c.valThb)}</td><td class="num">¥${pkMoney(c.valRmb)}</td></tr>`).join('')
+      +list.map(c=>`<tr><td style="text-align:center;"><b>${c.name}</b></td><td style="text-align:center;"><span style="font-size:10.5px;font-weight:700;color:${c.stColor};white-space:nowrap;">${c.stLabel}</span></td><td style="text-align:center;">${c.eta?poThaiShort(c.eta):'-'}</td><td class="num">฿${pkMoney2(c.valThb)}</td><td class="num">¥${pkMoney2(c.valRmb)}</td></tr>`).join('')
       +'</table></div></div>';
   } else { html+='<div class="muted" style="font-size:11px;margin-top:6px;">👆 คลิกช่องเดือนในตารางเพื่อกางดูรายตู้ (ETA + มูลค่าแต่ละตู้)</div>'; }
   el.innerHTML=html;
@@ -9984,8 +9998,7 @@ function flowSalesDIY(it){
   const offs=[0.27,0.47,0.67];
   rows.forEach((r,i)=>{ const gx=L+i*gw, cx=gx+gw/2;
     [['si',r.si],['st',r.st],['so',r.so]].forEach(([k,v],j)=>{ const bx=gx+gw*offs[j]-bw/2, h=v/maxV*PH, by=y0-h;
-      const poYM=selY+'-'+p(r.m); const poTxt=(k==='si'&&window.BC_DIYMON_PO&&window.BC_DIYMON_PO[it.no]&&window.BC_DIYMON_PO[it.no][poYM])?String(window.BC_DIYMON_PO[it.no][poYM]).replace(/&/g,'&amp;').replace(/</g,'&lt;'):'';
-bars+=`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,h).toFixed(1)}" rx="2.5" fill="${COL[k]}">${poTxt?'<title>'+poTxt+'</title>':''}</rect>`;
+      bars+=`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,h).toFixed(1)}" rx="2.5" fill="${COL[k]}"/>`;
       if(v>0) labels+=chip(bx+bw/2,by-1,fmtK(v),LBG[k],LTX[k]); });
     const ty=TOP+PH*(1-r.to/(maxT*1.45)); pts.push([cx,ty]);
     if(r.to>0) tolab+=chip(cx,ty-1,r.to.toFixed(1)+'%','#fde3cf','#c2410c');
@@ -10652,6 +10665,8 @@ function payCreditTerm(item, vendor, factory){ const C=window.BC_CREDITTERM||{};
   if(bi){ if(bi[vendor+'|'+factory]) return bi[vendor+'|'+factory]; const vals=Object.values(bi); if(vals.length) return vals[0]; }   // เจาะจงต่อรหัสสินค้าก่อน
   if(C.pair&&C.pair[vendor+'|'+factory]) return C.pair[vendor+'|'+factory];
   if(C.vendor&&C.vendor[vendor]) return C.vendor[vendor];
+  const def=(typeof pkDefaultVendorFactory==='function')&&pkDefaultVendorFactory(item);   // fallback ตามรหัสสินค้า (เช่น R-OSR)
+  if(def&&def.term) return def.term;
   return ''; }
 // วันที่โอน คำนวณจาก Term + Loading date
 function payDkey(dt){ return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
@@ -10792,7 +10807,8 @@ function renderPayment(){
   const cfCells=(r)=> r ? cfTypes.map(t=>`<td style="${bTd}text-align:center;vertical-align:middle;"><input type="checkbox" ${payChk(r._key+'|'+t)?'checked':''} onchange="payToggleCheck('${r._key+'|'+t}',this.checked)" style="width:17px;height:17px;cursor:pointer;"></td>`).join('') : `<td style="${bTd}"></td>`.repeat(3);   // CF/SUPPLIER CF/BANK SLIP ต่อบรรทัด
   const cfBlank3=`<td style="${bTd}"></td>`.repeat(3);
   let body=''; const divColspan=LEFT.length+1+weeks.length;   // WEEK..คอลัมน์วีคสุดท้าย (ไม่รวมฝั่งขวา)
-  const wkDivider='<tr><td colspan="'+divColspan+'" style="height:2px;line-height:2px;font-size:0;padding:0;border:0;background:#7f1d1d;"></td>'+cfBlank3+'</tr>';   // เส้นคั่นวีค (ฝั่งซ้าย) + ช่อง CF ว่าง (ฝั่งขวาไม่มีเส้น)
+  const divBlank3=`<td style="height:2px;line-height:2px;font-size:0;padding:0;border:0;"></td>`.repeat(3);
+  const wkDivider='<tr style="height:2px;"><td colspan="'+divColspan+'" style="height:2px;line-height:2px;font-size:0;padding:0;border:0;background:#7f1d1d;"></td>'+divBlank3+'</tr>';   // เส้นคั่นวีค (ฝั่งซ้าย) + ช่อง CF ว่าง (ฝั่งขวาไม่มีเส้น)
   const emitted={};
   weeks.forEach((w,wi)=>{ const rows=byWeek[wi]; const rng='('+w.start+'-'+w.end+')'; const half=halfOf(wi);
     const dataRows = rows.length ? rows : [null];
@@ -10822,7 +10838,10 @@ function renderPayment(){
       <table style="border-collapse:collapse;font-size:12px;min-width:100%;">${head}${body}</table>
       ${totals}
     </div>
-    ${payCalendarHtml(y,m)}
+    <div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;">
+      ${payCalendarHtml(y,m)}
+      <div title="ปีมังกร · ความมั่งคั่ง" style="width:8cm;text-align:center;font-size:120px;line-height:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,.25));user-select:none;">🐉</div>
+    </div>
   </div>`;
 }
 function renderTab(tab){
