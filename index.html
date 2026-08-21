@@ -10640,6 +10640,10 @@ function paySaveXfer(enc){ const key=decodeURIComponent(enc); const d=document.g
   const ov=document.getElementById('pay-xfer-ov'); if(ov) ov.remove(); renderPayment(); pkToast('บันทึกวันที่โอนแล้ว','good');
 }
 function payResetXfer(enc){ const key=decodeURIComponent(enc); payLoadOv(); delete window.payXferOv[key]; paySaveOv(); const ov=document.getElementById('pay-xfer-ov'); if(ov) ov.remove(); renderPayment(); pkToast('คืนค่าวันที่โอนอัตโนมัติแล้ว','good'); }
+// ---- checkbox บัญชี CF / SUPPLIER CF / BANK SLIP (เก็บ localStorage) ----
+function payLoadCheck(){ if(window.payCheck) return; try{ window.payCheck=JSON.parse(localStorage.getItem('payCheckV1')||'{}'); }catch(e){ window.payCheck={}; } }
+function payChk(key){ payLoadCheck(); return !!window.payCheck[key]; }
+function payToggleCheck(key,on){ payLoadCheck(); if(on) window.payCheck[key]=1; else delete window.payCheck[key]; try{ localStorage.setItem('payCheckV1', JSON.stringify(window.payCheck)); }catch(e){} }
 function payVendorForFactory(item, factory){ const lt=(window.BC_LEADTIME&&window.BC_LEADTIME[item]); if(lt&&Array.isArray(lt.opts)){ const o=lt.opts.find(x=>((x&&x.f)||'')===factory); if(o&&o.v) return o.v; } return ''; }
 function payCreditTerm(item, vendor, factory){ const C=window.BC_CREDITTERM||{};
   const bi=C.item&&C.item[item];
@@ -10765,7 +10769,7 @@ function renderPayment(){
       if(ci===gwi){ return isFirst ? `<td rowspan="${n}" style="${bTd}text-align:right;vertical-align:middle;white-space:nowrap;font-weight:800;font-size:12px;color:#7f1d1d;background:#fbe0e0;">฿${f2(wkTot)}</td>` : ''; }   // merge ครอบทุกบรรทัดของวีค
       return `<td style="${bTd}"></td>`;
     }).join('');
-    return c + gapTd + wkCells + gapTd + RIGHT.map(()=>`<td style="${bTd}"></td>`).join('');
+    return c + gapTd + wkCells;   // ฝั่งขวา (TOTAL 1-15/16-31 + CF/slip) emit แยกแบบ merge ต่อครึ่งเดือน
   }
   function groupCells(rows, gwi){   // vendor total แยกต่อวีค (แถวแรกของแต่ละ vendor) + ยอดรวมวีค (merge ทั้งกลุ่ม)
     const wv={}; rows.forEach(r=> wv[r.vendor]=(wv[r.vendor]||0)+r.amtRmb); const seen={};
@@ -10773,13 +10777,32 @@ function renderPayment(){
     return rows.map((r,ri)=>{ const show=seen[r.vendor]?null:wv[r.vendor]; seen[r.vendor]=1; return restCells(r,show,gwi,wkTot,n,ri===0); });
   }
   const wkLabel=(no,rng,n)=>`<td rowspan="${n}" style="border:1px solid #5c0f0f;font-weight:800;background:#7f1d1d;color:#f5d67a;text-align:center;white-space:nowrap;padding:4px 8px;">WEEK ${no}<div style="font-weight:600;font-size:10px;color:#e7c877;">${rng}</div></td>`;
-  let body=''; const wkDivider='<tr><td colspan="'+totCols+'" style="height:5px;padding:0;border:0;background:#7f1d1d;"></td></tr>';   // เส้นคั่นวีคสีแดงเลือดหมู
-  weeks.forEach((w,wi)=>{ const rows=byWeek[wi]; const rng='('+w.start+'-'+w.end+')';
-    if(!rows.length){ body+='<tr>'+wkLabel(wi+1,rng,1)+restCells(null,null,wi,wkTotBaht[wi],1,true)+'</tr>'; }
-    else { groupCells(rows,wi).forEach((cc,ri)=>{ body+='<tr>'+(ri===0?wkLabel(wi+1,rng,rows.length):'')+cc+'</tr>'; }); }
+  // ---- ฝั่งขวา: TOTAL (1-15)/(16-31) merge ต่อครึ่งเดือน + checkbox CF/SUPPLIER CF/BANK SLIP ----
+  let tot1=0, tot2=0; byWeek.forEach(rows=>rows.forEach(r=>{ const dm=String(r.xfer).match(/-(\d{1,2})$/); const d=dm?+dm[1]:0; const b=r.amtRmb*fx; if(d>=1&&d<=15) tot1+=b; else if(d>=16) tot2+=b; }));
+  const halfOf=wi=>weeks[wi].start<=15?1:2;
+  const weekPhys=wi=>Math.max(1, byWeek[wi].length)+1;   // +1 = แถวคั่น
+  let phys1=0, phys2=0; weeks.forEach((w,wi)=>{ if(halfOf(wi)===1) phys1+=weekPhys(wi); else phys2+=weekPhys(wi); });
+  const gapRs=n=>`<td rowspan="${n}" style="background:var(--bg);border:none;width:8px;"></td>`;
+  const totCell=(n,v)=>`<td rowspan="${n}" style="${bTd}text-align:right;vertical-align:middle;white-space:nowrap;font-weight:800;color:#7f1d1d;${v?'background:#fbe0e0;':''}">${v||''}</td>`;
+  const chkCell=(n,key)=>`<td rowspan="${n}" style="${bTd}text-align:center;vertical-align:middle;"><input type="checkbox" ${payChk(key)?'checked':''} onchange="payToggleCheck('${key}',this.checked)" style="width:17px;height:17px;cursor:pointer;"></td>`;
+  const rightGroup=(half,n)=>{ const kp=be+'|'+m+'|'+half; return gapRs(n)+totCell(n,half===1?('฿'+f2(tot1)):'')+totCell(n,half===2?('฿'+f2(tot2)):'')+chkCell(n,kp+'|cf')+chkCell(n,kp+'|supcf')+chkCell(n,kp+'|slip'); };
+  const rightBlank=n=>gapRs(n)+`<td rowspan="${n}" style="${bTd}"></td>`.repeat(5);
+  let body=''; const divColspan=LEFT.length+1+weeks.length;   // WEEK..คอลัมน์วีคสุดท้าย (ไม่รวมฝั่งขวา)
+  const wkDivider='<tr><td colspan="'+divColspan+'" style="height:5px;padding:0;border:0;background:#7f1d1d;"></td></tr>';   // เส้นคั่นวีค (เฉพาะฝั่งซ้าย ไม่ล้ำฝั่งขวา)
+  const emitted={};
+  weeks.forEach((w,wi)=>{ const rows=byWeek[wi]; const rng='('+w.start+'-'+w.end+')'; const half=halfOf(wi);
+    const cells = rows.length ? groupCells(rows,wi) : [restCells(null,null,wi,wkTotBaht[wi],1,true)];
+    const wl = rows.length ? wkLabel(wi+1,rng,rows.length) : wkLabel(wi+1,rng,1);
+    cells.forEach((cc,ri)=>{ let tr='<tr>'+(ri===0?wl:'')+cc;
+      if(ri===0 && !emitted[half]){ tr+=rightGroup(half, half===1?phys1:phys2); emitted[half]=true; }
+      body+=tr+'</tr>';
+    });
     body+=wkDivider;
   });
-  if(other.length){ groupCells(other,-1).forEach((cc,ri)=>{ body+='<tr>'+(ri===0?`<td rowspan="${other.length}" style="border:1px solid #5c0f0f;font-weight:800;background:#a33;text-align:center;white-space:nowrap;padding:4px 8px;color:#ffe;">อื่นๆ<div style="font-weight:500;font-size:9px;color:#ffd9d9;">นอกเดือน/ยังไม่กำหนด</div></td>`:'')+cc+'</tr>'; }); }
+  if(other.length){ const oc=groupCells(other,-1);
+    oc.forEach((cc,ri)=>{ let tr='<tr>'+(ri===0?`<td rowspan="${other.length}" style="border:1px solid #5c0f0f;font-weight:800;background:#a33;text-align:center;white-space:nowrap;padding:4px 8px;color:#ffe;">อื่นๆ<div style="font-weight:500;font-size:9px;color:#ffd9d9;">นอกเดือน/ยังไม่กำหนด</div></td>`:'')+cc;
+      if(ri===0) tr+=rightBlank(other.length); body+=tr+'</tr>'; });
+  }
   const usd=payUsd(), usdTot=0;   // ยังไม่มีรายการสกุล USD (เผื่อไว้ · ปรับเรทได้)
   const tdT='text-align:right;padding:8px 14px;border:1px solid #a8801f;color:#111;';
   const totals=`<div style="margin-top:14px;display:inline-block;border:1px solid #a8801f;border-radius:10px;overflow:hidden;">
