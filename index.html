@@ -10644,7 +10644,7 @@ function renderPayment(){
   const bySort=(a,b)=> String(a.vendor).localeCompare(String(b.vendor)) || String(a.cont).localeCompare(String(b.cont));
   byWeek.forEach(a=>a.sort(bySort)); other.sort(bySort);
   const wkTotBaht=weeks.map((w,wi)=> byWeek[wi].reduce((a,r)=>a+r.amtRmb,0)*fx);   // ยอดรวม TOTAL (SUPPLIER-BAHT) ต่อวีค
-  function restCells(r, venShow, gwi, wkShow){   // gwi=index วีคของกลุ่ม, wkShow=ยอดรวมวีค(บาท) แสดงในคอลัมน์ WEEK ตรงแนวทแยง (แถวแรก) · r=null แถวว่าง
+  function restCells(r, venShow, gwi, wkTot, n, isFirst){   // gwi=index วีคของกลุ่ม · เซลล์ยอดรวม Week merge (rowspan=n) ตรงแนวทแยง · r=null แถวว่าง
     let c;
     if(r){
       c=`<td style="${bTd}text-align:center;white-space:nowrap;font-weight:800;color:#7f1d1d;">${r.xfer?payThaiDate(r.xfer):'<span style="color:#9ca3af;font-weight:400;">-</span>'}</td>`
@@ -10656,18 +10656,21 @@ function renderPayment(){
        + `<td style="${bTd}text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?('¥'+f2(venShow)):''}</td>`
        + `<td style="${bTd}text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?('฿'+f2(venShow*fx)):''}</td>`;
     } else { c=`<td style="${bTd}"></td>`.repeat(8); }
-    const wkCells=weeks.map((w,ci)=> (ci===gwi && wkShow!=null) ? `<td style="${bTd}text-align:right;white-space:nowrap;font-weight:800;color:#7f1d1d;background:#fbe0e0;">฿${f2(wkShow)}</td>` : `<td style="${bTd}"></td>`).join('');
+    const wkCells=weeks.map((w,ci)=>{
+      if(ci===gwi){ return isFirst ? `<td rowspan="${n}" style="${bTd}text-align:right;vertical-align:middle;white-space:nowrap;font-weight:800;font-size:12px;color:#7f1d1d;background:#fbe0e0;">฿${f2(wkTot)}</td>` : ''; }   // merge ครอบทุกบรรทัดของวีค
+      return `<td style="${bTd}"></td>`;
+    }).join('');
     return c + gapTd + wkCells + gapTd + RIGHT.map(()=>`<td style="${bTd}"></td>`).join('');
   }
-  function groupCells(rows, gwi){   // vendor total แยกต่อวีค (แสดงแถวแรกของแต่ละ vendor) + ยอดรวมวีคในคอลัมน์ WEEK (แถวแรกของกลุ่ม)
+  function groupCells(rows, gwi){   // vendor total แยกต่อวีค (แถวแรกของแต่ละ vendor) + ยอดรวมวีค (merge ทั้งกลุ่ม)
     const wv={}; rows.forEach(r=> wv[r.vendor]=(wv[r.vendor]||0)+r.amtRmb); const seen={};
-    const wkTot=rows.reduce((a,r)=>a+r.amtRmb,0)*fx;
-    return rows.map((r,ri)=>{ const show=seen[r.vendor]?null:wv[r.vendor]; seen[r.vendor]=1; return restCells(r,show,gwi, ri===0?wkTot:null); });
+    const wkTot=rows.reduce((a,r)=>a+r.amtRmb,0)*fx, n=rows.length;
+    return rows.map((r,ri)=>{ const show=seen[r.vendor]?null:wv[r.vendor]; seen[r.vendor]=1; return restCells(r,show,gwi,wkTot,n,ri===0); });
   }
   const wkLabel=(no,rng,n)=>`<td rowspan="${n}" style="border:1px solid #5c0f0f;font-weight:800;background:#7f1d1d;color:#f5d67a;text-align:center;white-space:nowrap;padding:4px 8px;">WEEK ${no}<div style="font-weight:600;font-size:10px;color:#e7c877;">${rng}</div></td>`;
   let body='';
   weeks.forEach((w,wi)=>{ const rows=byWeek[wi]; const rng='('+w.start+'-'+w.end+')';
-    if(!rows.length){ body+='<tr>'+wkLabel(wi+1,rng,1)+restCells(null,null,wi,wkTotBaht[wi])+'</tr>'; }
+    if(!rows.length){ body+='<tr>'+wkLabel(wi+1,rng,1)+restCells(null,null,wi,wkTotBaht[wi],1,true)+'</tr>'; }
     else { groupCells(rows,wi).forEach((cc,ri)=>{ body+='<tr>'+(ri===0?wkLabel(wi+1,rng,rows.length):'')+cc+'</tr>'; }); }
   });
   if(other.length){ groupCells(other,-1).forEach((cc,ri)=>{ body+='<tr>'+(ri===0?`<td rowspan="${other.length}" style="border:1px solid #5c0f0f;font-weight:800;background:#a33;text-align:center;white-space:nowrap;padding:4px 8px;color:#ffe;">อื่นๆ<div style="font-weight:500;font-size:9px;color:#ffd9d9;">นอกเดือน/ยังไม่กำหนด</div></td>`:'')+cc+'</tr>'; }); }
