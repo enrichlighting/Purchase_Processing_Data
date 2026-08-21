@@ -6340,6 +6340,7 @@ window.BC_DIYMON = {
 };
 </script>
 <script src="bc-diymon.js" onerror="void 0"></script>
+<script src="bc-diymopo.js" onerror="void 0"></script>
 
 <script>
 /* =====================================================================
@@ -10790,8 +10791,7 @@ function renderPayment(){
   const cfCells=(r)=> r ? cfTypes.map(t=>`<td style="${bTd}text-align:center;vertical-align:middle;"><input type="checkbox" ${payChk(r._key+'|'+t)?'checked':''} onchange="payToggleCheck('${r._key+'|'+t}',this.checked)" style="width:17px;height:17px;cursor:pointer;"></td>`).join('') : `<td style="${bTd}"></td>`.repeat(3);   // CF/SUPPLIER CF/BANK SLIP ต่อบรรทัด
   const cfBlank3=`<td style="${bTd}"></td>`.repeat(3);
   let body=''; const divColspan=LEFT.length+1+weeks.length;   // WEEK..คอลัมน์วีคสุดท้าย (ไม่รวมฝั่งขวา)
-  const divBlank3=`<td style="height:2px;line-height:2px;font-size:0;padding:0;border:0;"></td>`.repeat(3);
-  const wkDivider='<tr style="height:2px;"><td colspan="'+divColspan+'" style="height:2px;line-height:2px;font-size:0;padding:0;border:0;background:#7f1d1d;"></td>'+divBlank3+'</tr>';   // เส้นคั่นวีค (ฝั่งซ้าย) + ช่อง CF ว่าง (ฝั่งขวาไม่มีเส้น)
+  const wkDivider='<tr><td colspan="'+divColspan+'" style="height:2px;line-height:2px;font-size:0;padding:0;border:0;background:#7f1d1d;"></td>'+cfBlank3+'</tr>';   // เส้นคั่นวีค (ฝั่งซ้าย) + ช่อง CF ว่าง (ฝั่งขวาไม่มีเส้น)
   const emitted={};
   weeks.forEach((w,wi)=>{ const rows=byWeek[wi]; const rng='('+w.start+'-'+w.end+')'; const half=halfOf(wi);
     const dataRows = rows.length ? rows : [null];
@@ -10821,10 +10821,7 @@ function renderPayment(){
       <table style="border-collapse:collapse;font-size:12px;min-width:100%;">${head}${body}</table>
       ${totals}
     </div>
-    <div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;">
-      ${payCalendarHtml(y,m)}
-      <div title="ปีมังกร · ความมั่งคั่ง" style="width:8cm;text-align:center;font-size:120px;line-height:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,.25));user-select:none;">🐉</div>
-    </div>
+    ${payCalendarHtml(y,m)}
   </div>`;
 }
 function renderTab(tab){
