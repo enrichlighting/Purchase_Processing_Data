@@ -8908,7 +8908,8 @@ function pkLoadRound(idx){
     // สินค้าผูก PO แต่ไม่มีมิติกล่องในระบบ → กู้มิติที่กรอกไว้กลับมาใน overlay
     if(r.item && !(window.BC_PACKING&&window.BC_PACKING[r.item])){ window.pkCustomDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1), desc:r.desc||'', rmb:(window.pkCustomDims[r.item]&&window.pkCustomDims[r.item].rmb)||''}; }
     if(s.mode==='released' && r.po){ const cp=pkPackCap(r.po,r.item); if(cp.cap!=null){ let others=0; (window.pkLog||[]).forEach((ss,i)=>{ if(i===idx) return; (ss.rows||[]).forEach(rr=>{ if(rr.po===r.po && rr.item===r.item) others+=(rr.pcs||0); }); }); lm=Math.max(0,cp.cap-others); } }   // เหลือจัดได้ = จำนวนสั่งผลิต/ค้างรับ − ที่จัดในรอบอื่น
-    return {item:r.item, factory:r.factory||undefined, rmbFixed:(r.rmbFixed!=null&&r.rmbFixed!==''?+r.rmbFixed:undefined), loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:(r.costIdx==null?null:r.costIdx), lotMax:lm};
+    const _rf=(r.rmbFixed!=null&&r.rmbFixed!=='')?+r.rmbFixed:((r.rmb!=null&&r.rmb!=='')?+r.rmb:undefined);   // fallback ต้นทุนล่าสุดที่บันทึกไว้ (กันหายตอนแก้ไขตู้ปิด/import ที่ Lot ไม่อยู่ในระบบแล้ว)
+    return {item:r.item, factory:r.factory||undefined, rmbFixed:_rf, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:(r.costIdx==null?null:r.costIdx), lotMax:lm};
   });
   if(!window.packingRows.length) window.packingRows=[{item:'',loads:[],lots:[],costIdx:null}];
   if(s.mode){ window.pkMode=s.mode; const rb=document.querySelector('input[name="pk-mode"][value="'+s.mode+'"]'); if(rb) rb.checked=true; }
