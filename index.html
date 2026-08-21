@@ -10643,7 +10643,8 @@ function renderPayment(){
   const grand=shown.reduce((a,r)=>a+r.amtRmb,0);
   const bySort=(a,b)=> String(a.vendor).localeCompare(String(b.vendor)) || String(a.cont).localeCompare(String(b.cont));
   byWeek.forEach(a=>a.sort(bySort)); other.sort(bySort);
-  function restCells(r, venShow){   // venShow=ยอดรวม vendor ในวีคนั้น (แสดงแถวแรกของ vendor) · null=ไม่แสดง · r=null แถวว่าง
+  const wkTotBaht=weeks.map((w,wi)=> byWeek[wi].reduce((a,r)=>a+r.amtRmb,0)*fx);   // ยอดรวม TOTAL (SUPPLIER-BAHT) ต่อวีค
+  function restCells(r, venShow, gwi, wkShow){   // gwi=index วีคของกลุ่ม, wkShow=ยอดรวมวีค(บาท) แสดงในคอลัมน์ WEEK ตรงแนวทแยง (แถวแรก) · r=null แถวว่าง
     let c;
     if(r){
       c=`<td style="${bTd}text-align:center;white-space:nowrap;font-weight:800;color:#7f1d1d;">${r.xfer?payThaiDate(r.xfer):'<span style="color:#9ca3af;font-weight:400;">-</span>'}</td>`
@@ -10655,19 +10656,21 @@ function renderPayment(){
        + `<td style="${bTd}text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?('¥'+f2(venShow)):''}</td>`
        + `<td style="${bTd}text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?('฿'+f2(venShow*fx)):''}</td>`;
     } else { c=`<td style="${bTd}"></td>`.repeat(8); }
-    return c + gapTd + weeks.map(()=>`<td style="${bTd}"></td>`).join('') + gapTd + RIGHT.map(()=>`<td style="${bTd}"></td>`).join('');
+    const wkCells=weeks.map((w,ci)=> (ci===gwi && wkShow!=null) ? `<td style="${bTd}text-align:right;white-space:nowrap;font-weight:800;color:#7f1d1d;background:#fbe0e0;">฿${f2(wkShow)}</td>` : `<td style="${bTd}"></td>`).join('');
+    return c + gapTd + wkCells + gapTd + RIGHT.map(()=>`<td style="${bTd}"></td>`).join('');
   }
-  function groupCells(rows){   // vendor total แยกต่อวีค (แสดงแถวแรกของแต่ละ vendor ในวีคนั้น)
+  function groupCells(rows, gwi){   // vendor total แยกต่อวีค (แสดงแถวแรกของแต่ละ vendor) + ยอดรวมวีคในคอลัมน์ WEEK (แถวแรกของกลุ่ม)
     const wv={}; rows.forEach(r=> wv[r.vendor]=(wv[r.vendor]||0)+r.amtRmb); const seen={};
-    return rows.map(r=>{ const show=seen[r.vendor]?null:wv[r.vendor]; seen[r.vendor]=1; return restCells(r,show); });
+    const wkTot=rows.reduce((a,r)=>a+r.amtRmb,0)*fx;
+    return rows.map((r,ri)=>{ const show=seen[r.vendor]?null:wv[r.vendor]; seen[r.vendor]=1; return restCells(r,show,gwi, ri===0?wkTot:null); });
   }
   const wkLabel=(no,rng,n)=>`<td rowspan="${n}" style="border:1px solid #5c0f0f;font-weight:800;background:#7f1d1d;color:#f5d67a;text-align:center;white-space:nowrap;padding:4px 8px;">WEEK ${no}<div style="font-weight:600;font-size:10px;color:#e7c877;">${rng}</div></td>`;
   let body='';
   weeks.forEach((w,wi)=>{ const rows=byWeek[wi]; const rng='('+w.start+'-'+w.end+')';
-    if(!rows.length){ body+='<tr>'+wkLabel(wi+1,rng,1)+restCells(null,null)+'</tr>'; }
-    else { groupCells(rows).forEach((cc,ri)=>{ body+='<tr>'+(ri===0?wkLabel(wi+1,rng,rows.length):'')+cc+'</tr>'; }); }
+    if(!rows.length){ body+='<tr>'+wkLabel(wi+1,rng,1)+restCells(null,null,wi,wkTotBaht[wi])+'</tr>'; }
+    else { groupCells(rows,wi).forEach((cc,ri)=>{ body+='<tr>'+(ri===0?wkLabel(wi+1,rng,rows.length):'')+cc+'</tr>'; }); }
   });
-  if(other.length){ groupCells(other).forEach((cc,ri)=>{ body+='<tr>'+(ri===0?`<td rowspan="${other.length}" style="border:1px solid #5c0f0f;font-weight:800;background:#a33;text-align:center;white-space:nowrap;padding:4px 8px;color:#ffe;">อื่นๆ<div style="font-weight:500;font-size:9px;color:#ffd9d9;">นอกเดือน/ยังไม่กำหนด</div></td>`:'')+cc+'</tr>'; }); }
+  if(other.length){ groupCells(other,-1).forEach((cc,ri)=>{ body+='<tr>'+(ri===0?`<td rowspan="${other.length}" style="border:1px solid #5c0f0f;font-weight:800;background:#a33;text-align:center;white-space:nowrap;padding:4px 8px;color:#ffe;">อื่นๆ<div style="font-weight:500;font-size:9px;color:#ffd9d9;">นอกเดือน/ยังไม่กำหนด</div></td>`:'')+cc+'</tr>'; }); }
   const usd=payUsd(), usdTot=0;   // ยังไม่มีรายการสกุล USD (เผื่อไว้ · ปรับเรทได้)
   const tdT='text-align:right;padding:8px 14px;border:1px solid #a8801f;color:#111;';
   const totals=`<div style="margin-top:14px;display:inline-block;border:1px solid #a8801f;border-radius:10px;overflow:hidden;">
