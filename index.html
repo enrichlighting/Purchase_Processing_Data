@@ -10500,7 +10500,7 @@ function renderFlowchart(){
   window._flowRcCache = {};                                 // รีเซ็ต cache ของ reorderCalc ทุกครั้งที่เรนเดอร์
   window._bcDesc2Map = null;                                 // รีเซ็ต map Description2 (เผื่อ BC_ITEMS อัปเดต)
   const salesCols = flowSalesCols(items);
-  let TH=['Vendor','Factory','รหัสสินค้า','สินค้า','ชื่อ/สเปก (EN)','ราคาตั้ง','สถานะ','','คงเหลือ (แยกคลัง)',FLOW_DIY_BADGE,'หมวด① คงเหลือคลังหักจอง','On hand Cover หมวด① (3ด.)','จัดตู้แล้ว','ตู้ (Container)','หมวด② คงเหลือหลังจัดตู้แล้ว','On hand Cover หมวด② (3ด.)','สั่งผลิต','PO ค้างรับ','หมวด③ คงเหลือ+PO ค้างรับ','Cover Stock (3/6ด.)','ยอดขายทุกกลุ่มเฉลี่ย/ด. (3/6ด.)','ยอดขายเฉลี่ย ไม่รวม DIY (3/6ด.)','Suggestion','Cover Stock คงเหลือรวมสั่งเพิ่ม','MOQ / วางแผนสั่ง'];
+  let TH=['Vendor','Factory','รหัสสินค้า','สินค้า','ชื่อ/สเปก (EN)','ราคาตั้ง','สถานะ','','คงเหลือ (แยกคลัง)',FLOW_DIY_BADGE,'หมวด①<br>คงเหลือคลังหักจอง','On hand Cover หมวด① (3ด.)','จัดตู้แล้ว','ตู้ (Container)','หมวด②<br>คงเหลือหลังจัดตู้แล้ว','On hand Cover หมวด② (3ด.)','สั่งผลิต','PO ค้างรับ','หมวด③<br>คงเหลือ+PO ค้างรับ','Cover Stock (3/6ด.)','ยอดขายทุกกลุ่มเฉลี่ย/ด. (3/6ด.)','ยอดขายเฉลี่ย ไม่รวม DIY (3/6ด.)','Suggestion','Cover Stock คงเหลือรวมสั่งเพิ่ม','MOQ / วางแผนสั่ง'];
   let KEYS=FLOW_FIXED_KEYS.slice();
   if(DIY){ const pk=KEYS.indexOf('price'), pt=TH.indexOf('ราคาตั้ง');   // แทรกคอลัมน์ราคา DIY หลัง "ราคาตั้ง" (อิงตำแหน่ง ไม่ยึดเลขคงที่)
     TH.splice(pt+1,0,'ราคาส่งให้ DIY','ราคาขายหน้าร้าน (ไม่รวม VAT)'); KEYS.splice(pk+1,0,'costdiy','npstore');
