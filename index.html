@@ -10191,8 +10191,8 @@ function flowCoverPlusCell(it, rc){
 // สีของ On hand Cover หมวด①/② — เกณฑ์เดือนคงที่ (ไม่อิง Lead Time)
 // ≤2=ส้ม · >2–2.5=เหลือง · >2.5=เขียว · ≥9=ชมพูอมม่วง · ≥12=ม่วงอมเทา
 function flowOhcColor(m){
-  if(!isFinite(m)) return 'background:#9c93b5;color:#2e2740;';   // ∞ → สูงสุด (ม่วงอมเทา)
-  if(m>=12)  return 'background:#9c93b5;color:#2e2740;';         // ≥12 เดือน → ม่วงอมเทา
+  if(!isFinite(m)) return 'background:#a78bca;color:#3a2359;';   // ∞ → สูงสุด (ม่วงอมเทา)
+  if(m>=12)  return 'background:#a78bca;color:#3a2359;';         // ≥12 เดือน → ม่วงอมเทา
   if(m>=9)   return 'background:#f9a8d4;color:#831843;';         // ≥9 เดือน → ชมพู (อมม่วง)
   if(m>2.5)  return 'background:#86efac;color:#14532d;';         // >2.5 เดือน → เขียว
   if(m>2)    return 'background:#fde047;color:#713f12;';         // >2–2.5 เดือน → เหลือง
