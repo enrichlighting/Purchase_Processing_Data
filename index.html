@@ -8440,23 +8440,22 @@ function renderPacking(){
     // ต้นทุนจาก PO: dropdown เลือก Lot → RMB Cost → THB Cost (ตัวเลือกตามโหมด)
     const lotList=pkLotList(r.item), rc=pkRowCost(r);
     const _cov=pkCoverInfo(r.item);   // {stock, mo} สำหรับ "อยู่ได้กี่เดือน" ต่อสินค้า
-    let cells=''; conts.forEach((ct,c)=>{
+    let qtyCells='', lotNoParts=[];
+    conts.forEach((ct,c)=>{
       const maxAttr=(window.pkMode==='released'&&r.lotMax!=null)?` max="${r.lotMax}"`:'';
       const pieceInput=`<input id="pk-in-${i}-${c}" type="number" value="${(r.loads||[])[c]===''||(r.loads||[])[c]==null?'':(r.loads||[])[c]}" min="0" step="1"${maxAttr} oninput="pkSetCell(${i},${c},this.value)" style="width:90px;text-align:right" title="จำนวนชิ้น">`;
+      qtyCells+=`<td class="num" style="vertical-align:top">${pieceInput}</td>`;   // เฉพาะจำนวน (ย้ายมาหลัง H · ตัด "อยู่ได้" ออก)
       let lotPart;
       if(window.pkMode==='released'){
-        // ยึด Lot No จาก Lot ที่เลือกในคอลัมน์ LOT (ต้นทุน) อัตโนมัติ — ไม่ต้องกรอก
-        const lot=rc.lot||'';
-        lotPart=`<div style="width:90px;text-align:right;font-size:11px;margin-top:3px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="Lot No (จาก PO ที่เลือก): ${lot||'ยังไม่เลือก'}">${lot?('Lot: '+lot):'<span style="opacity:.55;">—</span>'}</div>`;
+        const lot=rc.lot||'';   // ยึด Lot No จาก Lot ที่เลือกในคอลัมน์ LOT (ต้นทุน)
+        lotPart=`<div style="width:100px;text-align:right;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="Lot No (จาก PO ที่เลือก): ${lot||'ยังไม่เลือก'}">${lot?('Lot: '+lot):'<span style="opacity:.55;">—</span>'}</div>`;
       } else {
         const lot=((r.lots||[])[c]||'').replace(/"/g,'&quot;');
-        lotPart=`<input type="text" value="${lot}" oninput="pkSetLot(${i},${c},this.value)" placeholder="Lot No" title="Lot No (กรอกเอง)" style="width:90px;text-align:right;font-size:11px;margin-top:3px;padding:2px 4px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--muted)">`;
+        lotPart=`<input type="text" value="${lot}" oninput="pkSetLot(${i},${c},this.value)" placeholder="Lot No" title="Lot No (กรอกเอง)" style="width:100px;text-align:right;font-size:11px;padding:3px 5px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink)">`;
       }
-      let covLine='';
-      if(_cov){ const tu=+((r.loads||[])[c])||0; const coverQty=(_cov.base||0)+tu; const mmR=Math.round(coverQty/_cov.mo*10)/10;
-        covLine=`<div style="margin-top:4px;text-align:right;white-space:nowrap;"><span style="display:inline-block;font-size:12.5px;font-weight:800;padding:2px 9px;border-radius:6px;${pkCoverHi(mmR)}" title="อยู่ได้ = (หมวด③ คลัง+PO+จัดตู้+ผลิต ${fmtNum(_cov.base)}${tu>0?' + ตู้นี้ '+fmtNum(tu):''}) ÷ ยอดขายเฉลี่ย ${fmtNum(Math.round(_cov.mo))}/เดือน · ตรงกับหน้า Flowchart${tu>0?' (รวมตู้ที่กำลังจัด)':''}">อยู่ได้ ${fmtMo(mmR)} ด.</span></div>`; }
-      cells+=`<td class="num" style="vertical-align:top">${pieceInput}<br>${lotPart}${covLine}</td>`;
+      lotNoParts.push((conts.length>1?`<div style="font-size:9px;color:var(--muted);margin-top:${c>0?'6':'0'}px;">${(ct.name||pkDefName(c)).replace(/</g,'&lt;')}</div>`:'')+lotPart);
     });
+    const lotNoCell=`<td class="num" style="vertical-align:top">${lotNoParts.join('')}</td>`;   // Lot No. แยกเป็นคอลัมน์ท้ายสุด
     const cust=!!r.custom;
     const editDims=pkDimsEditable(r);   // กรอกมิติเองได้ = custom หรือ สินค้าไม่มีมิติกล่องในระบบ
     let costSel, capNote='';
@@ -8493,15 +8492,16 @@ function renderPacking(){
       <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.L:0}" onchange="pkDimSet(${i},'L',this.value)" title="กว้าง (ซม.) · แก้ไขได้ · เซฟทับอัตโนมัติ" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
       <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.W:0}" onchange="pkDimSet(${i},'W',this.value)" title="ยาว (ซม.)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
       <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.H:0}" onchange="pkDimSet(${i},'H',this.value)" title="สูง (ซม.)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
+      ${qtyCells}
       <td class="num" style="white-space:nowrap;">${r.item?`<input type="number" min="1" step="1" value="${d?d.pcs:1}" onchange="pkDimSet(${i},'pcs',this.value)" title="ชิ้น/กล่อง" style="width:56px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}${(r.item&&pkHasDimEdit(r.item))?` <a href="#" onclick="pkDimReset(${i});return false;" title="คืนค่าขนาดเดิม" style="font-size:11px;color:var(--muted);text-decoration:none;">↩︎</a>`:''}</td>
       <td>${costSel}${capNote}</td>
       <td class="num" id="pk-rmb-${i}">${rc.rmb==null?'<span class="muted">-</span>':('¥'+pkYuan(rc.rmb))}</td>
       ${facTd}
-      ${cells}
       <td class="num" id="pk-rbox-${i}">${fmt1(rs.box)}</td>
       <td class="num" id="pk-rcbm-${i}"><b>${rs.cbm.toFixed(3)}</b></td>
       <td class="num" id="pk-rvr-${i}">${rs.valRmb>0?'<b>¥'+pkYuan(rs.valRmb)+'</b>':'<span class="muted">-</span>'}</td>
       <td class="num" id="pk-rvt-${i}">${rs.valThb>0?'<b>฿'+pkMoney(rs.valThb)+'</b>':'<span class="muted">-</span>'}</td>
+      ${lotNoCell}
       <td><a href="#" onclick="pkDelRow(${i});return false;">ลบ</a></td>
     </tr>`;
   });
@@ -8516,11 +8516,11 @@ function renderPacking(){
   });
   let gp=0,gb=0,gc=0,gvr=0,gvt=0; window.packingRows.forEach(r=>{ const s=pkRowSum(r); gp+=s.pcs;gb+=s.box;gc+=s.cbm;gvr+=s.valRmb;gvt+=s.valThb; });
   const html = pkItemDatalist() + pkItemNoDatalist() + `<table>
-    <tr><th>#</th><th>Item (เลือก)</th><th class="num">L</th><th class="num">W</th><th class="num">H</th><th class="num">ชิ้น/กล่อง</th><th>Lot (ต้นทุน)</th><th class="num">RMB Cost</th>${REL?'<th>Factory</th>':'<th>Vendor</th><th>Factory</th>'}${contTh}<th class="num">รวมกล่อง</th><th class="num">รวม CBM</th><th class="num">มูลค่ารวม ¥</th><th class="num">มูลค่ารวม ฿</th><th></th></tr>
+    <tr><th>#</th><th>Item (เลือก)</th><th class="num">L</th><th class="num">W</th><th class="num">H</th>${contTh}<th class="num">pcs./ctn.</th><th>Lot (ต้นทุน)</th><th class="num">Price (RMB)</th>${REL?'<th>Factory</th>':'<th>Vendor</th><th>Factory</th>'}<th class="num">ctns</th><th class="num">cbm</th><th class="num">Total Price (RMB)</th><th class="num">Total Price (BAHT)</th><th class="num">Lot No.</th><th></th></tr>
     ${rows}
-    <tr style="border-top:2px solid var(--line)"><td colspan="${REL?9:10}" class="num"><b>รวม CBM ต่อตู้ →</b></td>${footCbm}<td class="num" id="pk-gbox"><b>${fmt1(gb)}</b></td><td class="num" id="pk-gcbm"><b>${gc.toFixed(3)}</b></td><td class="num" id="pk-gvr"><b>¥${pkYuan(gvr)}</b></td><td class="num" id="pk-gvt"><b>฿${pkMoney(gvt)}</b></td><td></td></tr>
-    <tr><td colspan="${REL?9:10}" class="num"><b>มูลค่าต่อตู้ (¥) →</b></td>${footVr}<td class="num" colspan="5"></td></tr>
-    <tr><td colspan="${REL?9:10}" class="num"><b>มูลค่าต่อตู้ (฿) →</b></td>${footVt}<td class="num" colspan="5"></td></tr>
+    <tr style="border-top:2px solid var(--line)"><td colspan="5" class="num"><b>รวม CBM ต่อตู้ →</b></td>${footCbm}<td colspan="${REL?4:5}"></td><td class="num" id="pk-gbox"><b>${fmt1(gb)}</b></td><td class="num" id="pk-gcbm"><b>${gc.toFixed(3)}</b></td><td class="num" id="pk-gvr"><b>¥${pkYuan(gvr)}</b></td><td class="num" id="pk-gvt"><b>฿${pkMoney(gvt)}</b></td><td colspan="2"></td></tr>
+    <tr><td colspan="5" class="num"><b>มูลค่าต่อตู้ (¥) →</b></td>${footVr}<td colspan="${REL?10:11}"></td></tr>
+    <tr><td colspan="5" class="num"><b>มูลค่าต่อตู้ (฿) →</b></td>${footVt}<td colspan="${REL?10:11}"></td></tr>
   </table>`;
   document.getElementById('pk-result').innerHTML = html;
   renderContainers();
