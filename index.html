@@ -10771,8 +10771,9 @@ function payRowsData(){
     (s.containers||[]).forEach((ct,ci)=>{ const groups={}; const load=(ct.dates&&ct.dates.load)||'', eta=(ct.dates&&ct.dates.arrWh)||'';
       (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; const q=per?(+per.pcs||0):0; if(q<=0) return; if(!/^POA/i.test(r.po||'')) return;   // เฉพาะ PO ขึ้นต้น POA (ข้าม POC/POS)
         const f=(r.factory||'').trim(); if(!f) return;
-        const g=groups[f]||(groups[f]={factory:f, vendor:payVendorForFactory(r.item,f)||(r.vendor||'').trim()||'', rmb:0, item:r.item, po:r.po||''});
-        g.rmb+=(+per.valRmb||0); if(!g.vendor){ const v=payVendorForFactory(r.item,f)||(r.vendor||'').trim(); if(v) g.vendor=v; } if(!g.item) g.item=r.item; if(!g.po) g.po=r.po||'';
+        const venOf=()=> payVendorForFactory(r.item,f) || ((typeof invPoVendor==='function')?invPoVendor(r.po||''):'') || (r.vendor||'').trim();   // Factory→Vendor · ถ้าไม่ได้ ใช้ Vendor จาก PO (POA) · สุดท้ายใช้ที่กรอกใน CSV
+        const g=groups[f]||(groups[f]={factory:f, vendor:venOf()||'', rmb:0, item:r.item, po:r.po||''});
+        g.rmb+=(+per.valRmb||0); if(!g.vendor){ const v=venOf(); if(v) g.vendor=v; } if(!g.item) g.item=r.item; if(!g.po) g.po=r.po||'';
       });
       Object.keys(groups).forEach(f=>{ const g=groups[f]; const term=payCreditTerm(g.item,g.vendor,g.factory);
         const docDate=(window.BC_PODATE&&window.BC_PODATE[g.po])||'';
