@@ -8655,6 +8655,8 @@ function pkParseCSVLine(line){
 // จับคู่หัวคอลัมน์ → field ภายใน (ยืดหยุ่น ไทย/อังกฤษ)
 function pkClassifyHeader(hRaw){
   const h=(hRaw||'').toLowerCase().replace(/\s+/g,'');
+  if(h.indexOf('factory')>=0 || h.indexOf('โรงงาน')>=0 || h.indexOf('ผู้ผลิต')>=0) return 'factory';
+  if(h.indexOf('vendor')>=0 || h.indexOf('supplier')>=0 || h.indexOf('ผู้ขาย')>=0) return 'vendor';
   if(h.indexOf('คลัง')>=0 || h.indexOf('arrwh')>=0 || h.indexOf('warehouse')>=0) return 'arrWh';
   if(h.indexOf('ถึงไทย')>=0 || h.indexOf('arrth')>=0 || h.indexOf('thai')>=0) return 'arrTH';
   if(h.indexOf('เรือ')>=0 || h.indexOf('etd')>=0 || h.indexOf('sail')>=0 || h.indexOf('ออกเรือ')>=0) return 'eta';
@@ -8705,7 +8707,7 @@ function pkImportOldCsv(text){
     // วันที่: ใช้ค่าล่าสุดที่เจอในกลุ่ม
     ['load','cls','eta','arrTH','arrWh'].forEach(dk=>{ const dv=pkNormDate(get(cells,dk)); if(dv) g.dates[dk]=dv; });
     const fxv=parseFloat(get(cells,'fx')); if(!isNaN(fxv)&&fxv>0) g.fx=fxv;
-    g.rows.push({item, qty, po:get(cells,'po'), rmb: parseFloat((get(cells,'rmb')||'0').replace(/,/g,''))||0});
+    g.rows.push({item, qty, po:get(cells,'po'), rmb: parseFloat((get(cells,'rmb')||'0').replace(/,/g,''))||0, factory:get(cells,'factory'), vendor:get(cells,'vendor')});
   }
   if(!order.length){ pkToast('ไม่พบข้อมูลตู้ที่อ่านได้', 'bad'); return; }
   const defFx=pkFxVal()||5, CAP=pkCap();
@@ -8717,7 +8719,7 @@ function pkImportOldCsv(text){
       const rmb=o.rmb||0, valRmb=o.qty*rmb, valThb=valRmb*fx;
       gp+=o.qty; gb+=cc.boxes; gc+=cc.cbm; gvr+=valRmb; gvt+=valThb;
       return {item:o.item, custom:false, desc:d.desc||'', L:d.L||0, W:d.W||0, H:d.H||0, pcsPerBox:d.pcs||0,
-        po:o.po||'', costIdx:null, lotMax:o.qty, costLot:'', rmb, thb:rmb*fx, rmbFixed:rmb,
+        po:o.po||'', factory:(o.factory||'').trim(), vendor:(o.vendor||'').trim(), costIdx:null, lotMax:o.qty, costLot:'', rmb, thb:rmb*fx, rmbFixed:rmb,
         per:[{pcs:o.qty, lot:'', boxes:cc.boxes, cbm:cc.cbm, valRmb}],
         pcs:o.qty, boxes:cc.boxes, cbm:cc.cbm, valRmb, valThb};
     });
@@ -8785,11 +8787,11 @@ function pkRestoreRmbFromCsv(file){
   rd.readAsText(file);
 }
 function pkDownloadTemplate(){
-  const headers=['เลขตู้','รหัสสินค้า','จำนวน(ชิ้น)','PO','ต้นทุน RMB/ชิ้น','เรทเงิน(บาท/หยวน)','วันที่ LOAD','วันปิดตู้','วันเรือออก','วันถึงไทย','ETA ถึงคลัง'];
+  const headers=['เลขตู้','รหัสสินค้า','จำนวน(ชิ้น)','PO','Factory','Vendor','ต้นทุน RMB/ชิ้น','เรทเงิน(บาท/หยวน)','วันที่ LOAD','วันปิดตู้','วันเรือออก','วันถึงไทย','ETA ถึงคลัง'];
   const sample=[
-    ['CONT-320','R-ENR-000009','500','POA240001','1.90','5.05','2025-02-01','2025-02-05','2025-02-10','2025-03-01','2025-03-10'],
-    ['CONT-320','R-ENR-000012','300','POA240001','2.35','5.05','2025-02-01','2025-02-05','2025-02-10','2025-03-01','2025-03-10'],
-    ['CONT-321','R-ENR-000021','800','POA240007','0.85','5.05','2025-03-10','2025-03-14','2025-03-20','2025-04-05','2025-04-14']
+    ['CONT-320','R-ENR-000009','500','POA240001','Osram','Star Lighting (SUP24-322)','1.90','5.05','2025-02-01','2025-02-05','2025-02-10','2025-03-01','2025-03-10'],
+    ['CONT-320','R-ENR-000012','300','POA240001','Osram','Star Lighting (SUP24-322)','2.35','5.05','2025-02-01','2025-02-05','2025-02-10','2025-03-01','2025-03-10'],
+    ['CONT-321','R-ENR-000021','800','POA240007','','','0.85','5.05','2025-03-10','2025-03-14','2025-03-20','2025-04-05','2025-04-14']
   ];
   const esc=v=>{ v=String(v==null?'':v); return /[",\n]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v; };
   const lines=[headers.map(esc).join(',')].concat(sample.map(r=>r.map(esc).join(',')));
@@ -10769,8 +10771,8 @@ function payRowsData(){
     (s.containers||[]).forEach((ct,ci)=>{ const groups={}; const load=(ct.dates&&ct.dates.load)||'', eta=(ct.dates&&ct.dates.arrWh)||'';
       (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; const q=per?(+per.pcs||0):0; if(q<=0) return; if(!/^POA/i.test(r.po||'')) return;   // เฉพาะ PO ขึ้นต้น POA (ข้าม POC/POS)
         const f=(r.factory||'').trim(); if(!f) return;
-        const g=groups[f]||(groups[f]={factory:f, vendor:payVendorForFactory(r.item,f)||'', rmb:0, item:r.item, po:r.po||''});
-        g.rmb+=(+per.valRmb||0); if(!g.vendor){ const v=payVendorForFactory(r.item,f); if(v) g.vendor=v; } if(!g.item) g.item=r.item; if(!g.po) g.po=r.po||'';
+        const g=groups[f]||(groups[f]={factory:f, vendor:payVendorForFactory(r.item,f)||(r.vendor||'').trim()||'', rmb:0, item:r.item, po:r.po||''});
+        g.rmb+=(+per.valRmb||0); if(!g.vendor){ const v=payVendorForFactory(r.item,f)||(r.vendor||'').trim(); if(v) g.vendor=v; } if(!g.item) g.item=r.item; if(!g.po) g.po=r.po||'';
       });
       Object.keys(groups).forEach(f=>{ const g=groups[f]; const term=payCreditTerm(g.item,g.vendor,g.factory);
         const docDate=(window.BC_PODATE&&window.BC_PODATE[g.po])||'';
