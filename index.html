@@ -10188,12 +10188,21 @@ function flowCoverPlusCell(it, rc){
   const sug=flowSugExCarton(it,rc).pieces, q=(rc.c3||0)+sug;   // ใช้จำนวนจากคอลัมน์ Suggestion (ปัดเต็มลัง · ตัด DIY)
   return flowCoverSplitCell(q, flowAvg3(it), flowAvg6(it), '(หมวด③ '+fmtNum(rc.c3||0)+' + Suggestion '+fmtNum(sug)+' = '+fmtNum(q)+')', it.leadTime, flowGrpBorder('covplus'));
 }
-// On hand Cover = จำนวน(หมวด1/หมวด2) ÷ ยอดขายเฉลี่ยทุกกลุ่ม 3 เดือน · สีอิง Lead Time เหมือน Cover อื่น
+// สีของ On hand Cover หมวด①/② — เกณฑ์เดือนคงที่ (ไม่อิง Lead Time)
+// ≤2=ส้ม · >2–2.5=เหลือง · >2.5=เขียว · ≥9=ชมพูอมม่วง · ≥12=ม่วงอมเทา
+function flowOhcColor(m){
+  if(!isFinite(m)) return 'background:#9c93b5;color:#2e2740;';   // ∞ → สูงสุด (ม่วงอมเทา)
+  if(m>=12)  return 'background:#9c93b5;color:#2e2740;';         // ≥12 เดือน → ม่วงอมเทา
+  if(m>=9)   return 'background:#e6a8e0;color:#5b1a54;';         // ≥9 เดือน → ชมพูอมม่วง
+  if(m>2.5)  return 'background:#86efac;color:#14532d;';         // >2.5 เดือน → เขียว
+  if(m>2)    return 'background:#fde047;color:#713f12;';         // >2–2.5 เดือน → เหลือง
+  return 'background:#fdba74;color:#7c2d12;';                    // ≤2 เดือน → ส้ม
+}
+// On hand Cover = จำนวน(หมวด1/หมวด2) ÷ ยอดขายเฉลี่ยทุกกลุ่ม 3 เดือน · สีตามเกณฑ์เดือนคงที่
 function flowOnHandCoverCell(qty, it, cat, xtra){
   const a3=flowAvg3(it); const m=a3>0?qty/a3:Infinity;
-  const ltTxt=(+it.leadTime>0)?(' · Lead Time '+Math.round((+it.leadTime)/30*10)/10+' เดือน'):'';
-  const tip=cat+' '+fmtNum(Math.round(qty))+' ÷ ยอดขายเฉลี่ยทุกกลุ่ม 3 เดือน '+fmtNum(Math.round(a3))+'/ด. = อยู่ได้ '+(isFinite(m)?fmtMo(m):'∞')+' เดือน'+ltTxt;
-  return `<td style="padding:6px 8px;text-align:center;white-space:nowrap;vertical-align:top;${xtra||''}"><span style="display:inline-block;font-size:16px;font-weight:800;padding:2px 9px;border-radius:7px;${coverHiByLead(m, it.leadTime)}" title="${tip}">${isFinite(m)?fmtMo(m):'∞'}</span></td>`;
+  const tip=cat+' '+fmtNum(Math.round(qty))+' ÷ ยอดขายเฉลี่ยทุกกลุ่ม 3 เดือน '+fmtNum(Math.round(a3))+'/ด. = อยู่ได้ '+(isFinite(m)?fmtMo(m):'∞')+' เดือน\nสี: ≤2 ส้ม · >2–2.5 เหลือง · >2.5 เขียว · ≥9 ชมพูอมม่วง · ≥12 ม่วงอมเทา';
+  return `<td style="padding:6px 8px;text-align:center;white-space:nowrap;vertical-align:top;${xtra||''}"><span style="display:inline-block;font-size:16px;font-weight:800;padding:2px 9px;border-radius:7px;${flowOhcColor(m)}" title="${tip}">${isFinite(m)?fmtMo(m):'∞'}</span></td>`;
 }
 function flowToggleOHC1(){ window.flowShowOHC1=!window.flowShowOHC1; try{ localStorage.setItem('flowShowOHC1V1', window.flowShowOHC1?'1':'0'); }catch(e){} renderFlowchart(); }
 function flowToggleOHC2(){ window.flowShowOHC2=!window.flowShowOHC2; try{ localStorage.setItem('flowShowOHC2V1', window.flowShowOHC2?'1':'0'); }catch(e){} renderFlowchart(); }
