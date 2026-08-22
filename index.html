@@ -10183,12 +10183,12 @@ function coverHiByLead(m, leadDays){
   return 'background:#86efac;color:#14532d;';                     // > LT+1 → เขียว
 }
 // Cover Stock แบบช่องเดียว แบ่งซ้าย–ขวา · ซ้าย=เทียบเฉลี่ย 3 เดือน · ขวา=เทียบเฉลี่ย 6 เดือน · สีอิง Lead Time
-function flowCoverSplitCell(q, a3, a6, tipNum, leadDays, xtra){
+function flowCoverSplitCell(q, a3, a6, tipNum, leadDays, xtra, cellId){
   const c3m=a3>0?q/a3:Infinity, c6m=a6>0?q/a6:Infinity;
   const hi=m=>coverHiByLead(isFinite(m)?Math.round(m*10)/10:m, leadDays);   // ยึดสีตามเลขที่แสดงจริง (ปัด 1 ตำแหน่ง)
   const ltTxt=(+leadDays>0)?(' · Lead Time '+Math.round((+leadDays)/30*10)/10+' เดือน'):'';
   const side=(m,win,avg)=>`<div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:3px;">${win}</div><span style="display:inline-block;font-size:16px;font-weight:800;padding:2px 9px;border-radius:7px;${hi(m)}" title="${tipNum} ÷ ยอดขายเฉลี่ย ${win} ${fmtNum(Math.round(avg))}/ด. = อยู่ได้ ${isFinite(m)?fmtMo(m):'∞'} เดือน${ltTxt}">${isFinite(m)?fmtMo(m):'∞'}</span>`;
-  return `<td style="padding:6px 8px;text-align:center;white-space:nowrap;vertical-align:top;${xtra||''}"><div style="display:flex;"><div style="flex:1;border-right:1px dashed var(--line);padding:0 8px;">${side(c3m,'3 เดือน',a3)}</div><div style="flex:1;padding:0 8px;">${side(c6m,'6 เดือน',a6)}</div></div></td>`;
+  return `<td ${cellId?('id="'+cellId+'" '):''}style="padding:6px 8px;text-align:center;white-space:nowrap;vertical-align:top;${xtra||''}"><div style="display:flex;"><div style="flex:1;border-right:1px dashed var(--line);padding:0 8px;">${side(c3m,'3 เดือน',a3)}</div><div style="flex:1;padding:0 8px;">${side(c6m,'6 เดือน',a6)}</div></div></td>`;
 }
 // ยอดขายเฉลี่ย/เดือน "ขายเข้า Mr.DIY" (เราขายให้ DIY = BC_DIYMON) N เดือนย้อนหลัง
 function flowDiySalesInAvg(it,n){ const diy=(window.BC_DIYMON&&window.BC_DIYMON[it.no])||{}; return flowMonthsBack(n).reduce((s,k)=>s+(diy[k]||0),0)/n; }
@@ -10208,7 +10208,7 @@ function flowCoverDiyOutCell(it, rc){
 // Cover Stock คงเหลือรวมสั่งเพิ่ม = (หมวด③ + ควรสั่งเพิ่ม) ÷ ยอดขายเฉลี่ย
 function flowCoverPlusCell(it, rc){
   const sug=flowSugExCarton(it,rc).pieces, q=(rc.c3||0)+sug;   // ใช้จำนวนจากคอลัมน์ Suggestion (ปัดเต็มลัง · ตัด DIY)
-  return flowCoverSplitCell(q, flowAvg3(it), flowAvg6(it), '(หมวด③ '+fmtNum(rc.c3||0)+' + Suggestion '+fmtNum(sug)+' = '+fmtNum(q)+')', it.leadTime, flowGrpBorder('covplus'));
+  return flowCoverSplitCell(q, flowAvg3(it), flowAvg6(it), '(หมวด③ '+fmtNum(rc.c3||0)+' + Suggestion '+fmtNum(sug)+' = '+fmtNum(q)+')', it.leadTime, flowGrpBorder('covplus'), 'covplus-'+it.no);
 }
 // สีของ On hand Cover หมวด①/② — เกณฑ์เดือนคงที่ (ไม่อิง Lead Time)
 // ≤2=ส้ม · >2–2.5=เหลือง · >2.5=เขียว · ≥9=ชมพูอมม่วง · ≥12=ม่วงอมเทา
@@ -10334,23 +10334,46 @@ function flowSugExCarton(it, rc){
   const sugAll=flowSugAll(it, rc);                                  // ควรสั่งเพิ่ม รวมทุกลูกค้า (ค่าเดิมที่เคยแสดง)
   let sugDiy=0;
   if(it.mrdiySell){ const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180); const s3=flowStoreAvg(it,3), stk=flowMrdiyStockNow(it); const tD=(typeof reorderTargetQty==='function')?reorderTargetQty(it,basis,s3/30):(s3*4); sugDiy=Math.max(0,Math.round(tD-stk)); }
-  const sugEx=Math.max(0, sugAll - sugDiy);                         // ตัดส่วน Mr.DIY ออกก่อน
+  let sugEx=Math.max(0, sugAll - sugDiy);                          // ตัดส่วน Mr.DIY ออกก่อน
+  const ov=(window.flowSug && window.flowSug[it.no]!=null && window.flowSug[it.no]!=='') ? Math.max(0,+window.flowSug[it.no]||0) : null;   // ค่าที่ผู้ใช้แก้เอง
+  const edited=(ov!=null);
+  if(edited) sugEx=ov;                                              // ใช้ค่าที่กรอกแทน
   const d=(typeof pkItem==='function')?pkItem(it.no):null;
   const pcs=(d&&d.pcs>0)?d.pcs:0;
   const cbmPer=(typeof pkBoxCbm==='function')?pkBoxCbm(it.no):0;    // CBM/ลัง
   const ctn=(pcs>0 && sugEx>0)?Math.ceil(sugEx/pcs):0;             // จำนวนลังเต็ม (ปัดขึ้น)
   const pieces=pcs>0?ctn*pcs:sugEx;                                 // ชิ้นหลังปัดขึ้นเต็มลัง
   const cbm=ctn*cbmPer;
-  return {sugAll, sugDiy, sugEx, pcs, ctn, pieces, cbm, hasPk:pcs>0};
+  return {sugAll, sugDiy, sugEx, pcs, ctn, pieces, cbm, hasPk:pcs>0, edited};
+}
+// ผลลัพธ์ควรสั่ง (ปัดเต็มลัง) — ใช้แสดงใต้ช่องกรอก + อัปเดตสด
+function flowSuggestResult(g){
+  return `<div style="margin-top:3px;"><b style="font-size:14px;color:#facc15;">${fmtNum(g.pieces)}</b> <span style="font-size:8px;color:#fde68a;">ชิ้น (เต็มลัง)</span></div>`
+    + (g.hasPk?`<div style="margin-top:1px;"><b style="font-size:12px;color:#facc15;">${fmtNum(g.ctn)}</b> <span style="font-size:8px;color:#fde68a;">CTN</span> · <b style="font-size:11px;color:#7dd3fc;">${g.cbm.toFixed(3)}</b> <span style="font-size:8px;color:#bae6fd;">CBM</span></div>`:'<div style="font-size:8.5px;color:#9ca3af;margin-top:1px;">— ไม่มีข้อมูลลัง</div>');
 }
 function flowSuggestCell(it, rc){
   const g=flowSugExCarton(it, rc);
-  const tip=`ควรสั่งเพิ่ม รวม ${fmtNum(g.sugAll)}${g.sugDiy>0?' − Mr.DIY '+fmtNum(g.sugDiy):''} = ${fmtNum(g.sugEx)} ชิ้น → ปัดขึ้นเต็มลัง${g.hasPk?' ('+fmtNum(g.pcs)+' ชิ้น/ลัง = '+fmtNum(g.pieces)+' ชิ้น · '+g.ctn+' ลัง · '+g.cbm.toFixed(3)+' CBM)':' · ยังไม่มีข้อมูลลังในไฟล์ Packing List'}`;
-  return `<td style="padding:7px 10px;text-align:right;white-space:nowrap;vertical-align:top;background:#111;${flowGrpBorder('suggest')}" title="${tip}">
-    <div><b style="font-size:15px;color:#fff;">${fmtNum(g.pieces)}</b> <span style="font-size:8.5px;color:#e5e7eb;">ชิ้น</span></div>
-    <div style="margin-top:2px;">${g.hasPk?`<b style="font-size:12.5px;color:#facc15;">${fmtNum(g.ctn)}</b> <span style="font-size:8.5px;color:#fde68a;">CTN</span>`:'<span style="font-size:9px;color:#9ca3af;">— ไม่มีข้อมูลลัง</span>'}</div>
-    ${g.hasPk?`<div style="margin-top:2px;"><b style="font-size:11.5px;color:#7dd3fc;">${g.cbm.toFixed(3)}</b> <span style="font-size:8.5px;color:#bae6fd;">CBM</span></div>`:''}
+  const inputVal=g.edited?(window.flowSug[it.no]):Math.round(g.sugEx);
+  const tip=`ควรสั่งเพิ่ม รวม ${fmtNum(g.sugAll)}${g.sugDiy>0?' − Mr.DIY '+fmtNum(g.sugDiy):''} = ${fmtNum(g.sugEx)} ชิ้น → ปัดขึ้นเต็มลัง${g.hasPk?' ('+fmtNum(g.pcs)+' ชิ้น/ลัง)':''}${g.edited?' · (แก้ไขเอง)':''} · แก้ตัวเลขได้ ระบบปัดเต็มลังให้`;
+  return `<td style="padding:6px 8px;text-align:right;white-space:nowrap;vertical-align:top;background:#111;${flowGrpBorder('suggest')}" title="${tip}">
+    <input type="number" min="0" step="1" value="${inputVal}" onclick="event.stopPropagation()" onchange="flowSetSug('${it.no}',this.value)" title="แก้จำนวนที่ควรสั่ง (ระบบปัดขึ้นเต็มลังให้)" style="width:84px;text-align:right;font-size:13px;font-weight:800;padding:3px 5px;border:1px solid ${g.edited?'#facc15':'#4b5563'};border-radius:5px;background:#1f2937;color:${g.edited?'#facc15':'#fff'};">
+    <div id="sug-res-${it.no}">${flowSuggestResult(g)}</div>
+    ${g.edited?`<a href="#" onclick="event.stopPropagation();flowSetSug('${it.no}','');return false;" style="font-size:9px;color:#93c5fd;text-decoration:none;">↩︎ คืนค่าคำนวณ</a>`:''}
   </td>`;
+}
+function flowSetSug(no, val){
+  window.flowSug=window.flowSug||{};
+  if(val===''||val==null) delete window.flowSug[no]; else window.flowSug[no]=Math.max(0,+val||0);
+  try{ localStorage.setItem('flowSugV1', JSON.stringify(window.flowSug)); }catch(e){}
+  flowSugUpdate(no);
+}
+function flowSugUpdate(no){
+  const it=ITEMS.find(x=>x.no===no); if(!it) return;
+  const rc=(typeof reorderCalc==='function')?reorderCalc(it,(window.RBASIS==='custom')?180:(+window.RBASIS||180),window.RGROUP||'all'):{};
+  const g=flowSugExCarton(it, rc);
+  const se=document.getElementById('sug-res-'+no); if(se) se.innerHTML=flowSuggestResult(g);       // อัปเดตผลควรสั่ง (เต็มลัง)
+  const ce=document.getElementById('covplus-'+no); if(ce) ce.outerHTML=flowCoverPlusCell(it, rc);  // อัปเดต Cover Stock คงเหลือรวมสั่งเพิ่ม
+  if(typeof flowMoqUpdate==='function') flowMoqUpdate(no);                                          // MOQ ใช้ค่าควรสั่งด้วย
 }
 // คอลัมน์ยอดขายหน้าร้าน Mr.DIY เฉลี่ย 3ด.(บน)/6ด.(ล่าง)
 // ยอดขายเฉลี่ยเฉพาะ Mr.DIY (เราขายให้ DIY = Sales In) 3ด.(บน)/6ด.(ล่าง)
@@ -10536,6 +10559,7 @@ function renderFlowchart(){
   if(window.flowShowDesc2===undefined){ try{ window.flowShowDesc2=localStorage.getItem('flowShowDesc2V1')==='1'; }catch(e){ window.flowShowDesc2=false; } }   // ค่าเริ่มต้น = ไม่แสดง Description2
   if(window.flowShowOHC1===undefined){ try{ window.flowShowOHC1=localStorage.getItem('flowShowOHC1V1')!=='0'; }catch(e){ window.flowShowOHC1=true; } }   // ค่าเริ่มต้น = แสดง
   if(window.flowShowOHC2===undefined){ try{ window.flowShowOHC2=localStorage.getItem('flowShowOHC2V1')!=='0'; }catch(e){ window.flowShowOHC2=true; } }
+  if(!window.flowSug){ try{ window.flowSug=JSON.parse(localStorage.getItem('flowSugV1')||'{}'); }catch(e){ window.flowSug={}; } }   // ค่าควรสั่งที่ผู้ใช้แก้เอง
   if(!window.flowMoq){ try{ window.flowMoq=JSON.parse(localStorage.getItem('flowMoqV1')||'{}'); }catch(e){ window.flowMoq={}; } }
   if(!window.flowMoqT){ try{ window.flowMoqT=JSON.parse(localStorage.getItem('flowMoqTV1')||'{}'); }catch(e){ window.flowMoqT={}; } }
   if(window.flowMoqMode===undefined){ try{ window.flowMoqMode=localStorage.getItem('flowMoqModeV1')||'qty'; }catch(e){ window.flowMoqMode='qty'; } }
