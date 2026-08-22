@@ -10406,6 +10406,8 @@ const FLOW_SORTVAL={
   avg36:(it,rc)=>flowAvg3(it),
   exdiyavg:(it,rc)=>flowExDiyAvg(it,3),
   cover36:(it,rc)=>{ const a3=flowAvg3(it); return a3>0 ? (rc.c3||0)/a3 : ((rc.c3||0)>0?999999:0); },
+  ohc1:(it,rc)=>{ const a3=flowAvg3(it); return a3>0 ? (rc.c1||0)/a3 : ((rc.c1||0)>0?999999:0); },   // On hand Cover หมวด①
+  ohc2:(it,rc)=>{ const a3=flowAvg3(it); return a3>0 ? (rc.c2||0)/a3 : ((rc.c2||0)>0?999999:0); },   // On hand Cover หมวด②
   covplus:(it,rc)=>{ const a3=flowAvg3(it); const q=(rc.c3||0)+flowSugExCarton(it,rc).pieces; return a3>0 ? q/a3 : (q>0?999999:0); },
   diyinavg:(it,rc)=>flowDiySalesInAvg(it,3),
   covdiyin:(it,rc)=>{ const a=flowDiySalesInAvg(it,3); return a>0 ? (rc.c3||0)/a : ((rc.c3||0)>0?999999:0); },
