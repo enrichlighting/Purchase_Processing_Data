@@ -10134,7 +10134,7 @@ function flowCatCell(num, mo, hiStyle, bg, xtra){
 }
 // ---- Sort ตาราง Flowchart (คลิกหัวคอลัมน์ · default = ควรสั่งก่อน แล้วยอดขายมาก→น้อย) ----
 const FLOW_ST_RANK={red:0,warn:1,watch:2,noneed:3};
-const FLOW_FIXED_KEYS=['vendor','factory','code','name','desc2','price','status','__sales__','onhand','podiy','c1','ohc1','packed','container','c2','ohc2','production','po','c3','cover36','avg36','exdiyavg','suggest','covplus','moqplan'];
+const FLOW_FIXED_KEYS=['vendor','factory','code','name','desc2','price','status','__sales__','onhand','podiy','c1','ohc1','packed','container','c2','ohc2','production','po','c3','cover36','avg36','suggest','covplus','moqplan','exdiyavg'];
 const FLOW_GRP_STARTS=['podiy','packed','production','diyinavg','exdiyavg','suggest','moqplan'];   // แทรกช่องว่างก่อนคอลัมน์เหล่านี้ · กลุ่มเขียวเริ่มที่ exdiyavg (OTHERS avg)
 // จัดกลุ่มคอลัมน์ด้วยเส้นประสีต่างกัน · G1 น้ำเงิน(Mr.DIY+หมวด①) · G2 ม่วง(จัดตู้+ตู้+หมวด②) · G3 ส้ม(สั่งผลิต+PO+หมวด③+Cover) · G4 เขียวน้ำเงิน(Suggestion+Cover รวมสั่งเพิ่ม)
 const FLOW_GRP_L={podiy:'#2563eb', packed:'#7c3aed', production:'#ea580c', suggest:'#0891b2', diyinavg:'#db2777', exdiyavg:'#65a30d'};   // ขอบซ้าย (เริ่มกลุ่ม) · G5 ชมพู · G6 เขียว (เริ่มที่ OTHERS avg)
@@ -10503,17 +10503,17 @@ function flowItemRow(it, basis, grp, salesCols){
     ${flowCoverCell(it, rc)}
     ${flowAvgCell(it)}
     <td style="padding:0;border:0;"></td>
+    ${flowSuggestCell(it, rc)}
+    ${flowCoverPlusCell(it, rc)}
+    <td style="padding:0;border:0;"></td>
+    ${flowMoqCell(it, rc)}
+    <td style="padding:0;border:0;"></td>
     ${flowDiyInAvgCell(it)}
     ${flowCoverDiyInCell(it, rc)}
     <td style="padding:0;border:0;"></td>
     ${flowExDiyAvgCell(it)}
     ${flowStoreAvgCell(it)}
     ${flowCoverDiyOutCell(it, rc)}
-    <td style="padding:0;border:0;"></td>
-    ${flowSuggestCell(it, rc)}
-    ${flowCoverPlusCell(it, rc)}
-    <td style="padding:0;border:0;"></td>
-    ${flowMoqCell(it, rc)}
     ${flowDiyRiskCell(it)}
   </tr>`;
   if(!iOpen) return tr;
@@ -10557,7 +10557,7 @@ function renderFlowchart(){
   window._flowRcCache = {};                                 // รีเซ็ต cache ของ reorderCalc ทุกครั้งที่เรนเดอร์
   window._bcDesc2Map = null;                                 // รีเซ็ต map Description2 (เผื่อ BC_ITEMS อัปเดต)
   const salesCols = flowSalesCols(items);
-  let TH=['Vendor','Factory','รหัสสินค้า','สินค้า','ชื่อ/สเปก (EN)','ราคาตั้ง','สถานะ','','คงเหลือ (แยกคลัง)',FLOW_DIY_BADGE,'หมวด①<br>คงเหลือคลังหักจอง','หมวด①<br>On hand Cover (3ด.)','จัดตู้แล้ว','ตู้ (Container)','หมวด②<br>คงเหลือหลังจัดตู้แล้ว','หมวด②<br>On hand Cover (3ด.)','สั่งผลิต','PO ค้างรับ','หมวด③<br>คงเหลือ+PO ค้างรับ','หมวด③<br>Cover Stock (3/6ด.)','ยอดขายทุกกลุ่มเฉลี่ย/ด. (3/6ด.)','ยอดขายเฉลี่ย Others (3/6ด.)','Suggestion','Cover Stock คงเหลือรวมสั่งเพิ่ม','MOQ / วางแผนสั่ง'];
+  let TH=['Vendor','Factory','รหัสสินค้า','สินค้า','ชื่อ/สเปก (EN)','ราคาตั้ง','สถานะ','','คงเหลือ (แยกคลัง)',FLOW_DIY_BADGE,'หมวด①<br>คงเหลือคลังหักจอง','หมวด①<br>On hand Cover (3ด.)','จัดตู้แล้ว','ตู้ (Container)','หมวด②<br>คงเหลือหลังจัดตู้แล้ว','หมวด②<br>On hand Cover (3ด.)','สั่งผลิต','PO ค้างรับ','หมวด③<br>คงเหลือ+PO ค้างรับ','หมวด③<br>Cover Stock (3/6ด.)','ยอดขายทุกกลุ่มเฉลี่ย/ด. (3/6ด.)','Suggestion','Cover Stock คงเหลือรวมสั่งเพิ่ม','MOQ / วางแผนสั่ง','ยอดขายเฉลี่ย Others (3/6ด.)'];
   let KEYS=FLOW_FIXED_KEYS.slice();
   if(DIY){ const pk=KEYS.indexOf('price'), pt=TH.indexOf('ราคาตั้ง');   // แทรกคอลัมน์ราคา DIY หลัง "ราคาตั้ง" (อิงตำแหน่ง ไม่ยึดเลขคงที่)
     TH.splice(pt+1,0,'ราคาส่งให้ DIY','ราคาขายหน้าร้าน (ไม่รวม VAT)'); KEYS.splice(pk+1,0,'costdiy','npstore');
