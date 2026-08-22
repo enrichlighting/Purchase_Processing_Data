@@ -8419,7 +8419,12 @@ function pkSetVendor(i, v){ const r=window.packingRows[i]; if(r) r.vendor=v; }
 // ค่าเริ่มต้น Vendor/Factory/Term ตามรหัสสินค้า (โหมด Forecast) — เพิ่มกลุ่มใหม่ได้ที่นี่
 function pkDefaultVendorFactory(item){
   const c=String(item||'').toUpperCase();
-  if(/^R-OSR/.test(c)) return {vendor:'Star Lighting (SUP24-322)', factory:'Osram', term:'100% after closing date, pay every 5, 15, 25'};
+  const V='Star Lighting (SUP24-322)', T='100% after closing date, pay every 5, 15, 25';
+  if(c==='R-ENR-000182') return {vendor:V, factory:'LITE', term:T};   // เจาะจงรหัสก่อน
+  if(/^R-OSR/.test(c)) return {vendor:V, factory:'Osram', term:T};
+  if(/^R-WOK-/.test(c)) return {vendor:V, factory:'Wokin', term:T};
+  if(/^R-VEG-/.test(c)) return {vendor:V, factory:'MEKA', term:T};
+  if(/^R-OTH-/.test(c)) return {vendor:V, factory:'NUOMI', term:T};
   return null;
 }
 function renderPacking(){
