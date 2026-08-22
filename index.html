@@ -10127,11 +10127,11 @@ function flowCatCell(num, mo, hiStyle, bg, xtra){
 // ---- Sort ตาราง Flowchart (คลิกหัวคอลัมน์ · default = ควรสั่งก่อน แล้วยอดขายมาก→น้อย) ----
 const FLOW_ST_RANK={red:0,warn:1,watch:2,noneed:3};
 const FLOW_FIXED_KEYS=['vendor','factory','code','name','desc2','price','status','__sales__','onhand','podiy','c1','ohc1','packed','container','c2','ohc2','production','po','c3','cover36','avg36','exdiyavg','suggest','covplus','moqplan'];
-const FLOW_GRP_STARTS=['podiy','packed','production','diyinavg','storeavg','suggest','moqplan'];   // แทรกช่องว่างก่อนคอลัมน์เหล่านี้ (diyinavg/storeavg = เฉพาะ DIY)
+const FLOW_GRP_STARTS=['podiy','packed','production','diyinavg','exdiyavg','suggest','moqplan'];   // แทรกช่องว่างก่อนคอลัมน์เหล่านี้ · กลุ่มเขียวเริ่มที่ exdiyavg (OTHERS avg)
 // จัดกลุ่มคอลัมน์ด้วยเส้นประสีต่างกัน · G1 น้ำเงิน(Mr.DIY+หมวด①) · G2 ม่วง(จัดตู้+ตู้+หมวด②) · G3 ส้ม(สั่งผลิต+PO+หมวด③+Cover) · G4 เขียวน้ำเงิน(Suggestion+Cover รวมสั่งเพิ่ม)
-const FLOW_GRP_L={podiy:'#2563eb', packed:'#7c3aed', production:'#ea580c', suggest:'#0891b2', diyinavg:'#db2777', storeavg:'#65a30d'};   // ขอบซ้าย (เริ่มกลุ่ม) · G5 ชมพู · G6 เขียว
+const FLOW_GRP_L={podiy:'#2563eb', packed:'#7c3aed', production:'#ea580c', suggest:'#0891b2', diyinavg:'#db2777', exdiyavg:'#65a30d'};   // ขอบซ้าย (เริ่มกลุ่ม) · G5 ชมพู · G6 เขียว (เริ่มที่ OTHERS avg)
 const FLOW_GRP_R={c1:'#2563eb', ohc1:'#2563eb', c2:'#7c3aed', ohc2:'#7c3aed', cover36:'#ea580c', covplus:'#0891b2', covdiyin:'#db2777', covdiyout:'#65a30d'};              // ขอบขวา (จบกลุ่ม) · ohc1/ohc2 = On hand Cover
-const FLOW_GRP_TOP={podiy:'#2563eb',c1:'#2563eb',ohc1:'#2563eb', packed:'#7c3aed',container:'#7c3aed',c2:'#7c3aed',ohc2:'#7c3aed', production:'#ea580c',po:'#ea580c',c3:'#ea580c',cover36:'#ea580c', suggest:'#0891b2',covplus:'#0891b2', diyinavg:'#db2777',covdiyin:'#db2777', storeavg:'#65a30d',covdiyout:'#65a30d'};
+const FLOW_GRP_TOP={podiy:'#2563eb',c1:'#2563eb',ohc1:'#2563eb', packed:'#7c3aed',container:'#7c3aed',c2:'#7c3aed',ohc2:'#7c3aed', production:'#ea580c',po:'#ea580c',c3:'#ea580c',cover36:'#ea580c', suggest:'#0891b2',covplus:'#0891b2', diyinavg:'#db2777',covdiyin:'#db2777', exdiyavg:'#65a30d',storeavg:'#65a30d',covdiyout:'#65a30d'};
 function flowGrpBorder(key){ let s=''; if(FLOW_GRP_L[key]) s+='border-left:3px dashed '+FLOW_GRP_L[key]+';box-shadow:-5px 0 7px -4px '+FLOW_GRP_L[key]+'99;';
   let rc=FLOW_GRP_R[key];
   if(key==='c1' && window.flowShowOHC1) rc=null;   // ขอบขวากลุ่ม① ย้ายไป ohc1 เมื่อแสดง
@@ -10190,8 +10190,10 @@ function flowCoverDiyInCell(it, rc){
 // Cover Stock DIY (ขายออกหน้าร้าน) = สต๊อกหน้าร้าน Mr.DIY ÷ ยอดขายหน้าร้านเฉลี่ย (3/6 เดือน)
 function flowCoverDiyOutCell(it, rc){
   if(!flowIsDiyItem(it)) return flowDiyNA(flowGrpBorder('covdiyout'));
-  const stk=flowMrdiyStockNow(it);
-  return flowCoverSplitCell(stk, flowStoreAvg(it,3), flowStoreAvg(it,6), 'สต๊อกหน้าร้าน Mr.DIY '+fmtNum(stk)+' (÷ ยอดขายหน้าร้าน)', it.leadTime, flowGrpBorder('covdiyout'));
+  const q=rc.c3||0;                                                   // หมวด③ เป็นตัวตั้ง
+  const a3=flowStoreAvg(it,3)+flowExDiyAvg(it,3);                     // Sales Out DIY (หน้าร้าน) + Sales In OTHERS (ไม่รวม DIY) เฉลี่ย 3 เดือน
+  const a6=flowStoreAvg(it,6)+flowExDiyAvg(it,6);
+  return flowCoverSplitCell(q, a3, a6, 'หมวด③ '+fmtNum(q)+' ÷ (Sales Out DIY '+fmtNum(Math.round(flowStoreAvg(it,3)))+' + Sales In OTHERS '+fmtNum(Math.round(flowExDiyAvg(it,3)))+' /ด.)', it.leadTime, flowGrpBorder('covdiyout'));
 }
 // Cover Stock คงเหลือรวมสั่งเพิ่ม = (หมวด③ + ควรสั่งเพิ่ม) ÷ ยอดขายเฉลี่ย
 function flowCoverPlusCell(it, rc){
@@ -10411,7 +10413,7 @@ const FLOW_SORTVAL={
   covplus:(it,rc)=>{ const a3=flowAvg3(it); const q=(rc.c3||0)+flowSugExCarton(it,rc).pieces; return a3>0 ? q/a3 : (q>0?999999:0); },
   diyinavg:(it,rc)=>flowDiySalesInAvg(it,3),
   covdiyin:(it,rc)=>{ const a=flowDiySalesInAvg(it,3); return a>0 ? (rc.c3||0)/a : ((rc.c3||0)>0?999999:0); },
-  covdiyout:(it,rc)=>{ const a=flowStoreAvg(it,3), s=flowMrdiyStockNow(it); return a>0 ? s/a : (s>0?999999:0); },
+  covdiyout:(it,rc)=>{ const a=flowStoreAvg(it,3)+flowExDiyAvg(it,3); return a>0 ? (rc.c3||0)/a : ((rc.c3||0)>0?999999:0); },
   diyrisk:(it,rc)=>{ const R={dropped:5,season:4,risk:3,safe:1}; const r=it.mrdiySell?flowDiyRisk(it):null; return r?(R[r.key]||0):-1; }
 };
 function flowSort(key){ const S=window.flowSort||{key:'default',dir:'desc'};
@@ -10549,9 +10551,12 @@ function renderFlowchart(){
   let KEYS=FLOW_FIXED_KEYS.slice();
   if(DIY){ const pk=KEYS.indexOf('price'), pt=TH.indexOf('ราคาตั้ง');   // แทรกคอลัมน์ราคา DIY หลัง "ราคาตั้ง" (อิงตำแหน่ง ไม่ยึดเลขคงที่)
     TH.splice(pt+1,0,'ราคาส่งให้ DIY','ราคาขายหน้าร้าน (ไม่รวม VAT)'); KEYS.splice(pk+1,0,'costdiy','npstore');
-    const ex=KEYS.indexOf('exdiyavg');   // แทรกคอลัมน์ Sales In/Out DIY หลัง "ยอดขายเฉลี่ย ไม่รวม DIY" (ก่อน Suggestion)
-    KEYS.splice(ex+1,0,'diyinavg','covdiyin','storeavg','covdiyout');
-    TH.splice(ex+1,0,'Sales In Mr.DIY (3/6ด.)','Cover Stock Sales In Mr.DIY (3/6ด.)','Sales Out Mr.DIY (3/6ด.)','Cover Stock Sales Out Mr.DIY (3/6ด.)');
+    let ex=KEYS.indexOf('exdiyavg');
+    KEYS.splice(ex,0,'diyinavg','covdiyin');   // กลุ่มชมพู (Sales In DIY) มาก่อน "ยอดขายเฉลี่ย OTHERS"
+    TH.splice(ex,0,'Sales In Mr.DIY (3/6ด.)','Cover Stock Sales In Mr.DIY (3/6ด.)');
+    ex=KEYS.indexOf('exdiyavg');               // กลุ่มเขียว = OTHERS avg + Sales Out DIY + Cover (ต่อจาก OTHERS avg)
+    KEYS.splice(ex+1,0,'storeavg','covdiyout');
+    TH.splice(ex+1,0,'Sales Out Mr.DIY (3/6ด.)','Cover Stock Sales Out DIY + Sales In OTHERS (3/6ด.)');
     TH.push('แนวโน้ม Mr.DIY ถอดสินค้า'); KEYS.push('diyrisk'); }
   if(window.flowHidePrice){ ['price','costdiy','npstore'].forEach(k=>{ const idx=KEYS.indexOf(k); if(idx>=0){ KEYS.splice(idx,1); TH.splice(idx,1); } }); }   // ซ่อนคอลัมน์ราคาทั้งหมด
   if(window.flowHideVF){ ['vendor','factory'].forEach(k=>{ const idx=KEYS.indexOf(k); if(idx>=0){ KEYS.splice(idx,1); TH.splice(idx,1); } }); }   // ซ่อนคอลัมน์ Vendor/Factory
