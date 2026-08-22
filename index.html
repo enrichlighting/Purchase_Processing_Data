@@ -9934,7 +9934,7 @@ function flowRowStatus(it,rc){
   const cy=APP_TODAY.getFullYear(), cm=APP_TODAY.getMonth()+1;
   const gapMo=(cy*12+cm)-(+lastSale.slice(0,4)*12 + (+lastSale.slice(5,7)));   // เดือนนับจากขายครั้งล่าสุด
   if(gapMo>=12) return {key:'dead', rank:50, t:'💀 Dead Stock', c:'#374151', bg:'#e5e7eb', dead:true, sub:'ไม่มียอดขาย ≥ 12 เดือน (ล่าสุด '+lastSale+')'};   // ไม่ขายมา ≥12 เดือน
-  const q=(rc.c3||0)+flowSugExCarton(it,rc).pieces, a3=flowAvg3(it);
+  const q=(rc.c3||0), a3=flowAvg3(it);   // สถานะยึดตาม หมวด③ Cover Stock ช่วง 3 เดือน (หมวด③ ÷ ยอดขายเฉลี่ย 3ด.)
   const cover=a3>0?q/a3:(q>0?Infinity:0), lm=(+it.leadTime||0)/30;
   let band;
   if(!isFinite(cover)) band='green';
@@ -10193,7 +10193,7 @@ function flowCoverPlusCell(it, rc){
 function flowOhcColor(m){
   if(!isFinite(m)) return 'background:#9c93b5;color:#2e2740;';   // ∞ → สูงสุด (ม่วงอมเทา)
   if(m>=12)  return 'background:#9c93b5;color:#2e2740;';         // ≥12 เดือน → ม่วงอมเทา
-  if(m>=9)   return 'background:#e6a8e0;color:#5b1a54;';         // ≥9 เดือน → ชมพูอมม่วง
+  if(m>=9)   return 'background:#f9a8d4;color:#831843;';         // ≥9 เดือน → ชมพู (อมม่วง)
   if(m>2.5)  return 'background:#86efac;color:#14532d;';         // >2.5 เดือน → เขียว
   if(m>2)    return 'background:#fde047;color:#713f12;';         // >2–2.5 เดือน → เหลือง
   return 'background:#fdba74;color:#7c2d12;';                    // ≤2 เดือน → ส้ม
