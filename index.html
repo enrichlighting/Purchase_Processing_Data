@@ -385,7 +385,7 @@
         <button class="go" id="pk-import" style="background:var(--warn);">⬆️ โหลดข้อมูลกลับ (Import)</button>
         <input type="file" id="pk-importfile" accept="application/json,.json,text/csv,.csv" style="display:none;">
         <button class="go" id="pk-template" style="background:#0d9488;" title="ดาวน์โหลดไฟล์ตัวอย่าง (CSV) สำหรับกรอกข้อมูลตู้เก่า แล้วนำเข้าด้วยปุ่ม Import">📄 ดาวน์โหลด Pattern ตู้เก่า (CSV)</button>
-        <button class="go" id="pk-restore-rmb" style="background:#7c3aed;" title="กู้เฉพาะต้นทุน RMB จากไฟล์ CSV มาเติมให้ตู้ที่มูลค่าเป็น 0 โดยไม่แตะ factory">🔧 กู้ต้นทุนตู้ import (เลือก CSV)</button>
+        <button class="go" id="pk-restore-rmb" style="background:#7c3aed;" title="เติมต้นทุน RMB + Factory + Vendor จากไฟล์ CSV ให้ตู้ที่ import ไว้ (จับคู่ ตู้|รหัส|PO) โดยไม่สร้างตู้ซ้ำ">🔧 เติมข้อมูลตู้ import จาก CSV (ต้นทุน/Factory/Vendor)</button>
         <input type="file" id="pk-restore-rmb-file" accept="text/csv,.csv" style="display:none;">
         <span class="muted" id="pk-backupstatus" style="font-size:12px;">Import รับได้ 2 แบบ: ไฟล์สำรอง (.json = แทนที่ทั้งหมด) หรือ Pattern ตู้เก่า (.csv = เพิ่มเข้าไป)</span>
       </div>
@@ -8755,32 +8755,40 @@ function pkRestoreRmbFromCsv(file){
     const lines=txt.split(/\r\n|\r|\n/).filter(l=>l.trim().length);
     if(lines.length<2){ pkToast('ไฟล์ CSV ว่าง','bad'); return; }
     const header=pkParseCSVLine(lines[0]); const col={}; header.forEach((h,i)=>{ const k=pkClassifyHeader(h); if(k&&col[k]===undefined) col[k]=i; });
-    if(col.container===undefined||col.item===undefined||col.rmb===undefined){ pkToast('CSV ต้องมีคอลัมน์ เลขตู้, รหัสสินค้า, ต้นทุน RMB','bad'); return; }
+    if(col.container===undefined||col.item===undefined){ pkToast('CSV ต้องมีคอลัมน์ เลขตู้, รหัสสินค้า','bad'); return; }
     const get=(c,k)=> col[k]===undefined?'':(c[col[k]]||'').trim();
-    const m1={},m2={},m3={},m4={};   // cont|item|po , item|po , cont|item , item
-    for(let i=1;i<lines.length;i++){ const c=pkParseCSVLine(lines[i]); const cont=get(c,'container'); let item=get(c,'item').toUpperCase(); const po=get(c,'po'); const rmb=parseFloat((get(c,'rmb')||'').replace(/,/g,'')); if(!cont||!item||!(rmb>0)) continue;
-      m1[cont+'|'+item+'|'+po]=rmb; m2[item+'|'+po]=rmb; if(m3[cont+'|'+item]==null)m3[cont+'|'+item]=rmb; if(m4[item]==null)m4[item]=rmb; }
-    const findRmb=(cont,item,po)=> m1[cont+'|'+item+'|'+po] ?? m2[item+'|'+po] ?? m3[cont+'|'+item] ?? m4[item] ?? null;
-    pkLoadLog(); let rounds=0, patchedRows=0;
-    (window.pkLog||[]).forEach(s=>{ if(s.pending) return; const fx=s.fx||pkFxVal()||5; let changed=false;
+    // เก็บ {rmb,factory,vendor} ต่อ key: cont|item|po → item|po → cont|item → item
+    const M1={},M2={},M3={},M4={};
+    const put=(map,key,o)=>{ const e=map[key]||(map[key]={}); if(o.rmb>0&&e.rmb==null)e.rmb=o.rmb; if(o.factory&&!e.factory)e.factory=o.factory; if(o.vendor&&!e.vendor)e.vendor=o.vendor; };
+    for(let i=1;i<lines.length;i++){ const c=pkParseCSVLine(lines[i]); const cont=get(c,'container'); let item=get(c,'item').toUpperCase(); const po=get(c,'po'); if(!cont||!item) continue;
+      const o={rmb:parseFloat((get(c,'rmb')||'').replace(/,/g,''))||0, factory:(get(c,'factory')||'').trim(), vendor:(get(c,'vendor')||'').trim()};
+      put(M1,cont+'|'+item+'|'+po,o); put(M2,item+'|'+po,o); put(M3,cont+'|'+item,o); put(M4,item,o); }
+    const findRec=(cont,item,po)=> M1[cont+'|'+item+'|'+po] || M2[item+'|'+po] || M3[cont+'|'+item] || M4[item] || null;
+    pkLoadLog(); let rounds=0, patchedRows=0, facAdded=0, venAdded=0, rmbAdded=0;
+    (window.pkLog||[]).forEach(s=>{ if(s.pending) return; const fx=s.fx||pkFxVal()||5; let rmbChanged=false, roundTouched=false;
       (s.containers||[]).forEach((ct,ci)=>{ const cont=ct.name||'';
         (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; if(!per||!(+per.pcs>0)) return; if(r.custom) return;
-          const cur=(r.rmb!=null&&r.rmb!==''?+r.rmb:0); if(cur>0 && r.rmbFixed!=null) return;   // มีต้นทุนอยู่แล้ว ข้าม
-          const nr=findRmb(cont, r.item, r.po||''); if(nr!=null&&nr>0){ r.rmb=nr; r.rmbFixed=nr; changed=true; patchedRows++; }
+          const rec=findRec(cont, r.item, r.po||''); if(!rec) return;
+          let touched=false;
+          const cur=(r.rmb!=null&&r.rmb!==''?+r.rmb:0);
+          if(!(cur>0 && r.rmbFixed!=null) && rec.rmb>0){ r.rmb=rec.rmb; r.rmbFixed=rec.rmb; rmbChanged=true; touched=true; rmbAdded++; }   // เติมต้นทุนเฉพาะที่ยังไม่มี
+          if(rec.factory && (r.factory||'').trim()!==rec.factory){ r.factory=rec.factory; touched=true; facAdded++; }   // เติม/อัปเดต Factory
+          if(rec.vendor && (r.vendor||'').trim()!==rec.vendor){ r.vendor=rec.vendor; touched=true; venAdded++; }        // เติม/อัปเดต Vendor
+          if(touched){ patchedRows++; roundTouched=true; }
         });
       });
-      if(changed){
+      if(rmbChanged){
         (s.rows||[]).forEach(r=>{ const rmb=+r.rmb||0; (r.per||[]).forEach(p=>{ p.valRmb=(+p.pcs||0)*rmb; }); r.valRmb=(r.per||[]).reduce((a,p)=>a+(+p.valRmb||0),0); r.valThb=r.valRmb*fx; r.thb=rmb*fx; });
         const nc=(s.containers||[]).length; s.contTotals=[];
         for(let c=0;c<nc;c++){ let pcs=0,box=0,cbm=0,vr=0; (s.rows||[]).forEach(r=>{ const p=(r.per||[])[c]; if(p){pcs+=+p.pcs||0;box+=+p.boxes||0;cbm+=+p.cbm||0;vr+=+p.valRmb||0;} }); s.contTotals[c]={pcs,boxes:box,cbm,valRmb:vr,valThb:vr*fx}; }
         let gp=0,gb=0,gc=0,gvr=0,gvt=0; (s.rows||[]).forEach(r=>{gp+=+r.pcs||0;gb+=+r.boxes||0;gc+=+r.cbm||0;gvr+=+r.valRmb||0;gvt+=+r.valThb||0;}); s.grand={pcs:gp,boxes:gb,cbm:gc,valRmb:gvr,valThb:gvt};
-        rounds++;
       }
+      if(roundTouched) rounds++;
     });
-    if(!patchedRows){ pkToast('ไม่พบตู้/สินค้าที่ตรงกับไฟล์ (หรือมีต้นทุนอยู่แล้ว)','muted'); return; }
-    pkConfirm(`กู้ต้นทุนจาก CSV:\n• เติมต้นทุนให้ ${patchedRows} รายการ ใน ${rounds} ตู้\n• ไม่แตะ factory/ข้อมูลอื่น\n\nกด "ตกลง" เพื่อบันทึก`, ()=>{
+    if(!patchedRows){ pkToast('ไม่พบตู้/สินค้าที่ตรงกับไฟล์ (หรือข้อมูลครบอยู่แล้ว)','muted'); return; }
+    pkConfirm(`เติมข้อมูลตู้ import จาก CSV:\n• ต้นทุน RMB ${rmbAdded} รายการ\n• Factory ${facAdded} รายการ\n• Vendor ${venAdded} รายการ\n(รวม ${patchedRows} รายการ ใน ${rounds} ตู้)\n\nกด "ตกลง" เพื่อบันทึก`, ()=>{
       pkSaveLogStore(); renderPkLog(); if(typeof renderArrivedMatrix==='function'){ try{ renderArrivedMatrix(); }catch(e){} }
-      pkToast(`กู้ต้นทุนสำเร็จ — ${patchedRows} รายการ / ${rounds} ตู้`,'good');
+      pkToast(`เติมข้อมูลสำเร็จ — RMB ${rmbAdded} · Factory ${facAdded} · Vendor ${venAdded}`,'good');
     });
   };
   rd.onerror=()=>pkToast('อ่านไฟล์ไม่สำเร็จ','bad');
