@@ -10163,19 +10163,21 @@ function flowExDiyAvgCell(it){
 }
 // ควรสั่งเพิ่ม 2 บรรทัด: บน=รวมทุกลูกค้า(อัตราขายเฉลี่ย 3ด.) · ล่าง=พาร์ท Mr.DIY(ยอดขายหน้าร้านเฉลี่ย 3ด. − สต๊อกหน้าร้าน)
 function flowSugAll(it, rc){ const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180); const a3=flowAvg3(it); const t=(typeof reorderTargetQty==='function')?reorderTargetQty(it,basis,a3/30):(a3*4); return Math.max(0,Math.round(t-(rc.c3||0))); }
-// สีของ "อยู่ได้ (เดือน)" อิงกับ Lead Time ของสินค้า · ยังอยู่ใน Lead Time=เขียว · <100% แต่ ≥50%=เหลือง · <50%=แดง
+// สีของ Cover Stock อิง Lead Time (เดือน) · เกณฑ์: ≤LT แดง · LT–LT+0.5 ส้ม · LT+0.5–LT+1 เหลือง · >LT+1 เขียว · ≥9 ชมพู · ≥12 ม่วง
 function coverHiByLead(m, leadDays){
-  if(!isFinite(m)) return 'color:var(--muted);';
   const lm=(+leadDays||0)/30;                                     // Lead Time เป็นเดือน
-  if(lm<=0) return (typeof pkCoverHi==='function')?pkCoverHi(m):'color:var(--muted);';   // ไม่มี Lead Time → เกณฑ์เดือนเดิม
-  if(m>=lm)     return 'background:#86efac;color:#14532d;';       // อยู่ได้ ≥ Lead Time → เขียว
-  if(m>=lm*0.5) return 'background:#fde047;color:#713f12;';       // < Lead Time แต่ ≥ 50% → เหลือง
-  return 'background:#f87171;color:#7f1d1d;';                     // < 50% ของ Lead Time → แดง
+  if(!isFinite(m)) return 'background:#a78bca;color:#3a2359;';    // ∞ → ม่วง (สูงสุด)
+  if(m>=12) return 'background:#a78bca;color:#3a2359;';           // ≥12 เดือน → ม่วง
+  if(m>=9)  return 'background:#f9a8d4;color:#831843;';           // ≥9 เดือน → ชมพู
+  if(m<=lm)     return 'background:#f87171;color:#7f1d1d;';       // ≤ Lead Time → แดง
+  if(m<=lm+0.5) return 'background:#fdba74;color:#7c2d12;';       // LT–LT+0.5 → ส้ม
+  if(m<=lm+1)   return 'background:#fde047;color:#713f12;';       // LT+0.5–LT+1 → เหลือง
+  return 'background:#86efac;color:#14532d;';                     // > LT+1 → เขียว
 }
 // Cover Stock แบบช่องเดียว แบ่งซ้าย–ขวา · ซ้าย=เทียบเฉลี่ย 3 เดือน · ขวา=เทียบเฉลี่ย 6 เดือน · สีอิง Lead Time
 function flowCoverSplitCell(q, a3, a6, tipNum, leadDays, xtra){
   const c3m=a3>0?q/a3:Infinity, c6m=a6>0?q/a6:Infinity;
-  const hi=m=>coverHiByLead(m, leadDays);
+  const hi=m=>coverHiByLead(isFinite(m)?Math.round(m*10)/10:m, leadDays);   // ยึดสีตามเลขที่แสดงจริง (ปัด 1 ตำแหน่ง)
   const ltTxt=(+leadDays>0)?(' · Lead Time '+Math.round((+leadDays)/30*10)/10+' เดือน'):'';
   const side=(m,win,avg)=>`<div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:3px;">${win}</div><span style="display:inline-block;font-size:16px;font-weight:800;padding:2px 9px;border-radius:7px;${hi(m)}" title="${tipNum} ÷ ยอดขายเฉลี่ย ${win} ${fmtNum(Math.round(avg))}/ด. = อยู่ได้ ${isFinite(m)?fmtMo(m):'∞'} เดือน${ltTxt}">${isFinite(m)?fmtMo(m):'∞'}</span>`;
   return `<td style="padding:6px 8px;text-align:center;white-space:nowrap;vertical-align:top;${xtra||''}"><div style="display:flex;"><div style="flex:1;border-right:1px dashed var(--line);padding:0 8px;">${side(c3m,'3 เดือน',a3)}</div><div style="flex:1;padding:0 8px;">${side(c6m,'6 เดือน',a6)}</div></div></td>`;
