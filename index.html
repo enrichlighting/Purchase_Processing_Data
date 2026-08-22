@@ -10396,6 +10396,7 @@ function flowCmp(a,b,basis,grp){
   const d=(va||0)-(vb||0); return S.dir==='asc'? d : -d;
 }
 // หนึ่งแถวสินค้า = คอลัมน์เรียงข้าง (เห็นทุกอย่างโดยไม่ต้องคลิก) · คลิกเพื่อกางกราฟยอดขายเต็ม
+function flowEtaShort(s){ const m=String(s||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!m) return ''; const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return String(+m[3]).padStart(2,'0')+'-'+M[+m[2]-1]+'-'+String(+m[1]).slice(2); }   // dd-mmm-yy
 function flowItemRow(it, basis, grp, salesCols){
   const rc=(typeof reorderCalc==='function')?reorderCalc(it, basis, grp):{statusKey:'noneed',suggestQty:0,cov3mo:Infinity,onHand:0,incoming:0,packed:0,production:0,poDiy:0,c1:0,c2:0,c3:0,dos1:Infinity,dos2:Infinity};
   const st=flowRowStatus(it, rc);   // สถานะยึดสีจาก Cover Stock คงเหลือรวมสั่งเพิ่ม (3 เดือน)
@@ -10410,7 +10411,7 @@ function flowItemRow(it, basis, grp, salesCols){
   const pos=((window.BC_PO&&window.BC_PO[it.no])||{}).pos||[];
   const poChips=pos.map(p=>flowChip(p[0]+' ค้าง '+fmtNum(p[1]), '#eaf1ff', '#2563eb', (p[3]||'')+(p[2]?' · ETA '+p[2]:''))).join('')||(rc.incoming>0?'':'<span class="muted" style="font-size:10px;">—</span>');
   let tuArr=[]; (window.pkLog||[]).forEach(s=>{ if(s.mode!=='released'||s.pending)return; if(typeof pkRoundArrived==='function' && pkRoundArrived(s)) return;   // ดราฟรอเปิด PO / ตู้ถึงคลังแล้ว → ไม่โชว์ chip ตู้ใน Flowchart
-    (s.rows||[]).forEach(r=>{ if(r.item!==it.no)return; (r.per||[]).forEach((per,ci)=>{ if(per&&per.pcs>0){ const ct=(s.containers||[])[ci]||{}; tuArr.push(flowChip((ct.name||'ตู้')+' '+fmtNum(per.pcs), '#ede9fe', '#7c3aed', 'จัดตู้ '+(ct.name||''))); } }); }); });
+    (s.rows||[]).forEach(r=>{ if(r.item!==it.no)return; (r.per||[]).forEach((per,ci)=>{ if(per&&per.pcs>0){ const ct=(s.containers||[])[ci]||{}; const eta=flowEtaShort(ct.dates&&ct.dates.arrWh); tuArr.push(`<div style="margin-bottom:4px;">${flowChip((ct.name||'ตู้')+' '+fmtNum(per.pcs), '#ede9fe', '#7c3aed', 'จัดตู้ '+(ct.name||''))}<div style="font-size:9px;color:#7c3aed;margin-top:1px;white-space:nowrap;">ETA WH : ${eta||'—'}</div></div>`); } }); }); });
   const tuChips=tuArr.join('')||'<span class="muted" style="font-size:10px;">—</span>';
   const stickyBg = iOpen?'#f3f6fb':'var(--card)';   // ตรึงคอลัมน์ Vendor/Factory/ชื่อสินค้าไว้ซ้าย (ต้องมีพื้นทึบ)
   const poRemain = Math.max(0, (rc.incoming||0)-(rc.packed||0)-(rc.production||0));   // PO ค้างรับ หักส่วนที่จัดตู้/สั่งผลิตไปแล้ว
@@ -10500,7 +10501,7 @@ function renderFlowchart(){
   window._flowRcCache = {};                                 // รีเซ็ต cache ของ reorderCalc ทุกครั้งที่เรนเดอร์
   window._bcDesc2Map = null;                                 // รีเซ็ต map Description2 (เผื่อ BC_ITEMS อัปเดต)
   const salesCols = flowSalesCols(items);
-  let TH=['Vendor','Factory','รหัสสินค้า','สินค้า','ชื่อ/สเปก (EN)','ราคาตั้ง','สถานะ','','คงเหลือ (แยกคลัง)',FLOW_DIY_BADGE,'หมวด①<br>คงเหลือคลังหักจอง','On hand Cover หมวด① (3ด.)','จัดตู้แล้ว','ตู้ (Container)','หมวด②<br>คงเหลือหลังจัดตู้แล้ว','On hand Cover หมวด② (3ด.)','สั่งผลิต','PO ค้างรับ','หมวด③<br>คงเหลือ+PO ค้างรับ','Cover Stock (3/6ด.)','ยอดขายทุกกลุ่มเฉลี่ย/ด. (3/6ด.)','ยอดขายเฉลี่ย ไม่รวม DIY (3/6ด.)','Suggestion','Cover Stock คงเหลือรวมสั่งเพิ่ม','MOQ / วางแผนสั่ง'];
+  let TH=['Vendor','Factory','รหัสสินค้า','สินค้า','ชื่อ/สเปก (EN)','ราคาตั้ง','สถานะ','','คงเหลือ (แยกคลัง)',FLOW_DIY_BADGE,'หมวด①<br>คงเหลือคลังหักจอง','On hand Cover หมวด① (3ด.)','จัดตู้แล้ว','ตู้ (Container)','หมวด②<br>คงเหลือหลังจัดตู้แล้ว','On hand Cover หมวด② (3ด.)','สั่งผลิต','PO ค้างรับ','หมวด③<br>คงเหลือ+PO ค้างรับ','Cover Stock (3/6ด.)','ยอดขายทุกกลุ่มเฉลี่ย/ด. (3/6ด.)','ยอดขายเฉลี่ย Others (3/6ด.)','Suggestion','Cover Stock คงเหลือรวมสั่งเพิ่ม','MOQ / วางแผนสั่ง'];
   let KEYS=FLOW_FIXED_KEYS.slice();
   if(DIY){ const pk=KEYS.indexOf('price'), pt=TH.indexOf('ราคาตั้ง');   // แทรกคอลัมน์ราคา DIY หลัง "ราคาตั้ง" (อิงตำแหน่ง ไม่ยึดเลขคงที่)
     TH.splice(pt+1,0,'ราคาส่งให้ DIY','ราคาขายหน้าร้าน (ไม่รวม VAT)'); KEYS.splice(pk+1,0,'costdiy','npstore');
