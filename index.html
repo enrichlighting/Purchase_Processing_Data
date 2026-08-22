@@ -10539,7 +10539,7 @@ function renderFlowchart(){
   if(!window.flowShowOHC2){ const idx=KEYS.indexOf('ohc2'); if(idx>=0){ KEYS.splice(idx,1); TH.splice(idx,1); } }
   FLOW_GRP_STARTS.forEach(k=>{ const idx=KEYS.indexOf(k); if(idx>0){ KEYS.splice(idx,0,'__gap__'); TH.splice(idx,0,''); } });   // แทรกช่องว่างคั่นกลุ่ม
   const RIGHT_KEYS=new Set(['price','costdiy','npstore','c1','c2','c3','podiy','production','packed','suggest','avg36','exdiyavg','cover36','covplus','covdiyin','covdiyout','storeavg','diyinavg','ohc1','ohc2']);
-  const CENTER_HEAD=new Set(['c1','c2','c3']);   // หัวคอลัมน์ หมวด①/②/③ จัดกึ่งกลาง (ข้อมูลยังชิดขวา)
+  const CENTER_HEAD=new Set(['c1','c2','c3','ohc1','ohc2','cover36']);   // หัวคอลัมน์ หมวด①/②/③ + On hand Cover①/② + Cover Stock จัดกึ่งกลาง (ข้อมูลยังชิดขวา)
   const COLBG={c1:'#dcfce7',c2:'#fef9c3',c3:'#ffedd5',suggest:'#111'};   // สีพื้นหัวคอลัมน์ (หมวด①เขียว ②เหลือง ③ส้ม · ควรสั่งเพิ่ม=ดำ)
   const STICKYL={}; { let o=0; if(!window.flowHideVF){ STICKYL.vendor=0; STICKYL.factory=78; o=156; } if(window.flowShowCode){ STICKYL.code=o; o+=110; } STICKYL.name=o; o+=186; if(window.flowShowDesc2){ STICKYL.desc2=o; } }   // ตรึงซ้ายแบบไดนามิก (Vendor/Factory/รหัส/ชื่อ/Desc2)
   window._flowSL=STICKYL;   // ให้ flowItemRow ใช้ตำแหน่งตรึงเดียวกัน
