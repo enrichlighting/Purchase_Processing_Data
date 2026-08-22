@@ -8869,7 +8869,7 @@ function pkRowWarn(i){
   const r=window.packingRows[i]; if(!r||!r.item||window.pkMode!=='released') return '';
   const pr=pkRowProd(r); if(!pr.po) return '';
   const total=(r.loads||[]).reduce((s,x)=>s+(+x||0),0);
-  if(!pr.prodEntered) return `<div style="font-size:10.5px;margin-top:2px;color:#dc2626;font-weight:700;">⚠️ คุณยังไม่ได้กรอกสั่งผลิต<br><span style="font-weight:400;">ไปกรอก "จำนวนสั่งผลิต" ที่การ์ด PO หน้า 🚨 วางแผน Lead Time</span></div>`;
+  if(!pr.prodEntered) return `<div style="font-size:10.5px;margin-top:2px;color:#dc2626;font-weight:700;" title="ไปกรอก &quot;จำนวนสั่งผลิต&quot; ที่การ์ด PO หน้า 🚨 วางแผน Lead Time">⚠️ ยังไม่ได้กรอกสั่งผลิต</div>`;
   if(total>pr.prod){ const usedC=[]; (r.loads||[]).forEach((x,c)=>{ if((+x||0)>0) usedC.push(((window.pkContainers[c]||{}).name)||('ตู้ '+(c+1))); });
     return `<div style="font-size:10.5px;margin-top:2px;color:#dc2626;font-weight:700;">⚠️ คุณกรอกเกินจำนวนสั่งผลิต · สั่งผลิต ${fmtNum(pr.prod)} · จัด ${fmtNum(total)} (เกิน ${fmtNum(total-pr.prod)})<br><span style="font-weight:400;">ตู้ที่กรอกไปแล้ว: ${usedC.join(', ')||'-'}</span></div>`; }
   return `<div class="muted" style="font-size:10px;margin-top:2px;">สั่งผลิต ${fmtNum(pr.prod)} ชิ้น · จัดแล้ว ${fmtNum(total)}${pr.out!=null?' · ค้างรับ '+fmtNum(pr.out):''}</div>`;
