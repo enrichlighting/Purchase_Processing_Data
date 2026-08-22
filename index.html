@@ -10349,7 +10349,7 @@ function flowSugExCarton(it, rc){
 // ผลลัพธ์ควรสั่ง (ปัดเต็มลัง) — ใช้แสดงใต้ช่องกรอก + อัปเดตสด
 function flowSuggestResult(g){
   return `<div style="margin-top:3px;"><b style="font-size:14px;color:#facc15;">${fmtNum(g.pieces)}</b> <span style="font-size:8px;color:#fde68a;">ชิ้น (เต็มลัง)</span></div>`
-    + (g.hasPk?`<div style="margin-top:1px;"><b style="font-size:12px;color:#facc15;">${fmtNum(g.ctn)}</b> <span style="font-size:8px;color:#fde68a;">CTN</span> · <b style="font-size:11px;color:#7dd3fc;">${g.cbm.toFixed(3)}</b> <span style="font-size:8px;color:#bae6fd;">CBM</span></div>`:'<div style="font-size:8.5px;color:#9ca3af;margin-top:1px;">— ไม่มีข้อมูลลัง</div>');
+    + (g.hasPk?`<div style="margin-top:1px;"><b style="font-size:12px;color:#facc15;">${fmtNum(g.ctn)}</b> <span style="font-size:8px;color:#fde68a;">CTN</span></div><div style="margin-top:1px;"><b style="font-size:11px;color:#7dd3fc;">${g.cbm.toFixed(3)}</b> <span style="font-size:8px;color:#bae6fd;">CBM</span></div>`:'<div style="font-size:8.5px;color:#9ca3af;margin-top:1px;">— ไม่มีข้อมูลลัง</div>');
 }
 function flowSuggestCell(it, rc){
   const g=flowSugExCarton(it, rc);
