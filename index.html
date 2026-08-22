@@ -9955,12 +9955,12 @@ function flowRowStatus(it,rc){
   else if(cv<=lm+0.5) band='orange';
   else if(cv<=lm+1) band='yellow';
   else band='green';
-  const M={ red:{key:'red',rank:0,t:'🔴 ควรสั่งซื้อ',c:'#7f1d1d',bg:'#f87171'},
-            orange:{key:'nearorder',rank:1,t:'🟠 ใกล้ถึงจุดสั่ง',c:'#7c2d12',bg:'#fdba74'},
-            yellow:{key:'warn',rank:2,t:'🟡 เฝ้าระวัง',c:'#713f12',bg:'#fde047'},
-            green:{key:'noneed',rank:3,t:'🟢 เพียงพอ',c:'#14532d',bg:'#86efac'},
-            pink:{key:'swell',rank:4,t:'🩷 สต๊อกเริ่มบวม',c:'#831843',bg:'#f9a8d4'},
-            purple:{key:'swellbig',rank:5,t:'🟣 สต๊อกบวมมาก',c:'#3a2359',bg:'#a78bca'} };
+  const M={ red:{key:'red',rank:0,t:'🛒 ควรสั่งซื้อ',c:'#ffe4e4',bg:'#dc2626'},
+            orange:{key:'nearorder',rank:1,t:'🚨 ใกล้ถึงจุดสั่ง',c:'#fff0e2',bg:'#ea580c'},
+            yellow:{key:'warn',rank:2,t:'👀 เฝ้าระวัง',c:'#fff8e6',bg:'#d97706'},
+            green:{key:'noneed',rank:3,t:'✅ เพียงพอ',c:'#e6ffef',bg:'#16a34a'},
+            pink:{key:'swell',rank:4,t:'🏬 สต๊อกเริ่มบวม',c:'#ffeaf4',bg:'#db2777'},
+            purple:{key:'swellbig',rank:5,t:'🏬🔥 สต๊อกบวมมาก',c:'#f1ecff',bg:'#7c3aed'} };
   return M[band];
 }
 function flowShort(no){ if(typeof pkDisplayName==='function'){ const s=pkDisplayName(no); if(s && s!==no) return s; } const g=(typeof getItem==='function')?getItem(no):null; return g?(typeof pkShortName==='function'?pkShortName(g.desc, (window.BC_PACKING&&window.BC_PACKING[no]||{}).model):g.desc):no; }
@@ -10600,7 +10600,7 @@ function renderFlowchart(){
     return `<th onclick="flowSort('${key}')" title="คลิกเพื่อเรียง" style="cursor:pointer;user-select:none;padding:7px 8px;text-align:${CENTER_HEAD.has(key)?'center':(RIGHT_KEYS.has(key)?'right':'left')};font-size:10.5px;line-height:1.25;color:var(--muted);white-space:normal;word-break:break-word;vertical-align:top;border-bottom:2px solid var(--line);${gtop}${flowGrpBorder(key)}${cbg}${sticky}${w}">${h} ${flowSortArrow(key)}</th>`; }).join('');
   const theadHtml = `<thead><tr style="background:var(--bg);">${fixedTh}</tr></thead>`;
   // ความกว้างคอลัมน์คงที่ (เท่ากันทุกหมวด → คอลัมน์ตรงกัน) · table-layout:fixed
-  const CW={vendor:78,factory:78,code:110,name:186,desc2:200,price:78,costdiy:102,npstore:120,status:104,c1:88,c2:88,c3:102,ohc1:118,ohc2:118,onhand:152,podiy:74,production:76,packed:78,container:134,po:200,cover36:150,covplus:160,covdiyin:150,covdiyout:174,suggest:114,moqplan:172,avg36:120,exdiyavg:132,diyinavg:122,storeavg:122,diyrisk:152};
+  const CW={vendor:78,factory:78,code:110,name:186,desc2:200,price:78,costdiy:102,npstore:120,status:150,c1:88,c2:88,c3:102,ohc1:118,ohc2:118,onhand:152,podiy:74,production:76,packed:78,container:134,po:200,cover36:150,covplus:160,covdiyin:150,covdiyout:174,suggest:114,moqplan:172,avg36:120,exdiyavg:132,diyinavg:122,storeavg:122,diyrisk:152};
   const SALESW=76;
   let tableW=0, colHtml='';
   KEYS.forEach(k=>{ if(k==='__sales__'){ (salesCols||[]).forEach(()=>{ colHtml+=`<col style="width:${SALESW}px">`; tableW+=SALESW; }); } else if(k==='__gap__'){ colHtml+='<col style="width:16px">'; tableW+=16; } else { const w=CW[k]||100; colHtml+=`<col style="width:${w}px">`; tableW+=w; } });
