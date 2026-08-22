@@ -404,6 +404,8 @@
         <select id="pay-month" onchange="renderPayment()" style="width:170px;max-width:170px;font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;"></select>
         <span>Vendor</span>
         <select id="pay-vendor" onchange="renderPayment()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;max-width:220px;"></select>
+        <span>เลขตู้</span>
+        <select id="pay-ct" onchange="renderPayment()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;max-width:160px;"></select>
         <span style="width:1px;height:22px;background:var(--line);margin:0 4px;"></span>
         <label style="font-size:13px;font-weight:700;">Exchange Rate: <input type="number" id="pay-fx" value="5" min="0" step="0.01" onchange="renderPayment()" oninput="renderPayment()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/หยวน</label>
         <label style="font-size:13px;font-weight:700;">USD: <input type="number" id="pay-usd" value="34" min="0" step="0.01" onchange="renderPayment()" oninput="renderPayment()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/ดอลลาร์</label>
@@ -10696,8 +10698,8 @@ function payWeeks(y,m){
 }
 function payFillSelectors(){
   const ms=document.getElementById('pay-month'), ys=document.getElementById('pay-year');
-  if(ms && !ms.options.length){ ms.innerHTML=PAY_MONTHS_TH.map((n,i)=>`<option value="${i+1}">${n}</option>`).join(''); ms.value=(APP_TODAY.getMonth()+1); }
-  if(ys && !ys.options.length){ const beNow=APP_TODAY.getFullYear()+543; let o=''; for(let yy=beNow-2;yy<=beNow+3;yy++) o+=`<option value="${yy}">${yy}</option>`; ys.innerHTML=o; ys.value=beNow; }
+  if(ms && !ms.options.length){ ms.innerHTML='<option value="__all__">ทุกเดือน</option>'+PAY_MONTHS_TH.map((n,i)=>`<option value="${i+1}">${n}</option>`).join(''); ms.value=(APP_TODAY.getMonth()+1); }
+  if(ys && !ys.options.length){ const beNow=APP_TODAY.getFullYear()+543; let o='<option value="__all__">ทุกปี</option>'; for(let yy=beNow-2;yy<=beNow+3;yy++) o+=`<option value="${yy}">${yy}</option>`; ys.innerHTML=o; ys.value=beNow; }
 }
 function payDatesToSet(){ return new Set(window.paySelDates||[]); }
 function payClearDates(){ window.paySelDates=[]; window._payLastClick=null; renderPayment(); }
@@ -10840,9 +10842,48 @@ function payRowsData(){
 function renderPayment(){
   const el=document.getElementById('pay-body'); if(!el) return;
   payFillSelectors();
-  const m=+document.getElementById('pay-month').value || (APP_TODAY.getMonth()+1);
-  const be=+document.getElementById('pay-year').value || (APP_TODAY.getFullYear()+543);
-  const y=be-543; const weeks=payWeeks(y,m); const fx=payFx();
+  const fx=payFx();
+  const mSel=(document.getElementById('pay-month')||{}).value||'';
+  const ySel=(document.getElementById('pay-year')||{}).value||'';
+  const allMonth=(mSel==='__all__'), allYear=(ySel==='__all__');
+  let data=payRowsData();
+  // ---- ตัวเลือก Vendor ----
+  const vsel=document.getElementById('pay-vendor');
+  if(vsel){ const vs=[...new Set(data.map(r=>r.vendor).filter(Boolean))].sort(); const cur=vsel.value||window.paySelVendor||'__all__';
+    vsel.innerHTML='<option value="__all__">ทุก Vendor</option>'+vs.map(v=>`<option value="${payEsc(v)}">${payEsc(v)}</option>`).join('');
+    vsel.value=(cur!=='__all__'&&vs.indexOf(cur)<0)?'__all__':cur; window.paySelVendor=vsel.value;
+  }
+  if(window.paySelVendor && window.paySelVendor!=='__all__') data=data.filter(r=>r.vendor===window.paySelVendor);
+  // ---- ตัวเลือก เลขตู้ (CT No.) ----
+  const csel=document.getElementById('pay-ct');
+  if(csel){ const cs=[...new Set(data.map(r=>r.cont).filter(Boolean))].sort(); const cur=csel.value||window.paySelCt||'__all__';
+    csel.innerHTML='<option value="__all__">ทุกตู้</option>'+cs.map(v=>`<option value="${payEsc(v)}">${payEsc(v)}</option>`).join('');
+    csel.value=(cur!=='__all__'&&cs.indexOf(cur)<0)?'__all__':cur; window.paySelCt=csel.value;
+  }
+  if(window.paySelCt && window.paySelCt!=='__all__') data=data.filter(r=>r.cont===window.paySelCt);
+  // ใช้วันที่โอนที่แก้เอง (ถ้ามี) + เก็บ meta ไว้ให้ modal
+  payLoadOv(); window._payRowMeta={};
+  data.forEach(r=>{ const key=r.cont+'|'+r.vendor+'|'+r.factory+'|'+(r.seg||''); r._key=key; const auto=r.xfer; const ov=window.payXferOv[key];
+    if(ov&&ov.date){ r.xfer=ov.date; r.xferReason=ov.reason||''; r.xferManual=true; }
+    window._payRowMeta[key]={cont:r.cont,vendor:r.vendor,factory:r.factory,seg:r.seg,auto:auto,cur:r.xfer,reason:(ov&&ov.reason)||''};
+  });
+  // ---- เลือกเดือน/ปีที่จะแสดง (รองรับ ทุกเดือน/ทุกปี → วนสร้างตารางต่อเดือน) ----
+  const beNow=APP_TODAY.getFullYear()+543;
+  const y0=allYear?null:((+ySel||beNow)-543);
+  let combos=[];
+  if(!allYear && !allMonth){ combos=[{y:y0, m:(+mSel||APP_TODAY.getMonth()+1)}]; }
+  else {
+    const set=new Set();
+    data.forEach(r=>{ const ds=r.xfer||r.load; const mm=String(ds||'').match(/^(\d{4})-(\d{1,2})/); if(!mm) return; const yy=+mm[1], mo=+mm[2]; if(!allYear && yy!==y0) return; if(!allMonth && mo!==(+mSel)) return; set.add(yy+'-'+String(mo).padStart(2,'0')); });
+    combos=[...set].sort().map(k=>({y:+k.slice(0,4), m:+k.slice(5,7)}));
+    if(!combos.length) combos=[{y:(y0||APP_TODAY.getFullYear()), m:(allMonth?(APP_TODAY.getMonth()+1):(+mSel||APP_TODAY.getMonth()+1))}];
+  }
+  const multi=combos.length>1;
+  el.innerHTML=combos.map(c=>payMonthBlock(c.y, c.m, data, fx, !multi)).join('<div style="height:26px;border-top:2px dashed #d8c893;margin-top:14px;"></div>');
+}
+// สร้างตาราง Payment ของเดือนเดียว (y,m) จาก data ที่กรองแล้ว · showSide=แสดงปฏิทิน+มังกร
+function payMonthBlock(y, m, data, fx, showSide){
+  const weeks=payWeeks(y,m);
   const LEFT=['WEEK','วันที่โอน','SUPPLIER (VENDOR+FACTORY)','TERM','Loading date','CT NO.','AMOUNT','TOTAL AMOUNT (SUPPLIER - RMB)','TOTAL AMOUNT (SUPPLIER - BAHT)'];
   const RIGHT=['TOTAL AMOUNT (1-15)','TOTAL AMOUNT (16-31)','บัญชี CF','SUPPLIER CF','BANK SLIP'];
   const bTh='border:1px solid #a8801f;padding:5px 6px;white-space:normal;word-break:break-word;line-height:1.2;background:#d4af37;color:#3a2a00;font-weight:800;text-align:center;font-size:11.5px;';
@@ -10853,21 +10894,6 @@ function renderPayment(){
     + weeks.map((w,i)=>`<th style="${bTh}">WEEK ${i+1}<br><span style="font-weight:400;font-size:10px;">(${w.start}-${w.end})</span></th>`).join('')
     + gapTh + RIGHT.map(h=>`<th style="${bTh}">${h}</th>`).join('')+'</tr>';
   const totCols=LEFT.length+1+weeks.length+1+RIGHT.length;
-  // ---- data rows จาก Packing (จัดเข้าวีคตาม "วันที่โอน" ที่คำนวณจาก Term) ----
-  let data=payRowsData();
-  // เติมตัวเลือก Vendor (จากข้อมูลทั้งหมด) + กรองตามที่เลือก
-  const vsel=document.getElementById('pay-vendor');
-  if(vsel){ const vs=[...new Set(data.map(r=>r.vendor).filter(Boolean))].sort(); const cur=vsel.value||window.paySelVendor||'__all__';   // อ่านค่าที่ผู้ใช้เพิ่งเลือกก่อน
-    vsel.innerHTML='<option value="__all__">ทุก Vendor</option>'+vs.map(v=>`<option value="${payEsc(v)}">${payEsc(v)}</option>`).join('');
-    vsel.value=(cur!=='__all__'&&vs.indexOf(cur)<0)?'__all__':cur; window.paySelVendor=vsel.value;
-  }
-  if(window.paySelVendor && window.paySelVendor!=='__all__') data=data.filter(r=>r.vendor===window.paySelVendor);
-  // ใช้วันที่โอนที่แก้เอง (ถ้ามี) + เก็บ meta ไว้ให้ modal
-  payLoadOv(); window._payRowMeta={};
-  data.forEach(r=>{ const key=r.cont+'|'+r.vendor+'|'+r.factory+'|'+(r.seg||''); r._key=key; const auto=r.xfer; const ov=window.payXferOv[key];
-    if(ov&&ov.date){ r.xfer=ov.date; r.xferReason=ov.reason||''; r.xferManual=true; }
-    window._payRowMeta[key]={cont:r.cont,vendor:r.vendor,factory:r.factory,seg:r.seg,auto:auto,cur:r.xfer,reason:(ov&&ov.reason)||''};
-  });
   const f2=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   function wkIndex(dstr){ const mm=String(dstr||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!mm) return -2; if(+mm[1]!==y || +mm[2]!==m) return -2; const d=+mm[3];
     for(let i=0;i<weeks.length;i++){ if(d>=weeks[i].start && d<=weeks[i].end) return i; if(d>weeks[i].end && (i+1>=weeks.length || d<weeks[i+1].start)) return i; } return -2; }
@@ -10945,12 +10971,8 @@ function renderPayment(){
       <tr><td style="${tdT}font-weight:800;background:#3a1010;color:#f5d67a;">TOTAL (USD)</td><td style="${tdT}background:#faf0cd;">$ <b>${f2(usdTot)}</b></td><td style="${tdT}font-weight:700;background:#3a1010;color:#f5d67a;">BAHT</td><td style="${tdT}"><b>฿${f2(usdTot*usd)}</b></td></tr>
       <tr><td colspan="2" style="border:none;"></td><td style="${tdT}font-weight:800;background:#d4af37;color:#3a2a00;">TOTAL BAHT</td><td style="${tdT}background:#d4af37;color:#3a2a00;"><b>฿${f2(grand*fx + usdTot*usd)}</b></td></tr>
     </table></div>`;
-  el.innerHTML=`<div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:nowrap;">
-    <div style="flex:1 1 auto;min-width:0;overflow-x:auto;">
-      <table style="border-collapse:collapse;font-size:12px;min-width:100%;">${head}${body}</table>
-      ${totals}
-    </div>
-    <div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;">
+  const title = showSide?'':`<div style="font-weight:800;font-size:15px;color:#7f1d1d;margin:2px 0 6px;">📅 ${PAY_MONTHS_TH[m-1]} ${y+543}</div>`;
+  const side = showSide?`<div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;">
       ${payCalendarHtml(y,m)}
       <div title="ปีมังกร · ความมั่งคั่ง พ่นไฟรับทรัพย์" style="width:8cm;display:flex;justify-content:flex-end;padding-right:8px;user-select:none;">
         <div style="position:relative;display:inline-block;line-height:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,.25));">
@@ -10967,7 +10989,13 @@ function renderPayment(){
           </div>
         </div>
       </div>
+    </div>`:'';
+  return `${title}<div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:nowrap;">
+    <div style="flex:1 1 auto;min-width:0;overflow-x:auto;">
+      <table style="border-collapse:collapse;font-size:12px;min-width:100%;">${head}${body}</table>
+      ${totals}
     </div>
+    ${side}
   </div>`;
 }
 function renderTab(tab){
