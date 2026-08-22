@@ -169,6 +169,15 @@
   body:not(.toc-open) #toc-open-btn { display:block; }
   @media (max-width:820px){ body.toc-open { padding-left:0; } body.toc-open #toc { box-shadow:6px 0 40px rgba(0,0,0,.35); } }
 
+  /* ===== มังกรพ่นไฟ (หน้า Payment) ===== */
+  .pay-dragon-fire{ animation:payFireFlicker 0.5s ease-in-out infinite alternate; }
+  @keyframes payFireFlicker{
+    0%   { transform:rotate(-58deg) scale(0.85); opacity:.75; }
+    40%  { transform:rotate(-66deg) scale(1.08); opacity:1; }
+    70%  { transform:rotate(-60deg) scale(0.95); opacity:.9; }
+    100% { transform:rotate(-70deg) scale(1.18); opacity:1; }
+  }
+  @media (prefers-reduced-motion: reduce){ .pay-dragon-fire{ animation:none; transform:rotate(-62deg); } }
   /* ===== ธีมหน้า Packing List: เขียวมิ้นท์ #56c2aa / เขียวเข้ม #0f655a + เรือใบพื้นหลังจาง ===== */
   #page-packing{ --brand:#0f655a; --brand-soft:#e2f4ee; position:relative; z-index:0; }
   #pk-arrived-card{ position:relative; overflow:hidden; }
@@ -10879,7 +10888,12 @@ function renderPayment(){
     </div>
     <div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;">
       ${payCalendarHtml(y,m)}
-      <div title="ปีมังกร · ความมั่งคั่ง" style="width:8cm;text-align:center;font-size:120px;line-height:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,.25));user-select:none;">🐉</div>
+      <div title="ปีมังกร · ความมั่งคั่ง พ่นไฟรับทรัพย์" style="width:8cm;display:flex;justify-content:center;user-select:none;">
+        <div style="position:relative;display:inline-block;line-height:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,.25));">
+          <span style="font-size:120px;">🐉</span>
+          <span class="pay-dragon-fire" style="position:absolute;left:-16px;top:18px;font-size:44px;transform-origin:right center;pointer-events:none;">🔥</span>
+        </div>
+      </div>
     </div>
   </div>`;
 }
