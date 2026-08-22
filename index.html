@@ -10156,7 +10156,7 @@ function flowIsDiyItem(it){ return !!(it && (it.hasPLU || it.mrdiySell)); }
 function flowDiyNA(xtra){ return `<td style="padding:6px 10px;text-align:center;vertical-align:middle;${xtra||''}"><span style="font-size:9px;color:#9ca3af;font-style:italic;white-space:normal;line-height:1.25;display:inline-block;max-width:120px;">สินค้านี้ไม่ได้ขาย Mr.DIY</span></td>`; }
 function flowExDiyAvgCell(it){
   const a3=Math.round(flowExDiyAvg(it,3)), a6=Math.round(flowExDiyAvg(it,6));
-  return `<td style="padding:6px 10px;text-align:right;white-space:nowrap;vertical-align:top;">
+  return `<td style="padding:6px 10px;text-align:right;white-space:nowrap;vertical-align:top;${flowGrpBorder('exdiyavg')}">
     <div style="border-bottom:1px dashed var(--line);padding-bottom:3px;margin-bottom:3px;" title="ยอดขายลูกค้าทั้งหมด ไม่รวม Mr.DIY เฉลี่ย/เดือน (3 เดือนย้อนหลัง)"><b style="font-size:13px;">${fmtNum(a3)}</b> <span class="muted" style="font-size:8.5px;">/ด. 3ด.</span></div>
     <div title="ยอดขายลูกค้าทั้งหมด ไม่รวม Mr.DIY เฉลี่ย/เดือน (6 เดือนย้อนหลัง)"><b style="font-size:13px;color:#64748b;">${fmtNum(a6)}</b> <span class="muted" style="font-size:8.5px;">/ด. 6ด.</span></div>
   </td>`;
