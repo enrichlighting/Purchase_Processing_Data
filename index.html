@@ -9936,7 +9936,7 @@ window.flowState = window.flowState || {sub:{}, item:{}, year:{}};
 const FLOW_WH_COLORS={'WH1-B1':'#2563eb','WH1-B2':'#0891b2','WH-RESERVE':'#7c3aed','HO689':'#16a34a','QWH':'#d97706','WH155':'#db2777'};
 function flowWhColor(w){ return FLOW_WH_COLORS[w]||'#64748b'; }
 const FLOW_ST={red:{t:'🔴 ควรสั่งซื้อ',c:'#dc2626',bg:'#fdeaea'},warn:{t:'⏰ ใกล้ถึงจุดสั่ง',c:'#b45309',bg:'#fdf1e0'},watch:{t:'👀 เฝ้าระวัง',c:'#a16207',bg:'#fef9c3'},noneed:{t:'🟢 ยังไม่ต้องสั่ง',c:'#16a34a',bg:'#e7f6ec'}};
-// สถานะ = ยึดสีจาก Cover Stock คงเหลือรวมสั่งเพิ่ม (3 เดือน) เทียบ Lead Time · เขียว≥LT · เหลือง≥50% · แดง<50%
+// สถานะ = ยึดตาม หมวด③ Cover Stock (3 เดือน) · 6 ระดับตรงกับสีคอลัมน์ Cover: ≤LT ควรสั่งซื้อ · LT+0.5 ใกล้จุดสั่ง · LT+1 เฝ้าระวัง · >LT+1 เพียงพอ · ≥9 สต๊อกเริ่มบวม · ≥12 สต๊อกบวมมาก
 function flowRowStatus(it,rc){
   // หาเดือนล่าสุดที่มียอดขาย (>0) จากประวัติทั้งหมด
   let lastSale=''; (it.monthly||[]).forEach(m=>{ if(m[1]>0 && m[0]>lastSale) lastSale=m[0]; });
@@ -9946,13 +9946,21 @@ function flowRowStatus(it,rc){
   if(gapMo>=12) return {key:'dead', rank:50, t:'💀 Dead Stock', c:'#374151', bg:'#e5e7eb', dead:true, sub:'ไม่มียอดขาย ≥ 12 เดือน (ล่าสุด '+lastSale+')'};   // ไม่ขายมา ≥12 เดือน
   const q=(rc.c3||0), a3=flowAvg3(it);   // สถานะยึดตาม หมวด③ Cover Stock ช่วง 3 เดือน (หมวด③ ÷ ยอดขายเฉลี่ย 3ด.)
   const cover=a3>0?q/a3:(q>0?Infinity:0), lm=(+it.leadTime||0)/30;
+  const cv=isFinite(cover)?Math.round(cover*10)/10:cover;   // ยึดตามเลขที่แสดงจริง (ปัด 1 ตำแหน่ง) เหมือนคอลัมน์ Cover Stock
   let band;
-  if(!isFinite(cover)) band='green';
-  else if(lm<=0) band=(cover>=3?'green':(cover>=1.5?'yellow':'red'));
-  else band=(cover>=lm?'green':(cover>=lm*0.5?'yellow':'red'));
-  const M={ red:{key:'red',rank:0,t:'🔴 ควรสั่งซื้อ',c:'#b91c1c',bg:'#fee2e2'},
-            yellow:{key:'warn',rank:1,t:'🟡 เฝ้าระวัง',c:'#a16207',bg:'#fef9c3'},
-            green:{key:'noneed',rank:2,t:'🟢 เพียงพอ',c:'#15803d',bg:'#dcfce7'} };
+  if(!isFinite(cv)) band='purple';
+  else if(cv>=12) band='purple';
+  else if(cv>=9) band='pink';
+  else if(cv<=lm) band='red';
+  else if(cv<=lm+0.5) band='orange';
+  else if(cv<=lm+1) band='yellow';
+  else band='green';
+  const M={ red:{key:'red',rank:0,t:'🔴 ควรสั่งซื้อ',c:'#7f1d1d',bg:'#f87171'},
+            orange:{key:'nearorder',rank:1,t:'🟠 ใกล้ถึงจุดสั่ง',c:'#7c2d12',bg:'#fdba74'},
+            yellow:{key:'warn',rank:2,t:'🟡 เฝ้าระวัง',c:'#713f12',bg:'#fde047'},
+            green:{key:'noneed',rank:3,t:'🟢 เพียงพอ',c:'#14532d',bg:'#86efac'},
+            pink:{key:'swell',rank:4,t:'🩷 สต๊อกเริ่มบวม',c:'#831843',bg:'#f9a8d4'},
+            purple:{key:'swellbig',rank:5,t:'🟣 สต๊อกบวมมาก',c:'#3a2359',bg:'#a78bca'} };
   return M[band];
 }
 function flowShort(no){ if(typeof pkDisplayName==='function'){ const s=pkDisplayName(no); if(s && s!==no) return s; } const g=(typeof getItem==='function')?getItem(no):null; return g?(typeof pkShortName==='function'?pkShortName(g.desc, (window.BC_PACKING&&window.BC_PACKING[no]||{}).model):g.desc):no; }
