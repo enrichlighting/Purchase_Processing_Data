@@ -9987,7 +9987,7 @@ function flowToggleItem(c){ window.flowState.item[c]=!window.flowState.item[c]; 
 function flowSetYear(c,y){ window.flowState.year[c]=y; renderFlowchart(); }
 function flowChip(txt,bg,fg,title){ return `<span title="${(title||'').replace(/"/g,'&quot;')}" style="display:inline-block;background:${bg};color:${fg};border:1px solid ${fg}44;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700;margin:2px 3px 2px 0;white-space:nowrap;">${txt}</span>`; }
 function flowSetVersion(v){ window.flowVersion=v; renderFlowchart(); }
-function flowSetDiyOnly(on){ window.flowDiyOnly=!!on; try{ localStorage.setItem('flowDiyOnlyV1', on?'1':'0'); }catch(e){} renderFlowchart(); }
+function flowSetDiyMode(m){ window.flowDiyMode=m; try{ localStorage.setItem('flowDiyModeV1', m); }catch(e){} renderFlowchart(); }
 // กราฟ Mr.DIY รายเดือน: 3 แท่ง/เดือน — ยอดขายเรา→DIY(ชิ้น) · ยอดขายหน้าร้าน(฿=ชิ้น×NP) · มูลค่าสต๊อก(฿=สต๊อก×Cost)
 function flowSetMonth(c,m){ window.flowState.month=window.flowState.month||{}; window.flowState.month[c]=m; renderFlowchart(); }
 function flowSalesDIY(it){
@@ -10486,7 +10486,7 @@ function renderFlowchart(){
   const basis=(window.RBASIS==='custom')?180:(+window.RBASIS||180), grp=window.RGROUP||'all';
   const q=(window.flowQuery||'').trim().toLowerCase();
   const DIY = true;   // รวมเป็นหน้าเดียว — แสดงคอลัมน์ Mr.DIY เสมอ (ใช้ Filter เลือกเฉพาะ DIY/ทุกสินค้าแทน)
-  if(window.flowDiyOnly===undefined){ try{ window.flowDiyOnly=localStorage.getItem('flowDiyOnlyV1')==='1'; }catch(e){ window.flowDiyOnly=false; } }
+  if(window.flowDiyMode===undefined){ try{ window.flowDiyMode=localStorage.getItem('flowDiyModeV1')||'all'; }catch(e){ window.flowDiyMode='all'; } }   // all | diy | nondiy
   if(window.flowHidePrice===undefined){ try{ window.flowHidePrice=localStorage.getItem('flowHidePriceV1')==='1'; }catch(e){ window.flowHidePrice=false; } }
   if(window.flowHideVF===undefined){ try{ window.flowHideVF=localStorage.getItem('flowHideVFV1')==='1'; }catch(e){ window.flowHideVF=false; } }
   if(window.flowShowCode===undefined){ try{ window.flowShowCode=localStorage.getItem('flowShowCodeV1')==='1'; }catch(e){ window.flowShowCode=false; } }   // ค่าเริ่มต้น = ไม่แสดงรหัส
@@ -10499,7 +10499,8 @@ function renderFlowchart(){
   if(window.flowMoqUnit===undefined){ try{ window.flowMoqUnit=localStorage.getItem('flowMoqUnitV1')||'month'; }catch(e){ window.flowMoqUnit='month'; } }
   let items=ITEMS.filter(i=> i.ileReal || (typeof itemHasReleasedPO==='function' && itemHasReleasedPO(i)));
   items=items.filter(i=> !FLOW_EXCLUDE.has(i.no));               // เอาสินค้าที่เลิกใช้ออกจากตาราง
-  if(window.flowDiyOnly) items=items.filter(i=> flowIsDiyItem(i));   // Filter: เฉพาะสินค้าที่ขายให้ Mr.DIY
+  if(window.flowDiyMode==='diy') items=items.filter(i=> flowIsDiyItem(i));            // เฉพาะสินค้าที่ขายให้ Mr.DIY
+  else if(window.flowDiyMode==='nondiy') items=items.filter(i=> !flowIsDiyItem(i));   // เฉพาะสินค้าที่ไม่ได้ขายให้ Mr.DIY
   if(q) items=items.filter(i=> (i.no+' '+(i.desc||'')+' '+flowShort(i.no)).toLowerCase().indexOf(q)>=0);
   const vf=(window.flowVendorFilter||'').trim(), ff=(window.flowFactoryFilter||'').trim();
   if(vf) items=items.filter(i=> (i.sources||[]).some(x=>x.vendor===vf));       // กรองตาม Vendor
@@ -10563,10 +10564,13 @@ function renderFlowchart(){
   let html='', anyOpen=false;
   html+=`<div style="margin-bottom:10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
     <span style="font-size:12px;font-weight:700;color:var(--muted);">แสดง:</span>
-    <div style="display:inline-flex;border:1px solid var(--brand);border-radius:9px;overflow:hidden;margin-right:6px;">
-      <button onclick="flowSetDiyOnly(false)" title="แสดงทุกสินค้า (คอลัมน์ Mr.DIY จะขึ้นครบ · สินค้าที่ไม่ได้ขาย DIY จะแจ้งในช่องนั้น)" style="padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;border:0;background:${window.flowDiyOnly?'var(--card)':'var(--brand)'};color:${window.flowDiyOnly?'var(--brand)':'#fff'};">📋 ทุกสินค้า</button>
-      <button onclick="flowSetDiyOnly(true)" title="แสดงเฉพาะสินค้าที่ขายให้ Mr.DIY" style="padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;border:0;border-left:1px solid var(--brand);background:${window.flowDiyOnly?'var(--brand)':'var(--card)'};color:${window.flowDiyOnly?'#fff':'var(--brand)'};">🛒 เฉพาะ Mr.DIY</button>
-    </div>
+    ${(function(){ const M=window.flowDiyMode||'all'; const on='var(--brand)', onT='#fff', off='var(--card)', offT='var(--brand)';
+      const b=(mode,lbl,tip,extra)=>`<button onclick="flowSetDiyMode('${mode}')" title="${tip}" style="padding:6px 14px;font-size:12px;font-weight:800;cursor:pointer;border:0;${extra||''}background:${M===mode?on:off};color:${M===mode?onT:offT};">${lbl}</button>`;
+      return `<div style="display:inline-flex;border:1px solid var(--brand);border-radius:9px;overflow:hidden;margin-right:6px;">`
+        + b('all','📋 ทุกสินค้า','แสดงทุกสินค้า (คอลัมน์ Mr.DIY จะขึ้นครบ · สินค้าที่ไม่ได้ขาย DIY จะแจ้งในช่องนั้น)','')
+        + b('diy','🛒 เฉพาะ Mr.DIY','แสดงเฉพาะสินค้าที่ขายให้ Mr.DIY','border-left:1px solid var(--brand);')
+        + b('nondiy','🚫 เฉพาะที่ไม่ขาย Mr.DIY','แสดงเฉพาะสินค้าที่ไม่ได้ขายให้ Mr.DIY','border-left:1px solid var(--brand);')
+        + `</div>`; })()}
   </div>
   <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
     <button onclick="flowExpandAll()" style="padding:6px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--brand);background:var(--card);color:var(--brand);">▼ ขยายทุกหมวด</button>
