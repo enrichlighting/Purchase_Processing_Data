@@ -11149,10 +11149,37 @@ function payMonthBlock(y, m, data, fx, showSide){
   const title = showSide?'':`<div style="font-weight:800;font-size:15px;color:#7f1d1d;margin:2px 0 6px;">📅 ${PAY_MONTHS_TH[m-1]} ${y+543}</div>`;
   const side = showSide?`<div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;">
       ${payCalendarHtml(y,m)}
-      <div title="ปีมังกร · มังกรพ่นน้ำ รับทรัพย์ (龍吐水)" style="width:8cm;display:flex;justify-content:flex-end;padding-right:8px;user-select:none;">
-        <div style="position:relative;display:inline-block;line-height:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,.25));">
-          <span style="font-size:120px;">🐉</span>
-          <div class="pay-dragon-water" style="position:absolute;left:-92px;top:24px;width:108px;height:40px;pointer-events:none;filter:drop-shadow(0 0 6px rgba(56,189,248,.55));">
+      <div title="ปลามังกรพ่นน้ำ รับทรัพย์ (มงคล ปีมังกร)" style="width:8cm;display:flex;justify-content:flex-end;padding-right:8px;user-select:none;">
+        <div style="position:relative;display:inline-block;line-height:1;filter:drop-shadow(0 4px 7px rgba(0,0,0,.22));">
+          <svg width="170" height="118" viewBox="0 0 340 200" style="display:block;" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="koiBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff9a2e"/><stop offset="0.45" stop-color="#ff6f11"/><stop offset="1" stop-color="#e14e00"/></linearGradient>
+              <linearGradient id="koiFin" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff8a1e"/><stop offset="1" stop-color="#ffd39a" stop-opacity="0.9"/></linearGradient>
+            </defs>
+            <!-- tail (ขวา) -->
+            <path d="M248 100 Q300 54 334 56 Q310 92 324 104 Q306 124 336 146 Q300 152 248 114 Z" fill="url(#koiFin)" stroke="#ef8b2a" stroke-width="2"/>
+            <!-- dorsal fin -->
+            <path d="M150 62 Q176 36 214 44 Q198 60 186 68 Z" fill="url(#koiFin)" stroke="#ef8b2a" stroke-width="1.5"/>
+            <!-- body -->
+            <path d="M30 100 Q120 52 210 62 Q252 68 260 102 Q252 134 210 140 Q120 150 30 100 Z" fill="url(#koiBody)" stroke="#d64c00" stroke-width="2"/>
+            <!-- belly highlight -->
+            <path d="M64 126 Q150 156 236 120 Q200 142 150 143 Q98 143 64 126 Z" fill="#ffbf7a" opacity="0.55"/>
+            <!-- pectoral fin -->
+            <path d="M118 132 Q112 172 148 176 Q136 148 150 132 Z" fill="url(#koiFin)" stroke="#ef8b2a" stroke-width="1.5"/>
+            <!-- scales -->
+            <g stroke="#ffe0b0" stroke-width="1.6" fill="none" opacity="0.75">
+              <path d="M96 78 Q108 90 96 102"/><path d="M120 74 Q132 90 120 106"/><path d="M144 72 Q156 90 144 108"/><path d="M168 74 Q180 90 168 108"/><path d="M192 78 Q204 92 192 106"/>
+              <path d="M108 96 Q120 108 108 120"/><path d="M132 96 Q144 110 132 122"/><path d="M156 96 Q168 110 156 122"/><path d="M180 96 Q192 110 180 120"/>
+            </g>
+            <!-- eye -->
+            <circle cx="74" cy="88" r="10" fill="#fff"/><circle cx="71" cy="88" r="5.5" fill="#6e1d0e"/><circle cx="69" cy="85" r="1.8" fill="#fff"/>
+            <!-- mouth -->
+            <path d="M31 100 Q22 104 29 111" fill="none" stroke="#c74400" stroke-width="2.5" stroke-linecap="round"/>
+            <!-- barbels (หนวด) -->
+            <path d="M32 104 Q12 112 8 128" fill="none" stroke="#ff8a1e" stroke-width="2.6" stroke-linecap="round"/>
+            <path d="M35 108 Q20 122 24 138" fill="none" stroke="#ff8a1e" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          <div class="pay-dragon-water" style="position:absolute;left:-96px;top:42px;width:108px;height:40px;pointer-events:none;filter:drop-shadow(0 0 6px rgba(56,189,248,.55));">
             <svg viewBox="0 0 150 60" width="100%" height="100%" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
               <defs><linearGradient id="payWaterG" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0" stop-color="#38bdf8" stop-opacity="0.25"/><stop offset="0.55" stop-color="#38bdf8"/><stop offset="1" stop-color="#0284c7"/>
