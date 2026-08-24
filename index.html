@@ -10548,6 +10548,7 @@ const FLOW_SORTVAL={
   container:(it,rc)=>rc.packed||0,
   suggest:(it,rc)=>flowSugExCarton(it,rc).pieces,
   avg36:(it,rc)=>flowAvg3(it),
+  salesval:(it,rc)=>flowAvg3(it)*(+it.unitPrice||0),   // มูลค่าขายเฉลี่ย = เฉลี่ย3ด. × ราคาตั้ง
   exdiyavg:(it,rc)=>flowExDiyAvg(it,3),
   cover36:(it,rc)=>{ const a3=flowAvg3(it); return a3>0 ? (rc.c3||0)/a3 : ((rc.c3||0)>0?999999:0); },
   ohc1:(it,rc)=>{ const a3=flowAvg3(it); return a3>0 ? (rc.c1||0)/a3 : ((rc.c1||0)>0?999999:0); },   // On hand Cover หมวด①
