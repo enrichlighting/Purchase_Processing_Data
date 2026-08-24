@@ -2304,6 +2304,7 @@ window.BC_PO = {
 };
 </script>
 <script src="bc-po.js" onerror="void 0"></script>
+<script src="bc-povendor.js" onerror="void 0"></script>   <!-- Vendor ต่อ PO (รวม PO ที่ปิดแล้ว) · ไม่มีไฟล์ = ใช้ bc-po.js + Vendor_No แทน -->
 
 <script>
 /* ===== Top ลูกค้าต่อสินค้า (DOCUS) ฝังในไฟล์ ===== */
@@ -10861,6 +10862,60 @@ function payResetXfer(enc){ const key=decodeURIComponent(enc); payLoadOv(); dele
 function payLoadCheck(){ if(window.payCheck) return; try{ window.payCheck=JSON.parse(localStorage.getItem('payCheckV1')||'{}'); }catch(e){ window.payCheck={}; } }
 function payChk(key){ payLoadCheck(); return !!window.payCheck[key]; }
 function payToggleCheck(key,on){ payLoadCheck(); if(on) window.payCheck[key]=1; else delete window.payCheck[key]; try{ localStorage.setItem('payCheckV1', JSON.stringify(window.payCheck)); }catch(e){} }
+// ===== Vendor ของแถว: ยึด Vendor ของ PO เป็นหลัก (ชื่อโรงงาน เช่น QH/HAVING/LANGGE ไม่ใช่ Vendor) =====
+// ตารางแปลง "รหัส Vendor (Vendor_No) ใน BC" → ชื่อสั้นที่ไฟล์ Lead Time/Credit Term ใช้ · แก้/เพิ่มได้ตรงนี้
+window.PAY_VENDOR_ALIAS = window.PAY_VENDOR_ALIAS || {
+  'SUP24-322':'STAR',            // Star Lighting Ltd.
+  'SUP24-327':'KTL(DINGDING)',   // ZHONGSHAN CITY KTL LIGHTING TECHNOLOGY CO.,LTD
+  'SUP24-412':'TUBO',            // GUANGDONG TUBO TRADING CO.LTD
+  'SUP24-321':'RED100',          // RED100 LIGHTING CO., LTD
+  'SUP24-323':'CPS',             // Shenzhen Fluence Lighting Technology Co., LTD
+  'DOVSUP25120001':'ZHONGQIAN'   // Guangdong Zhongqian New Energy Technology Co.,LTD
+};
+// รายชื่อ Vendor แบบสั้นทั้งหมดที่มีในไฟล์ Lead Time (เรียงยาว→สั้น ให้ชื่อเฉพาะเจาะจงชนะก่อน)
+function payShortVendorList(){
+  if(window._payShortV) return window._payShortV;
+  const set=new Set(), LT=window.BC_LEADTIME||{};
+  Object.keys(LT).forEach(k=>(((LT[k]||{}).opts)||[]).forEach(o=>{ if(o&&o.v) set.add(o.v); }));
+  window._payShortV=[...set].sort((a,b)=>b.length-a.length);
+  return window._payShortV;
+}
+// Vendor ประจำสินค้า (BC_ITEMS.Vendor_No) — ใช้สำรองตอนยังไม่มี bc-povendor.js
+function payItemVendorNo(item){
+  if(!window._payItemVno){ const m={}, I=window.BC_ITEMS||{};
+    Object.keys(I).forEach(k=>{ const r=I[k]; if(r && r.No && r.Vendor_No) m[r.No]=r.Vendor_No; }); window._payItemVno=m; }
+  return window._payItemVno[item]||'';
+}
+// ชื่อเต็มจาก BC → ชื่อสั้น (จับจากรหัสก่อน ถ้าไม่มีค่อยจับคำในชื่อเต็มแบบทั้งคำ)
+function payVendorShort(name, code){
+  const A=window.PAY_VENDOR_ALIAS||{};
+  if(code && A[code]) return A[code];
+  const n=String(name||'').toUpperCase(); if(!n) return code||'';
+  for(const sv of payShortVendorList()){
+    const t=String(sv).toUpperCase().replace(/\(.*?\)/g,'').trim(); if(!t) continue;
+    if(new RegExp('(^|[^A-Z0-9])'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'([^A-Z0-9]|$)').test(n)) return sv;
+  }
+  return name;
+}
+// Vendor ของ PO: bc-povendor.js (ครอบคลุม PO ปิดแล้ว) → bc-po.js (เฉพาะ PO ค้างรับ) → Vendor_No ของสินค้า
+function payPoVendor(po, item){
+  if(!po) return '';
+  const V=window.BC_POVENDOR||{}; let code='', name='';
+  const e=V[po];
+  if(e){ if(Array.isArray(e)){ code=e[0]||''; name=e[1]||''; }
+         else if(e && typeof e==='object'){ code=e.code||e.no||e.Vendor_No||''; name=e.name||e.Vendor_Name||''; }
+         else name=String(e||''); }
+  if(!code && !name && typeof invPoVendor==='function') name=invPoVendor(po)||'';
+  if(!code && !name && item) code=payItemVendorNo(item);
+  return payVendorShort(name, code);
+}
+// กติกา: ตู้ที่ import จาก CSV → ยึดข้อมูลในไฟล์ CSV เป็นหลัก
+//        ตู้ที่คีย์ในเว็บเอง (ตู้ 354 เป็นต้นไป) → ยึด Vendor ของ PO จาก Business Central
+function payRowVendor(s, r, factory){
+  const manual=(r.vendor||'').trim();
+  if(s && s.imported) return manual || payVendorForFactory(r.item,factory) || payPoVendor(r.po||'', r.item) || '';
+  return payPoVendor(r.po||'', r.item) || manual || payVendorForFactory(r.item,factory) || '';
+}
 function payVendorForFactory(item, factory){ const lt=(window.BC_LEADTIME&&window.BC_LEADTIME[item]); if(lt&&Array.isArray(lt.opts)){ const o=lt.opts.find(x=>((x&&x.f)||'')===factory); if(o&&o.v) return o.v; } return ''; }
 // เลือก Term ตาม Vendor/Factory ที่ระบุ · สินค้า 1 ตัวมีได้หลาย Vendor (Vendor1/2/3) ในไฟล์ Lead Time — จับคู่ให้ตรงตัวที่ระบุ
 function payCreditTerm(item, vendor, factory){ const C=window.BC_CREDITTERM||{};
@@ -10925,7 +10980,7 @@ function payRowsData(){
     (s.containers||[]).forEach((ct,ci)=>{ const groups={}; const load=(ct.dates&&ct.dates.load)||'', eta=(ct.dates&&ct.dates.arrWh)||'';
       (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; const q=per?(+per.pcs||0):0; if(q<=0) return; if(!/^POA/i.test(r.po||'')) return;   // เฉพาะ PO ขึ้นต้น POA (ข้าม POC/POS)
         const f=(r.factory||'').trim(); if(!f) return;
-        const ven=((r.vendor||'').trim() || payVendorForFactory(r.item,f) || ((typeof invPoVendor==='function')?invPoVendor(r.po||''):'') || '').trim();   // Vendor ที่กรอกเองมาก่อน · ถ้าไม่ได้กรอก → Factory→Vendor (Lead Time) → PO (POA)
+        const ven=(payRowVendor(s, r, f)||'').trim();   // ตู้ import → ยึด CSV · ตู้ที่คีย์เอง → ยึด Vendor ของ PO จาก BC
         const gk=f+'||'+ven;   // แยกกลุ่มตาม Vendor + Factory (สินค้าคนละ Vendor แม้ Factory เดียวกันก็แยกแถว)
         const g=groups[gk]||(groups[gk]={factory:f, vendor:ven, rmb:0, item:r.item, po:r.po||''});
         g.rmb+=(+per.valRmb||0); if(!g.item) g.item=r.item; if(!g.po) g.po=r.po||'';
