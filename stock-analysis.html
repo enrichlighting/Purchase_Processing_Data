@@ -190,7 +190,9 @@
   }
   #page-packing .card{ border-color:#bfe3d9; border-top:3px solid #56c2aa; }
   #page-packing .card h2{ color:#0f655a; }
-  /* ล็อกหัวตาราง Packing List (คำนวณกล่อง & CBM) ให้ค้างด้านบนเวลาเลื่อนดูรายการยาว ๆ */
+  /* ล็อกหัวตาราง Packing List (คำนวณกล่อง & CBM) ให้ค้างด้านบนเวลาเลื่อนดูรายการยาว ๆ
+     ต้องให้ #pk-result เป็นกล่องเลื่อน (มี max-height) หัวตาราง sticky ถึงจะยึดกับขอบบนของกล่องได้ */
+  #page-packing #pk-result{ max-height:78vh; overflow:auto; }
   #pk-result > table > tbody > tr:first-child th,
   #pk-result > table > tr:first-child th{ position:sticky; top:0; z-index:6; background:var(--card); box-shadow:inset 0 -2px 0 #bfe3d9, 0 3px 5px rgba(0,0,0,.07); }
   #page-packing .kpi{ background:rgba(226,244,238,.7); border-color:#bfe3d9; }
