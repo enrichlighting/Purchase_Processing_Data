@@ -387,7 +387,7 @@
         <button class="go" id="pk-template" style="background:#0d9488;" title="ดาวน์โหลดไฟล์ตัวอย่าง (CSV) สำหรับกรอกข้อมูลตู้เก่า แล้วนำเข้าด้วยปุ่ม Import">📄 ดาวน์โหลด Pattern ตู้เก่า (CSV)</button>
         <button class="go" id="pk-restore-rmb" style="background:#7c3aed;" title="เติมต้นทุน RMB + Factory + Vendor จากไฟล์ CSV ให้ตู้ที่ import ไว้ (จับคู่ ตู้|รหัส|PO) โดยไม่สร้างตู้ซ้ำ">🔧 เติมข้อมูลตู้ import จาก CSV (ต้นทุน/Factory/Vendor)</button>
         <input type="file" id="pk-restore-rmb-file" accept="text/csv,.csv" style="display:none;">
-        <span class="muted" id="pk-backupstatus" style="font-size:12px;">Import รับได้ 2 แบบ: ไฟล์สำรอง (.json = แทนที่ทั้งหมด) หรือ Pattern ตู้เก่า (.csv = เพิ่มเข้าไป)</span>
+        <span class="muted" id="pk-backupstatus" style="font-size:12px;">Import รับได้ 2 แบบ: ไฟล์สำรอง (.json = แทนที่ทั้งหมด) หรือ Pattern ตู้เก่า (.csv = เพิ่มเข้าไป) · ถ้าเลขตู้ใน .csv ซ้ำกับของเดิม จะมีป๊อปอัพขึ้นให้เลือก “🔁 ใช้ชุดใหม่ (แทนที่)” หรือ “🛡️ เก็บชุดเก่า (ข้ามตู้ซ้ำ)”</span>
       </div>
       <div id="pk-log"></div>
     </div>
