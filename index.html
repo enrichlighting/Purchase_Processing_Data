@@ -9178,8 +9178,9 @@ function invBuildSheetXml(items, vendor){
   xml=xml.replace(/<c r="B12"[^>]*\/>/, '<c r="B12" s="10" t="inlineStr"><is><t xml:space="preserve">'+invXmlEsc(vendor)+'</t></is></c>');
   const txt=(ref,s,v)=> (v!=null&&v!=='')? `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${invXmlEsc(v)}</t></is></c>` : `<c r="${ref}" s="${s}"/>`;
   const num=(ref,s,v)=> (v!=null&&v!=='')? `<c r="${ref}" s="${s}"><v>${invNum(v)}</v></c>` : `<c r="${ref}" s="${s}"/>`;
-  let R='';
+  let R='', sumQty=0, sumTot=0;   // เก็บยอดรวมไว้ใส่เป็น cached value ของเซลล์สูตร
   for(let i=0;i<n;i++){ const r=19+i, it=items[i];
+    const totRmb=(+it.qty||0)*(+it.rmb||0); sumQty+=(+it.qty||0); sumTot+=totRmb;   // Total Price (RMB) = Qty × Price
     R+=`<row r="${r}" spans="1:16" ht="18.75">`
       + (i===0? `<c r="A${r}" s="42" t="inlineStr"><is><t>ENRICH</t></is></c>` : `<c r="A${r}" s="42"/>`)
       + `<c r="B${r}" s="19"><v>${i+1}</v></c>`
@@ -9188,16 +9189,16 @@ function invBuildSheetXml(items, vendor){
       + num(`H${r}`,23,it.qty) + num(`I${r}`,24,it.pcsBox)
       + `<c r="J${r}" s="24" t="inlineStr"><is><t xml:space="preserve">PCS หรือ SETS</t></is></c>`
       + num(`K${r}`,25,it.ctns) + num(`L${r}`,26,it.rmb)
-      + `<c r="M${r}" s="26"><f>L${r}*H${r}</f></c>`
+      + `<c r="M${r}" s="26"><f>L${r}*H${r}</f><v>${invNum(totRmb)}</v></c>`   // ต้องมี <v> ด้วย ไม่งั้นโปรแกรมที่ไม่คำนวณสูตรเองจะโชว์ช่องว่าง
       + txt(`N${r}`,27,it.lot) + `<c r="O${r}" s="28"/>` + `<c r="P${r}" s="29"/></row>`;
   }
   R+=`<row r="${totR}" spans="1:16" ht="19.5">`
     + `<c r="A${totR}" s="43" t="inlineStr"><is><t xml:space="preserve">TOTAL :     </t></is></c>`
     + `<c r="B${totR}" s="44"/><c r="C${totR}" s="44"/><c r="D${totR}" s="44"/><c r="E${totR}" s="44"/><c r="F${totR}" s="44"/><c r="G${totR}" s="45"/>`
-    + `<c r="H${totR}" s="30"><f>SUM(H19:H${last})</f></c>`
+    + `<c r="H${totR}" s="30"><f>SUM(H19:H${last})</f><v>${invNum(sumQty)}</v></c>`
     + `<c r="I${totR}" s="30"/><c r="J${totR}" s="30"/><c r="K${totR}" s="30"/>`
     + `<c r="L${totR}" s="31" t="inlineStr"><is><t>TOTAL</t></is></c>`
-    + `<c r="M${totR}" s="32"><f>SUM(M19:M${last})</f></c>`
+    + `<c r="M${totR}" s="32"><f>SUM(M19:M${last})</f><v>${invNum(sumTot)}</v></c>`
     + `<c r="N${totR}" s="33"/><c r="O${totR}" s="34"/><c r="P${totR}" s="35"/></row>`;
   xml=xml.replace(/<row r="19"[\s\S]*?<\/sheetData>/, R+'</sheetData>');
   xml=xml.replace('<mergeCell ref="A19:A38"/>', '<mergeCell ref="A19:A'+last+'"/>');
@@ -9239,8 +9240,9 @@ function plBuildSheetXml(items, vendor){
   const txt=(ref,s,v)=> (v!=null&&v!=='')? `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${invXmlEsc(v)}</t></is></c>` : `<c r="${ref}" s="${s}"/>`;
   const num=(ref,s,v)=> (v!=null&&v!=='')? `<c r="${ref}" s="${s}"><v>${invNum(v)}</v></c>` : `<c r="${ref}" s="${s}"/>`;
   const num3=(ref,s,v)=> (v!=null&&v!=='')? `<c r="${ref}" s="${s}"><v>${plNum3(v)}</v></c>` : `<c r="${ref}" s="${s}"/>`;
-  let R='';
+  let R='', sQty=0, sCtn=0, sCbm=0;   // ยอดรวมสำหรับ cached value ของเซลล์สูตรแถว TOTAL
   for(let i=0;i<n;i++){ const r=19+i, it=items[i];
+    sQty+=(+it.qty||0); sCtn+=(+it.ctns||0); sCbm+=(+it.cbm||0);
     R+=`<row r="${r}" spans="1:18" ht="18.75">`
       + (i===0? `<c r="A${r}" s="59" t="inlineStr"><is><t>ENRICH</t></is></c>` : `<c r="A${r}" s="59"/>`)
       + `<c r="B${r}" s="28"><v>${i+1}</v></c>`
@@ -9256,11 +9258,11 @@ function plBuildSheetXml(items, vendor){
   R+=`<row r="${totR}" spans="1:19" s="46" customFormat="1" ht="19.5">`
     + `<c r="A${totR}" s="54" t="inlineStr"><is><t xml:space="preserve">TOTAL :     </t></is></c>`
     + `<c r="B${totR}" s="55"/><c r="C${totR}" s="55"/><c r="D${totR}" s="55"/><c r="E${totR}" s="55"/><c r="F${totR}" s="55"/><c r="G${totR}" s="55"/><c r="H${totR}" s="55"/>`
-    + `<c r="I${totR}" s="40"><f>SUM(I19:I${last})</f></c><c r="J${totR}" s="41"/><c r="K${totR}" s="41"/>`
-    + `<c r="L${totR}" s="40"><f>SUM(L19:L${last})</f></c><c r="M${totR}" s="42"/>`
-    + `<c r="N${totR}" s="43"><f>SUM(N19:N${last})</f></c><c r="O${totR}" s="43"/>`
-    + `<c r="P${totR}" s="43"><f>SUM(P19:P${last})</f></c>`
-    + `<c r="Q${totR}" s="44"><f>SUM(Q19:Q${last})</f></c><c r="R${totR}" s="45"/><c r="S${totR}" s="2"/></row>`;
+    + `<c r="I${totR}" s="40"><f>SUM(I19:I${last})</f><v>${invNum(sQty)}</v></c><c r="J${totR}" s="41"/><c r="K${totR}" s="41"/>`
+    + `<c r="L${totR}" s="40"><f>SUM(L19:L${last})</f><v>${invNum(sCtn)}</v></c><c r="M${totR}" s="42"/>`
+    + `<c r="N${totR}" s="43"><f>SUM(N19:N${last})</f><v>0</v></c><c r="O${totR}" s="43"/>`
+    + `<c r="P${totR}" s="43"><f>SUM(P19:P${last})</f><v>0</v></c>`
+    + `<c r="Q${totR}" s="44"><f>SUM(Q19:Q${last})</f><v>${plNum3(sCbm)}</v></c><c r="R${totR}" s="45"/><c r="S${totR}" s="2"/></row>`;
   const sdStart=xml.indexOf('<row r="19"'), sdEnd=xml.indexOf('</sheetData>');
   const head=xml.slice(0,sdStart), mid=xml.slice(sdStart,sdEnd), after=xml.slice(sdEnd);
   const ts=mid.indexOf('<row r="40"'); let tail = ts>=0 ? mid.slice(ts) : '';
