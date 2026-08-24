@@ -10829,18 +10829,19 @@ function payPaymentSegments(term, load, eta, docDate){
   if(/o\/?a\s*30\s*days?/i.test(t)){ push(payCalFrom(load,30),1,''); return segs; }   // OA 30DAYS
   return segs;
 }
-// ดึงจากประวัติ Packing (pkLog): เฉพาะสินค้าที่กรอก Factory · group ตาม (ตู้ × factory) = 1 แถว
+// ดึงจากประวัติ Packing (pkLog): เฉพาะสินค้าที่กรอก Factory · group ตาม (ตู้ × Vendor × Factory) = 1 แถว
 function payRowsData(){
   pkLoadLog(); const out=[];
   (window.pkLog||[]).forEach((s,si)=>{ if(s.pending) return;
     (s.containers||[]).forEach((ct,ci)=>{ const groups={}; const load=(ct.dates&&ct.dates.load)||'', eta=(ct.dates&&ct.dates.arrWh)||'';
       (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; const q=per?(+per.pcs||0):0; if(q<=0) return; if(!/^POA/i.test(r.po||'')) return;   // เฉพาะ PO ขึ้นต้น POA (ข้าม POC/POS)
         const f=(r.factory||'').trim(); if(!f) return;
-        const venOf=()=> (r.vendor||'').trim() || payVendorForFactory(r.item,f) || ((typeof invPoVendor==='function')?invPoVendor(r.po||''):'');   // Vendor ที่กรอกเองมาก่อน · ถ้าไม่ได้กรอก → Factory→Vendor (Lead Time) → Vendor จาก PO (POA)
-        const g=groups[f]||(groups[f]={factory:f, vendor:venOf()||'', rmb:0, item:r.item, po:r.po||''});
-        g.rmb+=(+per.valRmb||0); if(!g.vendor){ const v=venOf(); if(v) g.vendor=v; } if(!g.item) g.item=r.item; if(!g.po) g.po=r.po||'';
+        const ven=((r.vendor||'').trim() || payVendorForFactory(r.item,f) || ((typeof invPoVendor==='function')?invPoVendor(r.po||''):'') || '').trim();   // Vendor ที่กรอกเองมาก่อน · ถ้าไม่ได้กรอก → Factory→Vendor (Lead Time) → PO (POA)
+        const gk=f+'||'+ven;   // แยกกลุ่มตาม Vendor + Factory (สินค้าคนละ Vendor แม้ Factory เดียวกันก็แยกแถว)
+        const g=groups[gk]||(groups[gk]={factory:f, vendor:ven, rmb:0, item:r.item, po:r.po||''});
+        g.rmb+=(+per.valRmb||0); if(!g.item) g.item=r.item; if(!g.po) g.po=r.po||'';
       });
-      Object.keys(groups).forEach(f=>{ const g=groups[f]; const term=payCreditTerm(g.item,g.vendor,g.factory);
+      Object.keys(groups).forEach(gk=>{ const g=groups[gk]; const term=payCreditTerm(g.item,g.vendor,g.factory);
         const docDate=(window.BC_PODATE&&window.BC_PODATE[g.po])||'';
         const segs=payPaymentSegments(term, load, eta, docDate);
         const base={cont:ct.name||('ตู้'+(ci+1)), load, eta, factory:g.factory, vendor:g.vendor||'(ไม่ทราบ vendor)', term};
