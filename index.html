@@ -11135,14 +11135,20 @@ async function pkSyncFromCloud(){ if(!window.GraphStorage) return; const r=await
 async function pkPushToCloud(){ if(!window.GraphStorage) return; pkLoadLog(); await window.GraphStorage.saveData(PK_LOGKEY, window.pkLog); }
 async function poSyncFromCloud(){ if(!window.GraphStorage) return; const r=await window.GraphStorage.loadData(PO_FOLLOWKEY); if(r){ window.poFollow= typeof r==='string'?JSON.parse(r):r; try{ localStorage.setItem(PO_FOLLOWKEY, JSON.stringify(window.poFollow)); }catch(e){} } }
 async function poPushToCloud(){ if(!window.GraphStorage) return; poLoadFollow(); await window.GraphStorage.saveData(PO_FOLLOWKEY, window.poFollow); }
-function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
+// ===== ซิงค์ข้อมูลหน้า Payment (วันที่โอนที่แก้เอง + checkbox บัญชี CF/SUPPLIER CF/BANK SLIP) =====
+async function paySyncFromCloud(){ if(!window.GraphStorage) return;
+  const ov=await window.GraphStorage.loadData('payXferOvV1'); if(ov){ window.payXferOv= typeof ov==='string'?JSON.parse(ov):ov; try{ localStorage.setItem('payXferOvV1', JSON.stringify(window.payXferOv)); }catch(e){} }
+  const ck=await window.GraphStorage.loadData('payCheckV1'); if(ck){ window.payCheck= typeof ck==='string'?JSON.parse(ck):ck; try{ localStorage.setItem('payCheckV1', JSON.stringify(window.payCheck)); }catch(e){} }
+}
+async function payPushToCloud(){ if(!window.GraphStorage) return; payLoadOv(); payLoadCheck(); await window.GraphStorage.saveData('payXferOvV1', window.payXferOv||{}); await window.GraphStorage.saveData('payCheckV1', window.payCheck||{}); }
+function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent','renderPayment'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
 async function cloudPullNow(){ const b=document.getElementById('bc-pull'); if(b) b.disabled=true;
-  try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); cloudRerenderAll(); bcSetTs('bcCloudSyncAt'); pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
+  try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); cloudRerenderAll(); bcSetTs('bcCloudSyncAt'); pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
   catch(e){ console.error(e); pkToast('ดึงข้อมูลไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
   if(b) b.disabled=false;
 }
 async function cloudPushNow(){ const b=document.getElementById('bc-push'); if(b) b.disabled=true;
-  try{ pkToast('กำลังอัปโหลดขึ้นส่วนกลาง...','info'); await window.GraphAuth.signIn(); await pkPushToCloud(); await poPushToCloud(); bcSetTs('bcCloudSyncAt'); pkToast('อัปโหลดขึ้นส่วนกลางสำเร็จ ✅','good'); }
+  try{ pkToast('กำลังอัปโหลดขึ้นส่วนกลาง...','info'); await window.GraphAuth.signIn(); await pkPushToCloud(); await poPushToCloud(); await payPushToCloud(); bcSetTs('bcCloudSyncAt'); pkToast('อัปโหลดขึ้นส่วนกลางสำเร็จ ✅','good'); }
   catch(e){ console.error(e); pkToast('อัปโหลดไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
   if(b) b.disabled=false;
 }
