@@ -11051,6 +11051,9 @@ function renderPayment(){
   const multi=combos.length>1;
   el.innerHTML=combos.map(c=>payMonthBlock(c.y, c.m, data, fx, !multi)).join('<div style="height:26px;border-top:2px dashed #d8c893;margin-top:14px;"></div>');
 }
+// สีพื้นหลังพาสเทลต่อ Vendor (คงที่ต่อชื่อ) — ให้แยกบรรทัดตาม Vendor ได้ง่าย
+const PAY_VC_PALETTE=['#fde2e4','#e3f0d4','#d6ecf5','#efe4f7','#fff3d1','#dff5ea','#fce3d6','#e6e2f8','#d9f0f2','#f7e5ee','#eaf3d9','#f0e2d0'];
+function payVendorColor(v){ v=String(v||'').trim(); if(!v) return '#ffffff'; let h=0; for(let i=0;i<v.length;i++) h=(h*31+v.charCodeAt(i))>>>0; return PAY_VC_PALETTE[h%PAY_VC_PALETTE.length]; }
 // สร้างตาราง Payment ของเดือนเดียว (y,m) จาก data ที่กรองแล้ว · showSide=แสดงปฏิทิน+มังกร
 function payMonthBlock(y, m, data, fx, showSide){
   const weeks=payWeeks(y,m);
@@ -11075,7 +11078,7 @@ function payMonthBlock(y, m, data, fx, showSide){
   });
   const shown=byWeek.reduce((a,x)=>a.concat(x),[]).concat(other);
   const grand=shown.reduce((a,r)=>a+r.amtRmb,0);
-  const bySort=(a,b)=> String(a.vendor).localeCompare(String(b.vendor)) || String(a.cont).localeCompare(String(b.cont));
+  const bySort=(a,b)=> String(a.xfer||'').localeCompare(String(b.xfer||'')) || String(a.vendor).localeCompare(String(b.vendor)) || String(a.cont).localeCompare(String(b.cont));   // เรียงตามวันที่โอนก่อน (น้อย→มาก)
   byWeek.forEach(a=>a.sort(bySort)); other.sort(bySort);
   const wkTotBaht=weeks.map((w,wi)=> byWeek[wi].reduce((a,r)=>a+r.amtRmb,0)*fx);   // ยอดรวม TOTAL (SUPPLIER-BAHT) ต่อวีค
   const xferSet=new Set(); data.forEach(r=>{ if(r.xfer && inMonth(r.xfer)) xferSet.add(r.xfer); });   // วันที่มีการโอน (ในเดือนนี้) → ไปมาร์กบนปฏิทิน
@@ -11083,14 +11086,15 @@ function payMonthBlock(y, m, data, fx, showSide){
     let c;
     if(r){
       const hiX=(r.xfer && r.xfer===window.payHiliteDate);   // ไฮไลต์เมื่อคลิกวันในปฏิทินตรงกับวันโอนนี้
-      c=`<td onclick="payEditXfer('${encodeURIComponent(r._key||'')}')" title="${r.xferManual?('แก้เอง: '+payEsc(r.xferReason||'(ไม่ระบุเหตุผล)')):'คลิกเพื่อแก้ไขวันที่โอน'}" style="${bTd}text-align:center;white-space:nowrap;font-weight:800;color:#7f1d1d;cursor:pointer;${hiX?'background:#22d3ee;color:#083344;box-shadow:inset 0 0 0 2px #0891b2;':(r.xferManual?'background:#ffe8a3;':'')}">${r.xfer?payThaiDate(r.xfer):'<span style="color:#9ca3af;font-weight:400;">-</span>'}${r.xferManual?' ✎':''}</td>`
-       + `<td style="${bTd}text-align:left;white-space:normal;"><b style="color:#111;">${payEsc(r.vendor)}</b><div style="font-size:10.5px;color:#6b7280;">${payEsc(r.factory)}</div></td>`
-       + `<td style="${bTd}text-align:left;white-space:normal;font-size:11px;line-height:1.3;min-width:150px;color:#4b5563;">${payEsc(r.term)||'<span style="color:#9ca3af;">-</span>'}</td>`
-       + `<td style="${bTd}text-align:center;white-space:nowrap;color:#374151;">${payThaiDate(r.load)}</td>`
-       + `<td style="${bTd}text-align:center;white-space:nowrap;font-weight:700;color:#111;">${payEsc(r.cont)}</td>`
-       + `<td style="${bTd}text-align:right;white-space:nowrap;font-weight:700;color:#111;">¥${f2(r.amtRmb)}${r.seg?`<div style="font-size:9px;font-weight:700;color:#7f1d1d;">${payEsc(r.seg)}</div>`:''}</td>`
-       + `<td style="${bTd}text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?('¥'+f2(venShow)):''}</td>`
-       + `<td style="${bTd}text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?('฿'+f2(venShow*fx)):''}</td>`;
+      const vbg=payVendorColor(r.vendor);   // สีพาสเทลประจำ Vendor
+      c=`<td onclick="payEditXfer('${encodeURIComponent(r._key||'')}')" title="${r.xferManual?('แก้เอง: '+payEsc(r.xferReason||'(ไม่ระบุเหตุผล)')):'คลิกเพื่อแก้ไขวันที่โอน'}" style="${bTd}text-align:center;white-space:nowrap;font-weight:800;color:#7f1d1d;cursor:pointer;${hiX?'background:#22d3ee;color:#083344;box-shadow:inset 0 0 0 2px #0891b2;':(r.xferManual?'background:#ffe8a3;':('background:'+vbg+';'))}">${r.xfer?payThaiDate(r.xfer):'<span style="color:#9ca3af;font-weight:400;">-</span>'}${r.xferManual?' ✎':''}</td>`
+       + `<td style="${bTd}background:${vbg};text-align:left;white-space:normal;"><b style="color:#111;">${payEsc(r.vendor)}</b><div style="font-size:10.5px;color:#6b7280;">${payEsc(r.factory)}</div></td>`
+       + `<td style="${bTd}background:${vbg};text-align:left;white-space:normal;font-size:11px;line-height:1.3;min-width:150px;color:#4b5563;">${payEsc(r.term)||'<span style="color:#9ca3af;">-</span>'}</td>`
+       + `<td style="${bTd}background:${vbg};text-align:center;white-space:nowrap;color:#374151;">${payThaiDate(r.load)}</td>`
+       + `<td style="${bTd}background:${vbg};text-align:center;white-space:nowrap;font-weight:700;color:#111;">${payEsc(r.cont)}</td>`
+       + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:700;color:#111;">¥${f2(r.amtRmb)}${r.seg?`<div style="font-size:9px;font-weight:700;color:#7f1d1d;">${payEsc(r.seg)}</div>`:''}</td>`
+       + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?('¥'+f2(venShow)):''}</td>`
+       + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?('฿'+f2(venShow*fx)):''}</td>`;
     } else { c=`<td style="${bTd}"></td>`.repeat(8); }
     const wkCells=weeks.map((w,ci)=>{
       if(ci===gwi){ return isFirst ? `<td rowspan="${n}" style="${bTd}text-align:right;vertical-align:middle;white-space:nowrap;font-weight:800;font-size:12px;color:#7f1d1d;background:#fbe0e0;">฿${f2(wkTot)}</td>` : ''; }   // merge ครอบทุกบรรทัดของวีค
