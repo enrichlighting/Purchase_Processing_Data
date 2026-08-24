@@ -7881,28 +7881,37 @@ function pkCoverInfo(itemCode){
 function pkCoverColor(m){ return m<=2 ? '#ea580c' : (m<3 ? '#ca8a04' : '#16a34a'); }   // ≤2 ส้ม · 2–2.9 เหลือง · ≥3 เขียว
 function pkCoverHi(m){ return m<=2 ? 'background:#fb923c;color:#7c2d12;' : (m<3 ? 'background:#fde047;color:#713f12;' : 'background:#86efac;color:#14532d;'); }   // ไฮไลท์พื้นหลัง
 window.pkCustomDims = window.pkCustomDims || {};   // มิติสินค้ากรอกเอง (นอก PO) · key = รหัสสังเคราะห์ CUSTOM-*
+window.pkRoundDims = window.pkRoundDims || {};   // ขนาดกล่อง/ชิ้นต่อกล่องที่แก้ "เฉพาะตู้ที่กำลังแก้ไขอยู่" · key = รหัสสินค้า · {L,W,H,pcs}
 function pkItem(code){
+  const rd=(window.pkRoundDims && window.pkRoundDims[code]) || null;   // ค่าของตู้นี้มาก่อนเสมอ (กันค่ากลางมาทับตอนบันทึกซ้ำ)
+  let d=null;
   const base=(window.BC_PACKING && window.BC_PACKING[code]) ? window.BC_PACKING[code] : null;
-  if(base){ const ov=window.pkDimEdit && window.pkDimEdit[code]; return ov ? Object.assign({}, base, ov) : base; }   // ทับด้วยขนาดที่แก้ (ถ้ามี)
-  return (window.pkCustomDims && window.pkCustomDims[code]) ? window.pkCustomDims[code] : null;
+  if(base){ const ov=window.pkDimEdit && window.pkDimEdit[code]; d = ov ? Object.assign({}, base, ov) : base; }   // ทับด้วยขนาดที่แก้ (ถ้ามี)
+  else d=(window.pkCustomDims && window.pkCustomDims[code]) ? window.pkCustomDims[code] : null;
+  if(!d) return null;
+  return rd ? Object.assign({}, d, rd) : d;
 }
 // ----- แก้ไขขนาด L/W/H/pcs ของสินค้าในระบบ · เก็บทับในเครื่อง (localStorage) + ส่งออกไปอัปเดตไฟล์กลาง -----
 function pkDimEditLoad(){ try{ const s=localStorage.getItem('pkDimEditV1'); window.pkDimEdit=s?JSON.parse(s):{}; }catch(e){ window.pkDimEdit={}; } }
 function pkDimEditSave(){ try{ localStorage.setItem('pkDimEditV1', JSON.stringify(window.pkDimEdit||{})); }catch(e){} }
-function pkHasDimEdit(code){ return !!(window.pkDimEdit && window.pkDimEdit[code]); }
+// กรอบส้ม = ขนาดของตู้นี้ต่างจากค่ากลาง (ไม่ใช่แค่ "มีค่าที่ freeze ไว้" ไม่งั้นทุกช่องจะส้มหมด)
+function pkHasDimEdit(code){
+  if(window.pkDimEdit && window.pkDimEdit[code]) return true;
+  const rd=window.pkRoundDims && window.pkRoundDims[code]; if(!rd) return false;
+  const base=(window.BC_PACKING && window.BC_PACKING[code]) || (window.pkCustomDims && window.pkCustomDims[code]); if(!base) return false;
+  return ['L','W','H','pcs'].some(f=> rd[f]!=null && (+rd[f]||0)!==(+base[f]||0));
+}
 function pkDimEditCount(){ return window.pkDimEdit ? Object.keys(window.pkDimEdit).length : 0; }
 function pkDimSet(i, field, val){
   const r=window.packingRows[i]; if(!r||!r.item) return;
-  const base=(window.BC_PACKING && window.BC_PACKING[r.item]);
-  if(!base){ pkCustSet(i,field,val); return; }               // สินค้ากรอกเอง/ไม่มีมิติในระบบ → ใช้ของเดิม
-  if(!window.pkDimEdit) pkDimEditLoad();
-  const ov = window.pkDimEdit[r.item] || (window.pkDimEdit[r.item]={});
+  if(field==='desc'||field==='rmb'){ pkCustSet(i,field,val); return; }   // ชื่อ/ต้นทุน ของสินค้ากรอกเอง ยังเก็บที่เดิม
+  window.pkRoundDims = window.pkRoundDims || {};
+  const ov = window.pkRoundDims[r.item] || (window.pkRoundDims[r.item]={});
   let v=Math.max(0,+val||0); if(field==='pcs' && !(v>0)) v=1;
-  ov[field]=v;
-  if(['L','W','H','pcs'].every(f=> (ov[f]!=null?ov[f]:base[f])===base[f])) delete window.pkDimEdit[r.item];   // กลับค่าเดิมครบ → ลบ override
-  pkDimEditSave(); renderPacking();
+  ov[field]=v;                                              // มีผลเฉพาะตู้ที่กำลังแก้ไขอยู่ · บันทึกแล้วค่าจะติดไปกับตู้นั้น
+  renderPacking();
 }
-function pkDimReset(i){ const r=window.packingRows[i]; if(!r||!r.item||!window.pkDimEdit) return; delete window.pkDimEdit[r.item]; pkDimEditSave(); renderPacking(); if(typeof pkToast==='function') pkToast('คืนค่าขนาดเดิมแล้ว','good'); }
+function pkDimReset(i){ const r=window.packingRows[i]; if(!r||!r.item) return; if(window.pkRoundDims) delete window.pkRoundDims[r.item]; if(window.pkDimEdit && window.pkDimEdit[r.item]){ delete window.pkDimEdit[r.item]; pkDimEditSave(); } renderPacking(); if(typeof pkToast==='function') pkToast('คืนค่าขนาดเดิมแล้ว','good'); }
 function pkDimEditExport(){
   const o=window.pkDimEdit||{}; const keys=Object.keys(o);
   if(!keys.length){ if(typeof pkToast==='function') pkToast('ยังไม่มีการแก้ขนาด','muted'); return; }
@@ -8251,7 +8260,7 @@ function pkAddRow(){ window.packingRows.push({item:'',loads:[],lots:[],costIdx:n
 function pkDelRow(i){ window.packingRows.splice(i,1); if(!window.packingRows.length)window.packingRows.push({item:'',loads:[],lots:[],costIdx:null}); if(window.pkRowSel)window.pkRowSel=new Set(); renderPacking(); }
 function pkToggleRow(i,on){ window.pkRowSel=window.pkRowSel||new Set(); if(on)window.pkRowSel.add(i); else window.pkRowSel.delete(i); const b=document.getElementById('pk-delsel'); if(b) b.textContent='🗑️ ลบที่เลือก ('+window.pkRowSel.size+')'; }
 function pkDelSelected(){ const idx=[...(window.pkRowSel||[])].sort((a,b)=>b-a); if(!idx.length){ pkToast('ยังไม่ได้เลือกแถว — ติ๊กช่องหน้าแถวก่อน','bad'); return; } pkConfirm('ลบ '+idx.length+' แถวที่เลือกออกจากลิสท์ Packing?', function(){ idx.forEach(i=>window.packingRows.splice(i,1)); if(!window.packingRows.length)window.packingRows.push({item:'',loads:[],lots:[],costIdx:null}); window.pkRowSel=new Set(); renderPacking(); pkToast('ลบ '+idx.length+' แถวแล้ว','good'); }); }
-function pkClearRows(){ pkConfirm('ล้างรายการทั้งหมดในลิสท์ Packing? (ตู้และวันที่ยังอยู่)', function(){ window.packingRows=[{item:'',loads:[],lots:[],costIdx:null}]; window.pkRowSel=new Set(); renderPacking(); pkToast('ล้างลิสท์แล้ว','good'); }); }
+function pkClearRows(){ pkConfirm('ล้างรายการทั้งหมดในลิสท์ Packing? (ตู้และวันที่ยังอยู่)', function(){ window.packingRows=[{item:'',loads:[],lots:[],costIdx:null}]; window.pkRowSel=new Set(); window.pkRoundDims={}; renderPacking(); pkToast('ล้างลิสท์แล้ว','good'); }); }
 function pkAddCont(){ window.pkContainers.push({name:pkDefName(window.pkContainers.length)}); renderPacking(); }
 function pkDelCont(c){ window.pkContainers.splice(c,1); window.packingRows.forEach(r=>{ if(r.loads) r.loads.splice(c,1); if(r.lots) r.lots.splice(c,1); }); if(!window.pkContainers.length){ window.pkContainers.push({name:'ตู้ A'}); } renderPacking(); }
 function pkSetContName(c, v){ const ct=window.pkContainers[c]; const old=ct.name||pkDefName(c); ct.name=v;
@@ -8488,7 +8497,7 @@ function renderPacking(){
       facTd=`<td style="min-width:150px;"><input type="text" value="${vv}" onchange="pkSetVendor(${i},this.value)" placeholder="Vendor (กรอกเอง)" title="Vendor${r.term?(' · TERM: '+r.term.replace(/"/g,'&quot;')):''}" style="${inpSt}"></td>`
         +`<td style="min-width:120px;"><input type="text" value="${ff}" onchange="pkSetFactory(${i},this.value)" placeholder="Factory (กรอกเอง)" title="Factory" style="${inpSt}"></td>`;
     }
-    const cPcs=`<td class="num" style="white-space:nowrap;">${r.item?`<input type="number" min="1" step="1" value="${d?d.pcs:1}" onchange="pkDimSet(${i},'pcs',this.value)" title="ชิ้น/กล่อง" style="width:56px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}${(r.item&&pkHasDimEdit(r.item))?` <a href="#" onclick="pkDimReset(${i});return false;" title="คืนค่าขนาดเดิม" style="font-size:11px;color:var(--muted);text-decoration:none;">↩︎</a>`:''}</td>`;
+    const cPcs=`<td class="num" style="white-space:nowrap;">${r.item?`<input type="number" min="1" step="1" value="${d?d.pcs:1}" onchange="pkDimSet(${i},'pcs',this.value)" title="ชิ้น/กล่อง (PCS/CTN) — แก้แล้วมีผลเฉพาะตู้นี้เท่านั้น" style="width:56px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}${(r.item&&pkHasDimEdit(r.item))?` <a href="#" onclick="pkDimReset(${i});return false;" title="คืนค่าขนาดเดิม" style="font-size:11px;color:var(--muted);text-decoration:none;">↩︎</a>`:''}</td>`;
     const cLotCost=`<td>${costSel}${capNote}</td>`;
     const cPrice=`<td class="num" id="pk-rmb-${i}">${rc.rmb==null?'<span class="muted">-</span>':('¥'+pkYuan(rc.rmb))}</td>`;
     const cCtns=`<td class="num" id="pk-rbox-${i}">${fmt1(rs.box)}</td>`;
@@ -9040,6 +9049,8 @@ function pkLoadRound(idx){
   const s=window.pkLog[idx]; if(!s) return;
   window.pkContainers = s.containers.map(c=>({name:c.name, dates: Object.assign({}, c.dates||{}), dateLog: (c.dateLog||[]).slice()}));
   window.pkCustomDims = window.pkCustomDims || {};
+  window.pkRoundDims  = {};   // ขนาด/ชิ้นต่อกล่อง "ของตู้นี้" — freeze ตามที่บันทึกไว้ กันข้อมูลถูกคำนวณใหม่จากค่ากลาง
+  (s.rows||[]).forEach(r=>{ if(!r.item) return; window.pkRoundDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1)}; });
   window.packingRows  = s.rows.map(r=>{
     let lm=(r.lotMax==null?null:r.lotMax);
     if(r.custom){ window.pkCustomDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1), desc:r.desc||'', rmb:(r.rmb==null?'':r.rmb)}; return {item:r.item, custom:true, vendor:r.vendor||undefined, factory:r.factory||undefined, term:r.term||undefined, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:null, lotMax:null}; }
