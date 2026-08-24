@@ -10773,12 +10773,24 @@ function payLoadCheck(){ if(window.payCheck) return; try{ window.payCheck=JSON.p
 function payChk(key){ payLoadCheck(); return !!window.payCheck[key]; }
 function payToggleCheck(key,on){ payLoadCheck(); if(on) window.payCheck[key]=1; else delete window.payCheck[key]; try{ localStorage.setItem('payCheckV1', JSON.stringify(window.payCheck)); }catch(e){} }
 function payVendorForFactory(item, factory){ const lt=(window.BC_LEADTIME&&window.BC_LEADTIME[item]); if(lt&&Array.isArray(lt.opts)){ const o=lt.opts.find(x=>((x&&x.f)||'')===factory); if(o&&o.v) return o.v; } return ''; }
+// เลือก Term ตาม Vendor/Factory ที่ระบุ · สินค้า 1 ตัวมีได้หลาย Vendor (Vendor1/2/3) ในไฟล์ Lead Time — จับคู่ให้ตรงตัวที่ระบุ
 function payCreditTerm(item, vendor, factory){ const C=window.BC_CREDITTERM||{};
+  const nm=s=>String(s||'').trim().toUpperCase(); const v=nm(vendor), f=nm(factory);
   const bi=C.item&&C.item[item];
-  if(bi){ if(bi[vendor+'|'+factory]) return bi[vendor+'|'+factory]; const vals=Object.values(bi); if(vals.length) return vals[0]; }   // เจาะจงต่อรหัสสินค้าก่อน
-  if(C.pair&&C.pair[vendor+'|'+factory]) return C.pair[vendor+'|'+factory];
-  if(C.vendor&&C.vendor[vendor]) return C.vendor[vendor];
-  const def=(typeof pkDefaultVendorFactory==='function')&&pkDefaultVendorFactory(item);   // fallback ตามรหัสสินค้า (เช่น R-OSR)
+  if(bi){
+    for(const k in bi){ const p=k.split('|'); if(nm(p[0])===v && nm(p[1])===f) return bi[k]; }        // 1) ตรงทั้ง Vendor+Factory
+    for(const k in bi){ const p=k.split('|'); if(f && nm(p[1])===f) return bi[k]; }                    // 2) ตรง Factory
+    for(const k in bi){ const p=k.split('|'); if(v && nm(p[0])===v) return bi[k]; }                    // 3) ตรง Vendor
+    for(const k in bi){ const p=k.split('|'); const kv=nm(p[0]), kf=nm(p[1]);                          // 4) ชื่อย่อ/ยาวต่างกัน (contains) เช่น "STAR" vs "Star Lighting"
+      if((v&&kv&&(v.indexOf(kv)>=0||kv.indexOf(v)>=0)) || (f&&kf&&(f.indexOf(kf)>=0||kf.indexOf(f)>=0))) return bi[k]; }
+    const vals=Object.values(bi); if(vals.length===1) return vals[0];                                  // มีเทอมเดียว → ใช้ได้เลย (มีหลายเทอมแต่จับคู่ไม่ได้ → ไม่เดา ไปลองต่อ)
+  }
+  if(C.pair){ for(const k in C.pair){ const p=k.split('|'); if(nm(p[0])===v && nm(p[1])===f) return C.pair[k]; } }
+  if(C.vendor){ for(const k in C.vendor){ if(nm(k)===v) return C.vendor[k]; }                          // Vendor map: ตรง Vendor
+    for(const k in C.vendor){ if(f && nm(k)===f) return C.vendor[k]; }                                 // เผื่อ Factory = รหัส Vendor เดียวกัน
+    for(const k in C.vendor){ const kk=nm(k); if(v&&kk&&(v.indexOf(kk)>=0||kk.indexOf(v)>=0)) return C.vendor[k]; }
+  }
+  const def=(typeof pkDefaultVendorFactory==='function')&&pkDefaultVendorFactory(item);                // fallback ตามรหัสสินค้า (เช่น R-OSR/R-WOK)
   if(def&&def.term) return def.term;
   return ''; }
 // วันที่โอน คำนวณจาก Term + Loading date
