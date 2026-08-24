@@ -10946,6 +10946,17 @@ function paySaveExtra(){ try{ localStorage.setItem('payExtraV1', JSON.stringify(
 function payAllContainers(){ if(typeof pkLoadLog==='function' && (!window.pkLog||!window.pkLog.length)) pkLoadLog(); const seen={}, list=[]; (window.pkLog||[]).forEach(s=>{ if(s.pending) return; (s.containers||[]).forEach(ct=>{ const nm=(ct.name||'').trim(); if(!nm) return; const load=(ct.dates&&ct.dates.load)||''; if(!(nm in seen)){ seen[nm]=load; list.push({name:nm, load}); } else if(load && !seen[nm]){ seen[nm]=load; const it=list.find(x=>x.name===nm); if(it) it.load=load; } }); }); return list.sort((a,b)=>String(a.name).localeCompare(String(b.name))); }
 function payLoadDateOfCont(name){ name=(name||'').trim(); if(!name) return ''; const c=payAllContainers().find(x=>x.name===name); return c?c.load:''; }
 function payGenId(){ return 'x'+Date.now().toString(36)+Math.floor(Math.random()*1e5).toString(36); }
+// ประเภทค่าใช้จ่าย (ไม่ใช่สินค้า)
+const PAY_EXTRA_KINDS=[
+  {v:'Transportation Fee', th:'ค่าขนส่ง'},
+  {v:'Credit Note', th:'ใบลดหนี้ / เครดิตโน้ต'},
+  {v:'Color Box Charge', th:'ค่าใช้จ่ายสำหรับกล่องสี'},
+  {v:'Factory Inspection Fee', th:'ค่าตรวจโรงงาน'}
+];
+function payExtraKindLabel(v){ const k=PAY_EXTRA_KINDS.find(x=>x.v===v); return k?(k.th+' ('+k.v+')'):(v||''); }
+// รายชื่อ Factory ทั้งหมด (จาก Lead Time opts) ให้เลือกในฟอร์มค่าใช้จ่าย
+function payAllFactoriesList(){ if(window._payAllFac) return window._payAllFac; const set=new Set(), LT=window.BC_LEADTIME||{}; Object.keys(LT).forEach(k=>(((LT[k]||{}).opts)||[]).forEach(o=>{ if(o&&o.f) set.add(o.f); })); window._payAllFac=[...set].sort((a,b)=>String(a).localeCompare(String(b))); return window._payAllFac; }
+function payVendorChoices(){ return payShortVendorList().slice().sort((a,b)=>String(a).localeCompare(String(b))); }
 function payAddExtra(){ payExtraModal(null); }
 function payEditExtra(id){ payExtraModal(id); }
 function payExtraModal(id){
@@ -10957,14 +10968,19 @@ function payExtraModal(id){
   ov.style.cssText='position:fixed;inset:0;z-index:100006;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';
   const inp='margin-top:4px;width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:14px;';
   const ctOpts='<option value="">— ไม่ระบุตู้ —</option>'+conts.map(c=>`<option value="${payEsc(c.name)}" ${c.name===(e.cont||'')?'selected':''}>${payEsc(c.name)}${c.load?(' · Loading '+payThaiDate(c.load)):''}</option>`).join('');
+  const optSel=(list,cur)=>{ let o='<option value="">— เลือก —</option>'; list.forEach(v=>{ o+=`<option value="${payEsc(v)}" ${v===cur?'selected':''}>${payEsc(v)}</option>`; }); if(cur && list.indexOf(cur)<0) o+=`<option value="${payEsc(cur)}" selected>${payEsc(cur)}</option>`; return o; };
+  const venOpts=optSel(payVendorChoices(), e.vendor||'');
+  const facOpts=optSel(payAllFactoriesList(), e.factory||'');
+  const kindOpts='<option value="">— เลือกประเภท —</option>'+PAY_EXTRA_KINDS.map(k=>`<option value="${payEsc(k.v)}" ${k.v===(e.kind||'')?'selected':''}>${payEsc(k.th)} (${payEsc(k.v)})</option>`).join('');
   ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:18px 20px;max-width:460px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);max-height:90vh;overflow:auto;">
     <div style="font-weight:800;font-size:15px;margin-bottom:12px;">🧾 ${id?'แก้ไข':'เพิ่ม'}ค่าใช้จ่ายอื่น (ไม่ใช่สินค้า)</div>
     <label style="font-size:13px;font-weight:700;display:block;">วันที่โอน<br><input type="date" id="pex-xfer" value="${e.xfer||''}" style="${inp}"></label>
-    <label style="font-size:13px;font-weight:700;display:block;margin-top:10px;">SUPPLIER — Vendor<br><input type="text" id="pex-vendor" value="${payEsc(e.vendor||'')}" placeholder="เช่น ค่าขนส่ง / ชิปปิ้ง / ค่าธรรมเนียม ..." style="${inp}"></label>
-    <label style="font-size:13px;font-weight:700;display:block;margin-top:10px;">Factory (ถ้ามี — เว้นว่างได้)<br><input type="text" id="pex-factory" value="${payEsc(e.factory||'')}" placeholder="เว้นว่างได้" style="${inp}"></label>
+    <label style="font-size:13px;font-weight:700;display:block;margin-top:10px;">ประเภทค่าใช้จ่าย<br><select id="pex-kind" style="${inp}">${kindOpts}</select></label>
+    <label style="font-size:13px;font-weight:700;display:block;margin-top:10px;">SUPPLIER — Vendor<br><select id="pex-vendor" style="${inp}">${venOpts}</select></label>
+    <label style="font-size:13px;font-weight:700;display:block;margin-top:10px;">Factory (เว้นว่างได้)<br><select id="pex-factory" style="${inp}">${facOpts}</select></label>
     <label style="font-size:13px;font-weight:700;display:block;margin-top:10px;">CT No. (เลือกจากตู้ที่บันทึกไว้ → ดึง Loading date ให้อัตโนมัติ)<br><select id="pex-ct" style="${inp}">${ctOpts}</select></label>
     <label style="font-size:13px;font-weight:700;display:block;margin-top:10px;">AMOUNT (¥ RMB)<br><input type="number" id="pex-amt" value="${e.amtRmb!=null?e.amtRmb:''}" min="0" step="0.01" placeholder="จำนวนเงิน (หยวน)" style="${inp}"></label>
-    <div class="muted" style="font-size:11px;margin-top:8px;line-height:1.5;">TERM เว้นว่างได้ (กรอกวันที่โอนเองแล้ว) · TOTAL BAHT = AMOUNT × Exchange Rate (สูตรเดิม) · คอลัมน์อื่นคำนวณอัตโนมัติ</div>
+    <div class="muted" style="font-size:11px;margin-top:8px;line-height:1.5;">คอลัมน์ TERM จะแสดง "ประเภทค่าใช้จ่าย" แทน (ไม่ควานหา TERM เพราะไม่มีรหัสสินค้า) · TOTAL BAHT = AMOUNT × Exchange Rate (สูตรเดิม) · คอลัมน์อื่นคำนวณอัตโนมัติ</div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;">
       <button onclick="document.getElementById('pay-extra-ov').remove()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:700;">ยกเลิก</button>
       ${id?`<button onclick="payDeleteExtra('${id}')" style="padding:7px 14px;border-radius:8px;border:1px solid #b91c1c;background:var(--card);color:#b91c1c;cursor:pointer;font-weight:700;">🗑 ลบ</button>`:''}
@@ -10975,16 +10991,18 @@ function payExtraModal(id){
 }
 function paySaveExtraRow(id){
   const xfer=(document.getElementById('pex-xfer').value||'').trim();
+  const kind=(document.getElementById('pex-kind').value||'').trim();
   const vendor=(document.getElementById('pex-vendor').value||'').trim();
   const factory=(document.getElementById('pex-factory').value||'').trim();
   const cont=(document.getElementById('pex-ct').value||'').trim();
   const amt=+(document.getElementById('pex-amt').value)||0;
   if(!xfer){ pkToast('กรุณาระบุวันที่โอน','bad'); return; }
-  if(!vendor){ pkToast('กรุณาระบุ SUPPLIER (Vendor)','bad'); return; }
+  if(!kind){ pkToast('กรุณาเลือกประเภทค่าใช้จ่าย','bad'); return; }
+  if(!vendor){ pkToast('กรุณาเลือก SUPPLIER (Vendor)','bad'); return; }
   if(!(amt>0)){ pkToast('กรุณาระบุจำนวนเงิน (AMOUNT)','bad'); return; }
   payLoadExtra();
-  if(id){ const e=window.payExtra.find(x=>x.id===id); if(e){ e.xfer=xfer; e.vendor=vendor; e.factory=factory; e.cont=cont; e.amtRmb=amt; } }
-  else { window.payExtra.push({id:payGenId(), xfer, vendor, factory, cont, amtRmb:amt}); }
+  if(id){ const e=window.payExtra.find(x=>x.id===id); if(e){ e.xfer=xfer; e.kind=kind; e.vendor=vendor; e.factory=factory; e.cont=cont; e.amtRmb=amt; } }
+  else { window.payExtra.push({id:payGenId(), xfer, kind, vendor, factory, cont, amtRmb:amt}); }
   paySaveExtra();
   const ov=document.getElementById('pay-extra-ov'); if(ov) ov.remove();
   renderPayment(); pkToast('บันทึกค่าใช้จ่ายแล้ว','good');
@@ -11139,7 +11157,7 @@ function renderPayment(){
   let data=payRowsData();
   // ---- ค่าใช้จ่ายอื่น (ไม่ใช่สินค้า) ที่เพิ่มเอง — รวมเข้าตารางเดียวกัน ให้ไหลตามสูตรเดิม ----
   payLoadExtra();
-  (window.payExtra||[]).forEach(e=>{ const load=e.cont?payLoadDateOfCont(e.cont):''; data.push({cont:e.cont||'', load, eta:'', factory:e.factory||'', vendor:(e.vendor||'').trim()||'(ค่าใช้จ่ายอื่น)', term:'', amtRmb:+e.amtRmb||0, xfer:e.xfer||'', seg:'', _extra:true, _extraId:e.id}); });
+  (window.payExtra||[]).forEach(e=>{ const load=e.cont?payLoadDateOfCont(e.cont):''; data.push({cont:e.cont||'', load, eta:'', factory:e.factory||'', vendor:(e.vendor||'').trim()||'(ค่าใช้จ่ายอื่น)', term:'', amtRmb:+e.amtRmb||0, xfer:e.xfer||'', seg:'', _extra:true, _extraId:e.id, _kind:e.kind||''}); });
   // ---- ตัวเลือก Vendor ----
   const vsel=document.getElementById('pay-vendor');
   if(vsel){ const vs=[...new Set(data.map(r=>r.vendor).filter(Boolean))].sort(); const cur=vsel.value||window.paySelVendor||'__all__';
@@ -11221,7 +11239,7 @@ function payMonthBlock(y, m, data, fx, showSide){
       const exBadge = r._extra ? '<span style="font-size:9px;font-weight:800;background:#7f1d1d;color:#fff;padding:1px 5px;border-radius:4px;">🧾 ค่าใช้จ่ายอื่น</span><br>' : '';
       c=`<td onclick="${xferClick}" title="${xferTitle}" style="${bTd}text-align:center;white-space:nowrap;font-weight:800;color:#7f1d1d;cursor:pointer;${hiX?'background:#22d3ee;color:#083344;box-shadow:inset 0 0 0 2px #0891b2;':(r.xferManual?'background:#ffe8a3;':('background:'+vbg+';'))}">${r.xfer?payThaiDate(r.xfer):'<span style="color:#9ca3af;font-weight:400;">-</span>'}${r.xferManual?' ✎':''}${r._extra?' ✎':''}</td>`
        + `<td style="${bTd}background:${vbg};text-align:left;white-space:normal;">${exBadge}<b style="color:#111;">${payEsc(r.vendor)}</b><div style="font-size:10.5px;color:#6b7280;">${payEsc(r.factory)}</div></td>`
-       + `<td style="${bTd}background:${vbg};text-align:left;white-space:normal;font-size:11px;line-height:1.3;min-width:150px;color:#4b5563;">${payEsc(r.term)||'<span style="color:#9ca3af;">-</span>'}</td>`
+       + `<td style="${bTd}background:${vbg};text-align:left;white-space:normal;font-size:11px;line-height:1.3;min-width:150px;color:#4b5563;">${r._extra ? (r._kind?('<b style="color:#7f1d1d;">'+payEsc(payExtraKindLabel(r._kind))+'</b>'):'<span style="color:#9ca3af;">-</span>') : (payEsc(r.term)||'<span style="color:#9ca3af;">-</span>')}</td>`
        + `<td style="${bTd}background:${vbg};text-align:center;white-space:nowrap;color:#374151;">${payThaiDate(r.load)}</td>`
        + `<td style="${bTd}background:${vbg};text-align:center;white-space:nowrap;font-weight:700;color:#111;">${payEsc(r.cont)}</td>`
        + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:700;color:#111;">¥${f2(r.amtRmb)}${r.seg?`<div style="font-size:9px;font-weight:700;color:#7f1d1d;">${payEsc(r.seg)}</div>`:''}</td>`
