@@ -11037,6 +11037,7 @@ function renderPayment(){
     if(ov&&ov.date){ r.xfer=ov.date; r.xferReason=ov.reason||''; r.xferManual=true; }
     window._payRowMeta[key]={cont:r.cont,vendor:r.vendor,factory:r.factory,seg:r.seg,auto:auto,cur:r.xfer,reason:(ov&&ov.reason)||''};
   });
+  payAssignVendorColors(data.map(r=>r.vendor));   // แจกสีพาสเทลให้ Vendor แต่ละตัว (ไม่ซ้ำกัน)
   // ---- เลือกเดือน/ปีที่จะแสดง (รองรับ ทุกเดือน/ทุกปี → วนสร้างตารางต่อเดือน) ----
   const beNow=APP_TODAY.getFullYear()+543;
   const y0=allYear?null:((+ySel||beNow)-543);
@@ -11051,9 +11052,12 @@ function renderPayment(){
   const multi=combos.length>1;
   el.innerHTML=combos.map(c=>payMonthBlock(c.y, c.m, data, fx, !multi)).join('<div style="height:26px;border-top:2px dashed #d8c893;margin-top:14px;"></div>');
 }
-// สีพื้นหลังพาสเทลต่อ Vendor (คงที่ต่อชื่อ) — ให้แยกบรรทัดตาม Vendor ได้ง่าย
-const PAY_VC_PALETTE=['#fde2e4','#e3f0d4','#d6ecf5','#efe4f7','#fff3d1','#dff5ea','#fce3d6','#e6e2f8','#d9f0f2','#f7e5ee','#eaf3d9','#f0e2d0'];
-function payVendorColor(v){ v=String(v||'').trim(); if(!v) return '#ffffff'; let h=0; for(let i=0;i<v.length;i++) h=(h*31+v.charCodeAt(i))>>>0; return PAY_VC_PALETTE[h%PAY_VC_PALETTE.length]; }
+// สีพื้นหลังพาสเทลต่อ Vendor — แจกสีไล่ลำดับ (Vendor คนละตัว = คนละสี) จัดใน payAssignVendorColors()
+const PAY_VC_PALETTE=['#fde2e4','#d6ecf5','#e3f0d4','#efe4f7','#fff3d1','#dff5ea','#fce3d6','#e6e2f8','#d9f0f2','#f7e5ee','#eaf3d9','#f0e2d0','#dbeafe','#fae1f0','#e2f5d9','#f5e6c8'];
+function payAssignVendorColors(vendors){ window._payVCmap={}; [...new Set(vendors.filter(Boolean))].sort().forEach((v,i)=>{ window._payVCmap[v]=PAY_VC_PALETTE[i%PAY_VC_PALETTE.length]; }); }
+function payVendorColor(v){ v=String(v||'').trim(); if(!v) return '#ffffff';
+  if(window._payVCmap && window._payVCmap[v]) return window._payVCmap[v];
+  let h=0; for(let i=0;i<v.length;i++) h=(h*31+v.charCodeAt(i))>>>0; return PAY_VC_PALETTE[h%PAY_VC_PALETTE.length]; }
 // สร้างตาราง Payment ของเดือนเดียว (y,m) จาก data ที่กรองแล้ว · showSide=แสดงปฏิทิน+มังกร
 function payMonthBlock(y, m, data, fx, showSide){
   const weeks=payWeeks(y,m);
