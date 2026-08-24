@@ -9955,7 +9955,7 @@ function renderPoFollow(){
           <div>${itemHead}</div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
             <label style="font-size:12px;font-weight:600;">จำนวนสั่งผลิต: <input type="number" min="0" max="${x.out}" step="1" value="${o.orderQty===''||o.orderQty==null?x.out:o.orderQty}" onchange="poSetQty('${selPo.po}','${x.item}',this.value,${x.out})" style="width:78px;text-align:right;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> <span class="muted">/ ${fmtNum(x.out)} ชิ้น</span></label>
-            <label style="font-size:12px;font-weight:600;">Lead Time: <input type="number" min="0" step="1" value="${o.leadDays===''||o.leadDays==null?'':o.leadDays}" onchange="poSetLead('${selPo.po}','${x.item}',this.value)" style="width:66px;text-align:right;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> วัน</label>
+            <label style="font-size:12px;font-weight:600;">Lead Time (สั่งผลิต): <input type="number" min="0" step="1" value="${o.leadDays===''||o.leadDays==null?'':o.leadDays}" onchange="poSetLead('${selPo.po}','${x.item}',this.value)" style="width:66px;text-align:right;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> วัน</label>
           </div>
         </div>${phase}</div>`;
     }).join('');
