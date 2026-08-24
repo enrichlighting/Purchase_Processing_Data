@@ -10806,37 +10806,34 @@ function payFillSelectors(){
   if(ms && !ms.options.length){ ms.innerHTML='<option value="__all__">ทุกเดือน</option>'+PAY_MONTHS_TH.map((n,i)=>`<option value="${i+1}">${n}</option>`).join(''); ms.value=(APP_TODAY.getMonth()+1); }
   if(ys && !ys.options.length){ const beNow=APP_TODAY.getFullYear()+543; let o='<option value="__all__">ทุกปี</option>'; for(let yy=beNow-2;yy<=beNow+3;yy++) o+=`<option value="${yy}">${yy}</option>`; ys.innerHTML=o; ys.value=beNow; }
 }
-function payDatesToSet(){ return new Set(window.paySelDates||[]); }
-function payClearDates(){ window.paySelDates=[]; window._payLastClick=null; renderPayment(); }
-function paySelectDate(key, ev){   // เลือกได้หลายวัน · Shift+คลิก = เลือกช่วง (between)
-  const set=payDatesToSet();
-  if(ev && ev.shiftKey && window._payLastClick){
-    const pa=window._payLastClick.split('-').map(Number), pb=key.split('-').map(Number);
-    let a=new Date(pa[0],pa[1]-1,pa[2]), b=new Date(pb[0],pb[1]-1,pb[2]); if(a>b){ const t=a;a=b;b=t; }
-    for(let dt=new Date(a); dt<=b; dt.setDate(dt.getDate()+1)) set.add(dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'));
-  } else { if(set.has(key)) set.delete(key); else set.add(key); }
-  window.paySelDates=[...set].sort(); window._payLastClick=key; renderPayment();   // TODO: ลิงก์วันที่เลือก → คอลัมน์ "วันที่โอน"
+function payClearDates(){ window.payHiliteDate=''; renderPayment(); }
+function paySelectDate(key, ev){   // คลิกวันในปฏิทิน → ไฮไลต์รายการที่ "วันที่โอน" ตรงวันนั้น (คลิกซ้ำ = ยกเลิก)
+  window.payHiliteDate = (window.payHiliteDate===key) ? '' : key;
+  renderPayment();
+  if(window.payHiliteDate){ setTimeout(function(){ const el=document.querySelector('[data-xfer="'+window.payHiliteDate+'"]'); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); }, 60); }
 }
-function payCalendarHtml(y,m){
+function payCalendarHtml(y,m,xferSet){
+  xferSet=xferSet||new Set();
   const dim=new Date(y,m,0).getDate(); const lead=(new Date(y,m-1,1).getDay()+6)%7;   // Mon=0
-  const dn=['M','T','W','T','F','S','S']; const T=APP_TODAY; const sel=payDatesToSet(); const p2=n=>String(n).padStart(2,'0');
+  const dn=['M','T','W','T','F','S','S']; const T=APP_TODAY; const active=window.payHiliteDate||''; const p2=n=>String(n).padStart(2,'0');
   const LY='#fde68a', DY='#eab308';   // เหลืองอ่อน (จ–ศ) · เหลืองเข้ม (ส–อา)
   let cells=dn.map((d,i)=>`<div style="text-align:center;font-weight:800;font-size:9px;color:${i>=5?DY:LY};">${d}</div>`).join('');
   for(let i=0;i<lead;i++) cells+='<div></div>';
   for(let d=1;d<=dim;d++){ const wd=new Date(y,m-1,d).getDay(); const wknd=(wd===0||wd===6);
     const key=y+'-'+p2(m)+'-'+p2(d);
-    const isToday=(y===T.getFullYear() && m===T.getMonth()+1 && d===T.getDate()); const isSel=sel.has(key);
-    let st='display:flex;align-items:center;justify-content:center;font-size:11px;border-radius:5px;cursor:pointer;user-select:none;';
-    if(isSel) st+='background:'+LY+';color:#111;font-weight:800;';
+    const isToday=(y===T.getFullYear() && m===T.getMonth()+1 && d===T.getDate()); const isActive=(active===key); const hasXfer=xferSet.has(key);
+    let st='position:relative;display:flex;align-items:center;justify-content:center;font-size:11px;border-radius:5px;cursor:pointer;user-select:none;';
+    if(isActive) st+='background:#22d3ee;color:#083344;font-weight:800;';                              // วันที่กำลังไฮไลต์
+    else if(hasXfer) st+='background:rgba(34,211,238,.16);color:#67e8f9;font-weight:800;';             // วันที่มีการโอน
     else st+='color:'+(wknd?DY:LY)+';font-weight:'+(wknd?'800':'600')+';';
-    if(isToday && !isSel) st+='box-shadow:0 0 0 2px #38bdf8 inset;';
-    cells+=`<div onclick="paySelectDate('${key}',event)" title="${d} ${PAY_MONTHS_TH[m-1]} ${y+543}${isToday?' (วันนี้)':''}" style="${st}">${d}</div>`;
+    if(isToday && !isActive) st+='box-shadow:0 0 0 2px #38bdf8 inset;';
+    const dot=(hasXfer&&!isActive)?'<span style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:#22d3ee;"></span>':'';
+    cells+=`<div onclick="paySelectDate('${key}',event)" title="${d} ${PAY_MONTHS_TH[m-1]} ${y+543}${isToday?' (วันนี้)':''}${hasXfer?' · มีวันโอน (คลิกเพื่อไฮไลต์)':''}" style="${st}">${d}${dot}</div>`;
   }
-  const selArr=(window.paySelDates||[]); let selTxt='—';
-  if(selArr.length){ const cur=selArr.filter(k=>{const p=k.split('-');return +p[0]===y && +p[1]===m;}).map(k=>+k.split('-')[2]); selTxt=selArr.length+' วัน'+(cur.length?(' — '+cur.join(', ')):''); }
+  let selTxt = active ? ('โอนวันที่ '+payThaiDate(active)) : 'คลิกวันที่มีจุด = ไฮไลต์รายการที่โอนวันนั้น';
   return `<div style="flex:0 0 auto;width:8cm;height:8cm;box-sizing:border-box;border:1px solid #333;border-radius:10px;padding:7px 8px;background:#0b0b0b;display:flex;flex-direction:column;">
     <div style="text-align:center;font-weight:800;font-size:13px;letter-spacing:.3px;text-transform:uppercase;color:${LY};">${PAY_MONTHS_TH[m-1]} ${y+543}</div>
-    <div style="text-align:center;font-size:8.5px;color:#d4d4d4;margin-bottom:3px;line-height:1.3;">โอน: <b style="color:${LY};">${selTxt}</b>${selArr.length?` <a href="#" onclick="payClearDates();return false;" style="font-size:8.5px;color:#fca5a5;">✕</a>`:''} · <span style="color:#9ca3af;">Shift=ช่วง</span></div>
+    <div style="text-align:center;font-size:8.5px;color:#d4d4d4;margin-bottom:3px;line-height:1.3;"><b style="color:${active?'#67e8f9':LY};">${selTxt}</b>${active?` <a href="#" onclick="payClearDates();return false;" style="font-size:8.5px;color:#fca5a5;">✕ ล้าง</a>`:''}</div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;gap:1px;flex:1;">${cells}</div>
   </div>`;
 }
@@ -11081,10 +11078,12 @@ function payMonthBlock(y, m, data, fx, showSide){
   const bySort=(a,b)=> String(a.vendor).localeCompare(String(b.vendor)) || String(a.cont).localeCompare(String(b.cont));
   byWeek.forEach(a=>a.sort(bySort)); other.sort(bySort);
   const wkTotBaht=weeks.map((w,wi)=> byWeek[wi].reduce((a,r)=>a+r.amtRmb,0)*fx);   // ยอดรวม TOTAL (SUPPLIER-BAHT) ต่อวีค
+  const xferSet=new Set(); data.forEach(r=>{ if(r.xfer && inMonth(r.xfer)) xferSet.add(r.xfer); });   // วันที่มีการโอน (ในเดือนนี้) → ไปมาร์กบนปฏิทิน
   function restCells(r, venShow, gwi, wkTot, n, isFirst){   // gwi=index วีคของกลุ่ม · เซลล์ยอดรวม Week merge (rowspan=n) ตรงแนวทแยง · r=null แถวว่าง
     let c;
     if(r){
-      c=`<td onclick="payEditXfer('${encodeURIComponent(r._key||'')}')" title="${r.xferManual?('แก้เอง: '+payEsc(r.xferReason||'(ไม่ระบุเหตุผล)')):'คลิกเพื่อแก้ไขวันที่โอน'}" style="${bTd}text-align:center;white-space:nowrap;font-weight:800;color:#7f1d1d;cursor:pointer;${r.xferManual?'background:#ffe8a3;':''}">${r.xfer?payThaiDate(r.xfer):'<span style="color:#9ca3af;font-weight:400;">-</span>'}${r.xferManual?' ✎':''}</td>`
+      const hiX=(r.xfer && r.xfer===window.payHiliteDate);   // ไฮไลต์เมื่อคลิกวันในปฏิทินตรงกับวันโอนนี้
+      c=`<td onclick="payEditXfer('${encodeURIComponent(r._key||'')}')" title="${r.xferManual?('แก้เอง: '+payEsc(r.xferReason||'(ไม่ระบุเหตุผล)')):'คลิกเพื่อแก้ไขวันที่โอน'}" style="${bTd}text-align:center;white-space:nowrap;font-weight:800;color:#7f1d1d;cursor:pointer;${hiX?'background:#22d3ee;color:#083344;box-shadow:inset 0 0 0 2px #0891b2;':(r.xferManual?'background:#ffe8a3;':'')}">${r.xfer?payThaiDate(r.xfer):'<span style="color:#9ca3af;font-weight:400;">-</span>'}${r.xferManual?' ✎':''}</td>`
        + `<td style="${bTd}text-align:left;white-space:normal;"><b style="color:#111;">${payEsc(r.vendor)}</b><div style="font-size:10.5px;color:#6b7280;">${payEsc(r.factory)}</div></td>`
        + `<td style="${bTd}text-align:left;white-space:normal;font-size:11px;line-height:1.3;min-width:150px;color:#4b5563;">${payEsc(r.term)||'<span style="color:#9ca3af;">-</span>'}</td>`
        + `<td style="${bTd}text-align:center;white-space:nowrap;color:#374151;">${payThaiDate(r.load)}</td>`
@@ -11125,7 +11124,7 @@ function payMonthBlock(y, m, data, fx, showSide){
     const dataRows = rows.length ? rows : [null];
     const cells = rows.length ? groupCells(rows,wi) : [restCells(null,null,wi,wkTotBaht[wi],1,true)];
     const wl = rows.length ? wkLabel(wi+1,rng,rows.length) : wkLabel(wi+1,rng,1);
-    cells.forEach((cc,ri)=>{ let tr='<tr>'+(ri===0?wl:'')+cc;
+    cells.forEach((cc,ri)=>{ const _rx=(dataRows[ri]&&dataRows[ri].xfer)?(' data-xfer="'+dataRows[ri].xfer+'"'):''; let tr='<tr'+_rx+'>'+(ri===0?wl:'')+cc;
       if(ri===0 && !emitted[half]){ tr+=rightGroup(half, half===1?phys1:phys2); emitted[half]=true; }
       tr+=cfCells(dataRows[ri]||null);   // checkbox CF ต่อบรรทัด (แถวว่าง=blank)
       body+=tr+'</tr>';
@@ -11146,7 +11145,7 @@ function payMonthBlock(y, m, data, fx, showSide){
     </table></div>`;
   const title = showSide?'':`<div style="font-weight:800;font-size:15px;color:#7f1d1d;margin:2px 0 6px;">📅 ${PAY_MONTHS_TH[m-1]} ${y+543}</div>`;
   const side = showSide?`<div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;">
-      ${payCalendarHtml(y,m)}
+      ${payCalendarHtml(y,m,xferSet)}
       <div title="ปลามังกรพ่นน้ำ รับทรัพย์ (มงคล ปีมังกร)" style="width:8cm;display:flex;justify-content:flex-end;padding-right:8px;user-select:none;">
         <div style="position:relative;display:inline-block;line-height:1;filter:drop-shadow(0 4px 7px rgba(0,0,0,.22));">
           <svg width="172" height="120" viewBox="0 0 320 220" style="display:block;overflow:visible;" xmlns="http://www.w3.org/2000/svg">
