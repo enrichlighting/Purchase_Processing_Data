@@ -9522,6 +9522,24 @@ const PO_FOLLOWKEY='poFollowV1';
 window.poFollow = window.poFollow || {};
 function poLoadFollow(){ try{ const s=localStorage.getItem(PO_FOLLOWKEY); window.poFollow=s?JSON.parse(s):{}; }catch(e){ window.poFollow={}; } }
 function poSaveFollow(){ try{ localStorage.setItem(PO_FOLLOWKEY, JSON.stringify(window.poFollow)); }catch(e){} }
+// ลบรายการติดตามที่อ้าง PO+สินค้า ซึ่งไม่มีอยู่ในข้อมูล BC ปัจจุบันแล้ว (เช่น PO ถูกออกใหม่/เปลี่ยนเลขใน BC)
+// เงื่อนไข: จะลบเฉพาะเมื่อ "สินค้านั้นยังมีใน BC_PO" แต่ "ไม่ได้อยู่ใต้ PO เลขนั้น" แล้ว — กัน export ที่ยังโหลดไม่ครบไม่ให้ลบผิด
+function poPruneStaleFollow(){
+  if(!window.poFollow || !window.BC_PO) return [];
+  const removed=[];
+  for(const po in window.poFollow){
+    const items=(window.poFollow[po]||{}).items||{};
+    for(const item in items){
+      const rec=window.BC_PO[item];
+      if(!rec || !(rec.pos||[]).length) continue;   // สินค้านี้ไม่มีในข้อมูล BC รอบนี้ → อาจโหลดไม่ครบ ไม่ลบ
+      const stillHere=(rec.pos||[]).some(p=>p[0]===po && p[4]==='Released');
+      if(!stillHere){ delete items[item]; removed.push(po+' · '+item); }
+    }
+    if(!Object.keys(items).length) delete window.poFollow[po];   // ไม่เหลือสินค้าใต้ PO นี้ → ลบทั้ง PO
+  }
+  if(removed.length){ poSaveFollow(); if(typeof poPushToCloud==='function'){ try{ poPushToCloud(); }catch(e){} } }
+  return removed;
+}
 // ต่อ (PO, สินค้า) — แยก Lead Time / Follow เป็นรายสินค้า
 function poFI(po,item){ let f=window.poFollow[po]; if(!f||!f.items){ f=window.poFollow[po]={items:{}}; } if(!f.items[item]) f.items[item]={leadDays:'',f1:{},f2:{}}; const o=f.items[item]; if(!o.f1)o.f1={}; if(!o.f2)o.f2={}; return o; }
 window.poSelected = window.poSelected || '';
@@ -11193,7 +11211,7 @@ function payMonthBlock(y, m, data, fx, showSide){
 function renderTab(tab){
   if(tab==='flowchart'){ if(typeof poLoadFollow==='function') poLoadFollow(); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderFlowchart(); }
   else if(tab==='search'){ renderSearch(); renderItemList(); }   // หน้าค้นหารวมรายการสินค้าแล้ว
-  else if(tab==='leadtime'){ poLoadFollow(); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderUrgent(); renderPoFollow(); renderArrivedMatrix(); }
+  else if(tab==='leadtime'){ poLoadFollow(); const _pr=poPruneStaleFollow(); if(_pr && _pr.length && typeof pkToast==='function') pkToast('ล้างรายการติดตาม PO เก่าที่ไม่ตรงข้อมูล BC แล้ว '+_pr.length+' รายการ','good'); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderUrgent(); renderPoFollow(); renderArrivedMatrix(); }
   else if(tab==='packing'){ renderPacking(); pkLoadLog(); renderPkLog(); if(typeof renderArrivedMatrix==='function') renderArrivedMatrix(); }
   else if(tab==='payment'){ renderPayment(); }
   window.tabRendered[tab]=true;
