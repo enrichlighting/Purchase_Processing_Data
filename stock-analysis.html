@@ -9511,7 +9511,7 @@ function renderPkLog(){
   if(!order.length){ el.innerHTML=tabBar+'<p class="muted" style="margin:6px 0;">'+(window.pkLogTab==='arrived'?'ยังไม่มีตู้ที่ของถึงคลัง'+(window.pkArrMonth?'ในเดือนนี้':''):'ไม่มีรายการ')+'</p>'; return; }
   let rows='';
   order.forEach((o,pos)=>{ const s=o.s, idx=o.idx;
-    const cont=s.containers.map((c,i)=>`${c.name}: <b>${s.contTotals[i].cbm.toFixed(2)}</b> CBM / ¥${Math.round(s.contTotals[i].valRmb).toLocaleString()} / ฿${Math.round(s.contTotals[i].valThb).toLocaleString()}`).join(' &nbsp;·&nbsp; ');
+    const cont=s.containers.map((c,i)=>`${c.name}: <b>${s.contTotals[i].cbm.toFixed(3)}</b> CBM / ¥${Math.round(s.contTotals[i].valRmb).toLocaleString()} / ฿${Math.round(s.contTotals[i].valThb).toLocaleString()}`).join(' &nbsp;·&nbsp; ');
     const modeTag = s.pending
       ? '<span class="tag" style="background:#fef3c7;color:#92400e;">⏳ รอเปิด PO</span>'
       : ((s.mode==='released')?'<span class="tag" style="background:var(--good-soft);color:var(--good);">Released PO</span>':'<span class="tag" style="background:var(--brand-soft);color:var(--brand);">Forecast</span>');
