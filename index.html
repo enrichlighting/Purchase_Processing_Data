@@ -9860,7 +9860,8 @@ function renderPoFollow(){
   window.poExpY=window.poExpY||{}; window.poExpM=window.poExpM||{}; window.poExpV=window.poExpV||{};
   const poEtaOf=(poNo,item)=>{ const arr=((window.BC_PO&&window.BC_PO[item])||{}).pos||[]; const f=arr.find(p=>p[0]===poNo); return f&&f[2]?f[2]:null; };  // ETA จาก Purchase Order Line
   const tree={};
-  list.forEach(po=>{ const doc=PD[po.po]; if(!doc) return; const y=doc.slice(0,4), ym=doc.slice(0,7); const vn=po.vendor||'(ไม่ระบุผู้ขาย)';
+  list.forEach(po=>{ if(!/^PO[AC]/i.test(po.po||'')) return;   // รับเฉพาะ POA / POC · ตัดเลขที่ขึ้นต้น "PO" เฉย ๆ ออก
+    const doc=PD[po.po]; if(!doc) return; const y=doc.slice(0,4), ym=doc.slice(0,7); const vn=po.vendor||'(ไม่ระบุผู้ขาย)';
     let val=0,out=0,lots=[],eta=null; po.items.forEach(x=>{ const rl=poRelLot(po.po,x.item)||{}; const o=+x.out||0; out+=o; val+=o*(+rl.rmb||0); if(rl.lot) lots.push(rl.lot); const e=poEtaOf(po.po,x.item); if(e && (!eta||e<eta)) eta=e; });  // eta = ETA เร็วสุดของ PO (ค้างนานสุด)
     if(!(eta && (new Date(today)-new Date(eta))>0)) return;   // เฉพาะ PO ที่เลย ETA แล้วเท่านั้น (ตัดที่ยังไม่ถึง/ไม่มี ETA ออก)
     const Y=tree[y]||(tree[y]={val:0,out:0,pos:new Set(),months:{}}); Y.val+=val; Y.out+=out; Y.pos.add(po.po);
@@ -9892,7 +9893,7 @@ function renderPoFollow(){
     ${rowsT?'':'<div class="muted" style="font-size:12px;padding:8px 4px;">🎉 ไม่มี PO ที่เลย ETA</div>'}
     <div style="overflow-x:auto;"><table style="width:100%;font-size:12px;table-layout:fixed;"><tr><th style="width:18px;"></th><th>ช่วง / ผู้ขาย / PO</th><th class="num" style="width:104px;">มูลค่า ¥ / ค้าง</th></tr>${rowsT}</table></div></div>`;
   // ===== dropdown เลือก PO =====
-  const sorted=list.slice().sort((a,b)=>a.po<b.po?-1:1);
+  const sorted=list.filter(po=>/^PO[AC]/i.test(po.po||'')).sort((a,b)=>a.po<b.po?-1:1);   // รับเฉพาะ POA / POC
   const poShort=iso=>{ if(!iso) return ''; const p=String(iso).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0].slice(2)}`:''; };   // dd/mm/yy
   const poLabel=po=>{ const doc=PD[po.po]; const lots=[...new Set(po.items.map(x=>(poRelLot(po.po,x.item)||{}).lot).filter(Boolean))]; const lotTxt=lots.length?(' · Lot: '+lots.join(', ')):''; const totOut=po.items.reduce((s,x)=>s+(+x.out||0),0); const dt=doc?(' · '+poShort(doc)):''; return `${po.po}${lotTxt}${dt} · ค้าง ${fmtNum(totOut)}`; };
   const dlOpts=sorted.map(po=>`<option value="${poLabel(po).replace(/"/g,'&quot;')}"></option>`).join('');
