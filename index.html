@@ -8002,7 +8002,7 @@ function pkRecalcAllValues(){
       for(let c=0;c<nc;c++){ let pcs=0,box=0,cbm=0,vr=0; (s.rows||[]).forEach(r=>{ const p=(r.per||[])[c]; if(p){ pcs+=+p.pcs||0; box+=+p.boxes||0; cbm+=+p.cbm||0; vr+=+p.valRmb||0; } }); s.contTotals[c]={pcs,boxes:box,cbm,valRmb:vr,valThb:vr*fx}; }
       let gp=0,gb=0,gc=0,gvr=0,gvt=0; (s.rows||[]).forEach(r=>{ gp+=+r.pcs||0; gb+=+r.boxes||0; gc+=+r.cbm||0; gvr+=+r.valRmb||0; gvt+=+r.valThb||0; }); s.grand={pcs:gp,boxes:gb,cbm:gc,valRmb:gvr,valThb:gvt};
     });
-    pkSaveLogStore(); if(typeof renderPkLog==='function') renderPkLog(); if(typeof renderArrivedMatrix==='function'){ try{ renderArrivedMatrix(); }catch(e){} }
+    pkSaveLogStore(); if(typeof renderPkLog==='function') renderPkLog(); pkRerenderLinked();
     pkToast(`อัปเดตมูลค่าแล้ว ${rounds} รอบ (แก้ต้นทุน ${fixed} แถว${unmatched?' · จับคู่ไม่ได้ '+unmatched+' แถว':''})`,'good');
   });
 }
@@ -8065,7 +8065,7 @@ function pkMatchSaveDraft(){
   if(!snap.rows.length){ pkToast('ยังไม่มีสินค้าในร่าง','bad'); return; }
   snap.pending=true;                                // รอเปิด PO
   snap.matchSel={}; picks.forEach(p=>{ if(p.po) snap.matchSel[p.item]=p.po; });
-  window.pkLog.unshift(snap); pkSaveLogStore();
+  window.pkLog.unshift(snap); pkSaveLogStore(); pkRerenderLinked();
   const ov=document.getElementById('pk-match-ov'); if(ov) ov.remove();
   renderPkLog(); pkToast('บันทึกร่างไว้แล้ว (สถานะ: รอเปิด PO) — ในตาราง Packing List ด้านล่าง','good');
 }
@@ -8537,6 +8537,13 @@ window.pkLog = window.pkLog || [];
 window.pkDirHandle = null;
 function pkLoadLog(){ try{ const s=localStorage.getItem(PK_LOGKEY); window.pkLog = s?JSON.parse(s):[]; }catch(e){ window.pkLog=[]; } }
 function pkSaveLogStore(){ try{ localStorage.setItem(PK_LOGKEY, JSON.stringify(window.pkLog)); }catch(e){} }
+// ข้อมูล Packing เปลี่ยน → รีเฟรชทุกหน้าที่อ่านจาก pkLog ชุดเดียวกัน (Payment · Flowchart · Lead Time)
+// เรียกทุกครั้งหลัง pkSaveLogStore() เพื่อให้หน้า Payment ตรงกับ Packing List เสมอ ไม่ต้องรีโหลด
+function pkRerenderLinked(){
+  ['renderPayment','renderFlowchart','renderLeadtime','renderArrivedMatrix'].forEach(function(fn){
+    try{ if(typeof window[fn]==='function') window[fn](); }catch(e){ console.warn('pkRerenderLinked: '+fn, e); }
+  });
+}
 function pkNowStr(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }
 // แยกเวลาสร้าง + ประวัติแก้ไข (รองรับข้อมูลเก่าที่ต่อสตริง "orig (แก้ไข t1) (แก้ไข t2)...")
 function pkTsParts(s){
@@ -8632,8 +8639,8 @@ function pkImportJsonBackup(str){
   const msg = `โหลดข้อมูลกลับ:\n• Packing: ไฟล์มี ${inLog.length} รอบ (ปัจจุบัน ${curLog})\n• สถานะ PO: ไฟล์มี ${Object.keys(inFollow).length} รายการ (ปัจจุบัน ${curFollow})\n\nสำรองเมื่อ: ${data.exportedAt||'-'}\n\n"ตกลง" = แทนที่ข้อมูลปัจจุบันทั้งหมดด้วยไฟล์นี้`;
   pkConfirm(msg, ()=>{
     window.pkLog = inLog; window.poFollow = inFollow;
-    pkSaveLogStore(); poSaveFollow();
-    renderPkLog(); if(typeof renderLeadtime==='function'){ try{ renderLeadtime(); }catch(e){} }
+    pkSaveLogStore(); poSaveFollow(); pkRerenderLinked();
+    renderPkLog(); pkRerenderLinked();
     pkToast(`โหลดข้อมูลกลับสำเร็จ — Packing ${inLog.length} รอบ · สถานะ PO ${Object.keys(inFollow).length} รายการ`, 'good');
   });
 }
@@ -8740,13 +8747,82 @@ function pkImportOldCsv(text){
   let warn='';
   if(badItem.length){ const u=[...new Set(badItem)].slice(0,5); warn+=`\n\n⚠️ รหัสสินค้าที่รูปแบบผิดปกติ (${badItem.length}): ${u.join(', ')}${badItem.length>5?' …':''}`; }
   if(skipped) warn+=`\n⚠️ ข้ามแถวว่าง/ไม่ครบ ${skipped} แถว`;
-  const msg=`นำเข้าตู้เก่าจาก CSV:\n• ตู้ใหม่ ${newRounds.length} ตู้ · รวม ${totItems} รายการสินค้า\n• มูลค่ารวม ฿${Math.round(totVal).toLocaleString()}\n\nจะ "เพิ่ม" เข้าไปในประวัติ Packing เดิม (ปัจจุบัน ${cur} รอบ) โดยไม่ลบของเดิม${warn}\n\nกด "ตกลง" เพื่อนำเข้า`;
+  const dup=pkFindDupConts(newRounds);
+  if(dup.names.length){ pkAskDupImport(newRounds, dup, {cur, warn}); return; }   // เจอตู้ซ้ำ → ถามก่อนว่าจะใช้ชุดไหน
+  pkConfirmImport(newRounds, [], {cur, warn});
+}
+
+// ---------- ตรวจ "ตู้ซ้ำ" ตอน Import CSV ----------
+function pkContKey(n){ return String(n==null?'':n).replace(/\s+/g,'').toLowerCase(); }
+// หาตู้ในไฟล์ที่ชื่อซ้ำกับประวัติเดิม
+//   fullIdx    = รอบเดิมที่ "ทุกตู้ในรอบ" ซ้ำ → แทนที่ได้ทั้งรอบ
+//   partialIdx = รอบหลายตู้ที่ซ้ำแค่บางตู้ → แทนที่อัตโนมัติไม่ได้ ต้องข้าม
+function pkFindDupConts(newRounds){
+  const inFile=new Map();
+  (newRounds||[]).forEach(r=>(r.containers||[]).forEach(c=>inFile.set(pkContKey(c.name), c.name)));
+  const fullIdx=[], partialIdx=[], names=new Set(), lockedKeys=new Set();
+  (window.pkLog||[]).forEach((s,idx)=>{
+    const cs=s.containers||[]; if(!cs.length) return;
+    const hit=cs.filter(c=>inFile.has(pkContKey(c.name)));
+    if(!hit.length) return;
+    hit.forEach(c=>names.add(inFile.get(pkContKey(c.name))||c.name));
+    if(hit.length===cs.length) fullIdx.push(idx);
+    else { partialIdx.push(idx); hit.forEach(c=>lockedKeys.add(pkContKey(c.name))); }
+  });
+  return {names:[...names], fullIdx, partialIdx, lockedKeys};
+}
+// กล่องเลือกหลายปุ่ม (สไตล์เดียวกับ pkConfirm)
+function pkChoice(msg, buttons){
+  let ov=document.getElementById('pk-confirm-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='pk-confirm-ov';
+  ov.style.cssText='position:fixed;inset:0;z-index:100002;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';
+  const box=document.createElement('div');
+  box.style.cssText='background:var(--card,#fff);color:var(--ink,#111);max-width:560px;width:100%;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:22px 22px 18px;max-height:86vh;overflow:auto;';
+  box.innerHTML='<div style="font-size:14px;line-height:1.55;white-space:pre-line;margin-bottom:18px;">'+String(msg).replace(/</g,'&lt;')+'</div>'+
+    '<div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">'+
+    (buttons||[]).map((b,i)=>'<button data-i="'+i+'" class="go" style="background:'+(b.color||'var(--brand)')+';">'+b.label+'</button>').join('')+'</div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  const close=()=>{ if(ov&&ov.parentNode) ov.parentNode.removeChild(ov); };
+  box.querySelectorAll('button[data-i]').forEach(btn=>{ btn.onclick=()=>{ close(); const b=buttons[+btn.dataset.i]; if(b&&b.onClick) b.onClick(); }; });
+  ov.onclick=(e)=>{ if(e.target===ov) close(); };
+}
+// แจ้งเตือนตู้ซ้ำ → ให้เลือกใช้ชุดเก่าหรือชุดใหม่
+function pkAskDupImport(newRounds, dup, info){
+  const show=dup.names.slice(0,12).join(', ')+(dup.names.length>12?(' … (อีก '+(dup.names.length-12)+' ตู้)'):'');
+  let note='';
+  if(dup.partialIdx.length){
+    const pn=[]; dup.partialIdx.forEach(i=>(((window.pkLog||[])[i]||{}).containers||[]).forEach(c=>{ if(dup.lockedKeys.has(pkContKey(c.name))) pn.push(c.name); }));
+    note='\n\n⚠️ ตู้ '+[...new Set(pn)].join(', ')+' อยู่ในรอบที่บันทึกรวมหลายตู้ — แทนที่อัตโนมัติไม่ได้ ระบบจะข้ามให้ (ถ้าต้องการแทนที่ ให้ลบรอบนั้นเองก่อน)';
+  }
+  const msg='⚠️ พบตู้ซ้ำกับข้อมูลเดิม '+dup.names.length+' ตู้\n\n'+show+
+    '\n\nจะใช้ข้อมูลชุดไหน?\n• ใช้ชุดใหม่ = ลบตู้เดิมทิ้ง แล้วใช้ข้อมูลจากไฟล์นี้แทน\n• เก็บชุดเก่า = ข้ามตู้ที่ซ้ำ นำเข้าเฉพาะตู้ใหม่'+note;
+  pkChoice(msg, [
+    {label:'ยกเลิก', color:'#64748b', onClick:()=>pkToast('ยกเลิกการนำเข้า','muted')},
+    {label:'🛡️ เก็บชุดเก่า (ข้ามตู้ซ้ำ)', color:'var(--good)', onClick:()=>{
+      const skip=new Set(dup.names.map(pkContKey));
+      const keep=newRounds.filter(r=>!(r.containers||[]).some(c=>skip.has(pkContKey(c.name))));
+      if(!keep.length){ pkToast('ทุกตู้ในไฟล์ซ้ำกับของเดิมทั้งหมด — ไม่มีอะไรให้นำเข้า','warn'); return; }
+      pkConfirmImport(keep, [], Object.assign({}, info, {extra:'\n\n🛡️ เก็บชุดเก่า — ข้ามตู้ซ้ำ '+dup.names.length+' ตู้'}));
+    }},
+    {label:'🔁 ใช้ชุดใหม่ (แทนที่)', color:'var(--warn)', onClick:()=>{
+      const use=dup.partialIdx.length ? newRounds.filter(r=>!(r.containers||[]).some(c=>dup.lockedKeys.has(pkContKey(c.name)))) : newRounds;
+      pkConfirmImport(use, dup.fullIdx, Object.assign({}, info, {extra:'\n\n🔁 ใช้ชุดใหม่ — จะลบตู้เดิม '+dup.fullIdx.length+' รอบ แล้วแทนที่ด้วยไฟล์นี้'}));
+    }}
+  ]);
+}
+// ยืนยันครั้งสุดท้าย + เขียนลงประวัติ
+function pkConfirmImport(rounds, removeIdx, info){
+  info=info||{};
+  const totItems=rounds.reduce((s,r)=>s+r.rows.length,0);
+  const totVal=rounds.reduce((s,r)=>s+r.grand.valThb,0);
+  const msg='นำเข้าตู้เก่าจาก CSV:\n• ตู้ '+rounds.length+' ตู้ · รวม '+totItems+' รายการสินค้า\n• มูลค่ารวม ฿'+Math.round(totVal).toLocaleString()+
+    '\n\nประวัติ Packing ปัจจุบัน '+(info.cur||0)+' รอบ'+(info.extra||'')+(info.warn||'')+'\n\nกด "ตกลง" เพื่อนำเข้า';
   pkConfirm(msg, ()=>{
-    window.pkLog = (window.pkLog||[]).concat(newRounds);
+    const rm=new Set(removeIdx||[]);
+    window.pkLog = (window.pkLog||[]).filter((s,i)=>!rm.has(i)).concat(rounds);
     pkSaveLogStore();
-    renderPkLog(); if(typeof renderLeadtime==='function'){ try{ renderLeadtime(); }catch(e){} }
-    if(typeof renderFlowchart==='function'){ try{ renderFlowchart(); }catch(e){} }
-    pkToast(`นำเข้าตู้เก่าสำเร็จ — เพิ่ม ${newRounds.length} ตู้ (${totItems} รายการ)`, 'good');
+    renderPkLog(); pkRerenderLinked();
+    pkToast('นำเข้าตู้เก่าสำเร็จ — '+(rm.size?('แทนที่ '+rm.size+' รอบ · '):'')+'เพิ่ม '+rounds.length+' ตู้ ('+totItems+' รายการ)', 'good');
   });
 }
 // ดาวน์โหลดไฟล์ Pattern (CSV) สำหรับกรอกข้อมูลตู้เก่า
@@ -8791,7 +8867,7 @@ function pkRestoreRmbFromCsv(file){
     });
     if(!patchedRows){ pkToast('ไม่พบตู้/สินค้าที่ตรงกับไฟล์ (หรือข้อมูลครบอยู่แล้ว)','muted'); return; }
     pkConfirm(`เติมข้อมูลตู้ import จาก CSV:\n• ต้นทุน RMB ${rmbAdded} รายการ\n• Factory ${facAdded} รายการ\n• Vendor ${venAdded} รายการ\n(รวม ${patchedRows} รายการ ใน ${rounds} ตู้)\n\nกด "ตกลง" เพื่อบันทึก`, ()=>{
-      pkSaveLogStore(); renderPkLog(); if(typeof renderArrivedMatrix==='function'){ try{ renderArrivedMatrix(); }catch(e){} }
+      pkSaveLogStore(); renderPkLog(); pkRerenderLinked();
       pkToast(`เติมข้อมูลสำเร็จ — RMB ${rmbAdded} · Factory ${facAdded} · Vendor ${venAdded}`,'good');
     });
   };
@@ -8908,7 +8984,7 @@ function pkSaveRound(asNew){
     if(asNew) snap.ts = pkNowStr()+' · คัดลอกเป็นตู้ใหม่';
     window.pkLog.unshift(snap); savedIdx=0; window.pkEditIdx=null;
   }
-  pkSaveLogStore(); renderPkLog(); pkUpdateSaveBtn();
+  pkSaveLogStore(); renderPkLog(); pkUpdateSaveBtn(); pkRerenderLinked();
   if(window.tabRendered && window.tabRendered.leadtime) poRefresh();   // อัปเดตสถานะ PO ในหน้า Lead Time
   if(window.pkDirHandle){ pkExportExcel(savedIdx); pkExportImage(savedIdx); }
   const b=document.getElementById('pk-save'); if(b){ const t=b.textContent; b.textContent='✅ บันทึกแล้ว'; setTimeout(()=>{ b.textContent=t; pkUpdateSaveBtn(); },1500); }
@@ -8947,7 +9023,7 @@ function pkDelRound(idx){
   window.pkDelConfirm=null; clearTimeout(window._pkDelT);
   window.pkLog.splice(idx,1);
   if(window.pkEditIdx===idx) window.pkEditIdx=null; else if(window.pkEditIdx>idx) window.pkEditIdx--;
-  pkSaveLogStore(); renderPkLog(); pkUpdateSaveBtn(); pkToast('ลบรอบบันทึกแล้ว','good');
+  pkSaveLogStore(); renderPkLog(); pkUpdateSaveBtn(); pkRerenderLinked(); pkToast('ลบรอบบันทึกแล้ว','good');
   if(window.tabRendered && window.tabRendered.leadtime) poRefresh();
 }
 function pkPrintRound(idx){
