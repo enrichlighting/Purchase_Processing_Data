@@ -7956,6 +7956,18 @@ function pkYuan(v){ return Number(v).toLocaleString('en-US',{maximumFractionDigi
 /* ===== โหมด + ต้นทุนจาก Purchase Order Line (Direct Unit Cost / Lot) ===== */
 window.pkMode = window.pkMode || 'forecast';   // 'forecast' | 'released'
 function pkPoCost(code){ return (window.BC_POCOST && window.BC_POCOST[code]) ? window.BC_POCOST[code] : []; }
+// Lot No. จาก (รหัสสินค้า + PO) — ใช้ตอนที่แถวนั้นไม่ได้เลือก Lot ไว้ (เช่นตู้ที่ import มา ซึ่งไฟล์ CSV ไม่มีช่อง Lot)
+function pkLotFromPO(item, po){
+  if(!item || !po) return '';
+  const K=item+'|'+po; if(!window._pkLotPO) window._pkLotPO={};
+  if(window._pkLotPO[K]!==undefined) return window._pkLotPO[K];
+  let lot='';
+  const rel=(window.BC_POREL && window.BC_POREL[item]) || [];
+  const a=rel.find(function(x){ return x && x[0]===po; }); if(a && a[1]) lot=a[1];          // PO ที่ยังค้างรับ
+  if(!lot){ const pc=(window.BC_POCOST && window.BC_POCOST[item]) || [];
+    const b=pc.find(function(x){ return x && x[2]===po; }); if(b && b[0]) lot=b[0]; }        // PO ที่ปิดไปแล้ว
+  window._pkLotPO[K]=lot; return lot;
+}
 function pkFxVal(){ const e=document.getElementById('pk-fx'); const v=e?+e.value:5; return (v>0)?v:5; }
 // เซ็ตของ PO ที่ Status Released (จาก BC_PO)
 function pkReleasedSet(){ if(window._pkRelSet) return window._pkRelSet; var s={}; if(window.BC_PO){ for(var it in window.BC_PO){ (window.BC_PO[it].pos||[]).forEach(function(p){ if(p[4]==='Released') s[p[0]]=1; }); } } window._pkRelSet=s; return s; }
@@ -7972,7 +7984,7 @@ function pkRowCost(r){
   if(r && r.custom){ const cd=(window.pkCustomDims||{})[r.item]||{}; const rmb=(cd.rmb!=null&&cd.rmb!=='')?+cd.rmb:null; return {lot:'', po:'', rmb, thb:(rmb!=null?rmb*pkFxVal():null), out:null}; }
   const list=pkLotList(r.item);
   if(!list.length || r.costIdx==null || r.costIdx==='' || !list[r.costIdx]){
-    if(r && r.rmbFixed!=null && r.rmbFixed!==''){ const rf=+r.rmbFixed; return {lot:r.costLot||'', po:r.po||'', rmb:rf, thb:rf*pkFxVal(), out:(r.lotMax!=null?r.lotMax:null)}; }   // ตู้ import: ใช้ต้นทุนที่กรอกมา (ไม่มี Lot ในระบบ)
+    if(r && r.rmbFixed!=null && r.rmbFixed!==''){ const rf=+r.rmbFixed; return {lot:(r.costLot||pkLotFromPO(r.item, r.po||'')||''), po:r.po||'', rmb:rf, thb:rf*pkFxVal(), out:(r.lotMax!=null?r.lotMax:null)}; }   // ตู้ import: ใช้ต้นทุนที่กรอกมา (ไม่มี Lot ในระบบ)
     return {lot:'', po:'', rmb:null, thb:null, out:null};
   }
   const e=list[r.costIdx];
@@ -9212,7 +9224,7 @@ function invExport(idx, ci){
   const items=[], venCount={};
   (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; const q=per?(+per.pcs||0):0; if(q<=0) return;
     const enName=(typeof flowItemDesc2==='function'?flowItemDesc2(r.item):'')||invItemName(r.item);   // Detail = Description2 (ชื่ออังกฤษ) · fallback ชื่อเดิมถ้ายังไม่มี
-    items.push({no:r.item, name:enName, L:r.L, W:r.W, H:r.H, qty:q, pcsBox:r.pcsPerBox, ctns:(per&&per.boxes)||0, rmb:r.rmb, lot:(per&&per.lot)||r.costLot||''});
+    items.push({no:r.item, name:enName, L:r.L, W:r.W, H:r.H, qty:q, pcsBox:r.pcsPerBox, ctns:(per&&per.boxes)||0, rmb:r.rmb, lot:(per&&per.lot)||r.costLot||pkLotFromPO(r.item, r.po||'')||''});
     const v=invPoVendor(r.po); if(v) venCount[v]=(venCount[v]||0)+1;
   });
   if(!items.length){ pkToast('ตู้นี้ไม่มีรายการสินค้า','bad'); return; }
@@ -9279,7 +9291,7 @@ function plExport(idx, ci){
   const items=[], venCount={};
   (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; const q=per?(+per.pcs||0):0; if(q<=0) return;
     const enName=(typeof flowItemDesc2==='function'?flowItemDesc2(r.item):'')||invItemName(r.item);
-    items.push({no:r.item, name:enName, cn:plChinese(r.item), L:r.L, W:r.W, H:r.H, qty:q, pcsBox:r.pcsPerBox, ctns:(per&&per.boxes)||0, cbm:(per&&per.cbm)||0, lot:(per&&per.lot)||r.costLot||''});
+    items.push({no:r.item, name:enName, cn:plChinese(r.item), L:r.L, W:r.W, H:r.H, qty:q, pcsBox:r.pcsPerBox, ctns:(per&&per.boxes)||0, cbm:(per&&per.cbm)||0, lot:(per&&per.lot)||r.costLot||pkLotFromPO(r.item, r.po||'')||''});
     const v=invPoVendor(r.po); if(v) venCount[v]=(venCount[v]||0)+1;
   });
   if(!items.length){ pkToast('ตู้นี้ไม่มีรายการสินค้า','bad'); return; }
