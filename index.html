@@ -190,6 +190,9 @@
   }
   #page-packing .card{ border-color:#bfe3d9; border-top:3px solid #56c2aa; }
   #page-packing .card h2{ color:#0f655a; }
+  /* ล็อกหัวตาราง Packing List (คำนวณกล่อง & CBM) ให้ค้างด้านบนเวลาเลื่อนดูรายการยาว ๆ */
+  #pk-result > table > tbody > tr:first-child th,
+  #pk-result > table > tr:first-child th{ position:sticky; top:0; z-index:6; background:var(--card); box-shadow:inset 0 -2px 0 #bfe3d9, 0 3px 5px rgba(0,0,0,.07); }
   #page-packing .kpi{ background:rgba(226,244,238,.7); border-color:#bfe3d9; }
   @media (prefers-color-scheme: dark){
     #page-packing .card{ border-color:#1f5148; border-top-color:#0f655a; }
@@ -319,9 +322,14 @@
     </div>
     <!-- ===== ตู้ที่ถึงคลังแล้ว (สรุปตาม ETA) — ตารางบนสุด ===== -->
     <div class="card" id="pk-arrived-card">
-      <h2>🚢 สรุปตู้ทั้งหมด (ตาม ETA)</h2>
-      <p class="hint">สรุป<b>ทุกตู้ที่บันทึกไว้</b> แยกเป็น <b>ปี × เดือน</b> (ยึดเดือนจาก ETA ถึงคลัง) · แสดงจำนวนตู้ + มูลค่ารวม · คลิกช่องเดือนเพื่อกางดูแต่ละตู้ (<b>สถานะ</b> · ETA · มูลค่า)</p>
-      <div id="pk-arrived-matrix"></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;position:relative;z-index:1;">
+        <div style="min-width:260px;flex:1 1 300px;">
+          <h2 style="margin:0;">🚢 สรุปตู้ทั้งหมด (ตาม ETA)</h2>
+          <p class="hint" style="margin:6px 0 0;">สรุป<b>ทุกตู้ที่บันทึกไว้</b> แยกเป็น <b>ปี × เดือน</b> (ยึดเดือนจาก ETA ถึงคลัง) · แสดงจำนวนตู้ + มูลค่ารวม · คลิกช่องเดือนเพื่อกางดูแต่ละตู้ (<b>สถานะ</b> · ETA · มูลค่า)</p>
+        </div>
+        <div id="pk-stockval" style="flex:0 0 auto;"></div>
+      </div>
+      <div id="pk-arrived-matrix" style="margin-top:12px;"></div>
     </div>
     <div class="card" id="sec-packing">
       <h2>📦 Packing List (คำนวณกล่อง &amp; CBM)</h2>
@@ -7885,36 +7893,40 @@ function pkCoverColor(m){ return m<=2 ? '#ea580c' : (m<3 ? '#ca8a04' : '#16a34a'
 function pkCoverHi(m){ return m<=2 ? 'background:#fb923c;color:#7c2d12;' : (m<3 ? 'background:#fde047;color:#713f12;' : 'background:#86efac;color:#14532d;'); }   // ไฮไลท์พื้นหลัง
 window.pkCustomDims = window.pkCustomDims || {};   // มิติสินค้ากรอกเอง (นอก PO) · key = รหัสสังเคราะห์ CUSTOM-*
 window.pkRoundDims = window.pkRoundDims || {};   // ขนาดกล่อง/ชิ้นต่อกล่องที่แก้ "เฉพาะตู้ที่กำลังแก้ไขอยู่" · key = รหัสสินค้า · {L,W,H,pcs}
-function pkItem(code){
+function pkItem(code, r){
   const rd=(window.pkRoundDims && window.pkRoundDims[code]) || null;   // ค่าของตู้นี้มาก่อนเสมอ (กันค่ากลางมาทับตอนบันทึกซ้ำ)
   let d=null;
   const base=(window.BC_PACKING && window.BC_PACKING[code]) ? window.BC_PACKING[code] : null;
   if(base){ const ov=window.pkDimEdit && window.pkDimEdit[code]; d = ov ? Object.assign({}, base, ov) : base; }   // ทับด้วยขนาดที่แก้ (ถ้ามี)
   else d=(window.pkCustomDims && window.pkCustomDims[code]) ? window.pkCustomDims[code] : null;
   if(!d) return null;
-  return rd ? Object.assign({}, d, rd) : d;
+  let out = rd ? Object.assign({}, d, rd) : d;
+  if(r && r.dim){ out = Object.assign({}, out, r.dim); }   // ★ มิติ/ชิ้นต่อกล่อง "ต่อแถว" (บรรทัดใครบรรทัดมัน) มาก่อนสุด — รหัสเดียวกันคนละบรรทัดไม่ลิงก์กัน
+  return out;
 }
 // ----- แก้ไขขนาด L/W/H/pcs ของสินค้าในระบบ · เก็บทับในเครื่อง (localStorage) + ส่งออกไปอัปเดตไฟล์กลาง -----
 function pkDimEditLoad(){ try{ const s=localStorage.getItem('pkDimEditV1'); window.pkDimEdit=s?JSON.parse(s):{}; }catch(e){ window.pkDimEdit={}; } }
 function pkDimEditSave(){ try{ localStorage.setItem('pkDimEditV1', JSON.stringify(window.pkDimEdit||{})); }catch(e){} }
 // กรอบส้ม = ขนาดของตู้นี้ต่างจากค่ากลาง (ไม่ใช่แค่ "มีค่าที่ freeze ไว้" ไม่งั้นทุกช่องจะส้มหมด)
-function pkHasDimEdit(code){
-  if(window.pkDimEdit && window.pkDimEdit[code]) return true;
-  const rd=window.pkRoundDims && window.pkRoundDims[code]; if(!rd) return false;
-  const base=(window.BC_PACKING && window.BC_PACKING[code]) || (window.pkCustomDims && window.pkCustomDims[code]); if(!base) return false;
-  return ['L','W','H','pcs'].some(f=> rd[f]!=null && (+rd[f]||0)!==(+base[f]||0));
+// กรอบส้ม = มิติของ "แถวนี้" ต่างจากค่ากลาง (ยึดต่อแถว ไม่ผูกกับรหัสข้ามบรรทัด)
+function pkHasDimEdit(r){
+  if(!r || !r.item) return false;
+  const code=r.item;
+  const base=(window.BC_PACKING && window.BC_PACKING[code]) || (window.pkCustomDims && window.pkCustomDims[code]);
+  if(!base) return !!(r.dim && Object.keys(r.dim).length);   // สินค้ากรอกเอง/ไม่มีมิติกลาง → ส้มเมื่อแถวนี้มีค่าที่กรอก
+  const eff=pkItem(code, r)||{};
+  return ['L','W','H','pcs'].some(f=> (+eff[f]||0)!==(+base[f]||0));
 }
 function pkDimEditCount(){ return window.pkDimEdit ? Object.keys(window.pkDimEdit).length : 0; }
 function pkDimSet(i, field, val){
   const r=window.packingRows[i]; if(!r||!r.item) return;
   if(field==='desc'||field==='rmb'){ pkCustSet(i,field,val); return; }   // ชื่อ/ต้นทุน ของสินค้ากรอกเอง ยังเก็บที่เดิม
-  window.pkRoundDims = window.pkRoundDims || {};
-  const ov = window.pkRoundDims[r.item] || (window.pkRoundDims[r.item]={});
+  r.dim = r.dim || {};
   let v=Math.max(0,+val||0); if(field==='pcs' && !(v>0)) v=1;
-  ov[field]=v;                                              // มีผลเฉพาะตู้ที่กำลังแก้ไขอยู่ · บันทึกแล้วค่าจะติดไปกับตู้นั้น
+  r.dim[field]=v;                                           // ★ มีผลเฉพาะแถวนี้เท่านั้น (รหัสเดียวกันคนละบรรทัด แยกกันได้)
   renderPacking();
 }
-function pkDimReset(i){ const r=window.packingRows[i]; if(!r||!r.item) return; if(window.pkRoundDims) delete window.pkRoundDims[r.item]; if(window.pkDimEdit && window.pkDimEdit[r.item]){ delete window.pkDimEdit[r.item]; pkDimEditSave(); } renderPacking(); if(typeof pkToast==='function') pkToast('คืนค่าขนาดเดิมแล้ว','good'); }
+function pkDimReset(i){ const r=window.packingRows[i]; if(!r||!r.item) return; if(r.dim) delete r.dim; if(window.pkRoundDims) delete window.pkRoundDims[r.item]; renderPacking(); if(typeof pkToast==='function') pkToast('คืนค่าขนาดเดิม (เฉพาะแถวนี้) แล้ว','good'); }
 function pkDimEditExport(){
   const o=window.pkDimEdit||{}; const keys=Object.keys(o);
   if(!keys.length){ if(typeof pkToast==='function') pkToast('ยังไม่มีการแก้ขนาด','muted'); return; }
@@ -7946,11 +7958,11 @@ function pkCustSet(i, field, val){
   else { cd[field]=Math.max(0,+val||0); if(field==='pcs' && !(cd.pcs>0)) cd.pcs=1; }
   renderPacking();
 }
-function pkBoxCbm(code){ const d=pkItem(code); return d ? (d.L*d.W*d.H)/1000000 : 0; }        // CBM/กล่อง
+function pkBoxCbm(code, r){ const d=pkItem(code, r); return d ? (d.L*d.W*d.H)/1000000 : 0; }        // CBM/กล่อง
 function pkUnitCost(code){ const it=(typeof getItem==='function')?getItem(code):null; return it?(it.unitCost||0):0; }
-function pkCell(code, pieces){ pieces=+pieces||0; const d=pkItem(code); if(!d||!pieces) return {boxes:0,cbm:0}; const boxes=d.pcs>0?pieces/d.pcs:0; return {boxes, cbm:boxes*pkBoxCbm(code)}; }
-function pkRowSum(r){ const rmb=pkRowCost(r).rmb||0, fx=pkFxVal(); let pcs=0,box=0,cbm=0; window.pkContainers.forEach((ct,c)=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p); pcs+=p; box+=cc.boxes; cbm+=cc.cbm; }); const vr=pcs*rmb; return {pcs,box,cbm,valRmb:vr,valThb:vr*fx}; }
-function pkContSum(c){ const fx=pkFxVal(); let pcs=0,box=0,cbm=0,vr=0; window.packingRows.forEach(r=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p); const rmb=pkRowCost(r).rmb||0; pcs+=p; box+=cc.boxes; cbm+=cc.cbm; vr+=p*rmb; }); return {pcs,box,cbm,valRmb:vr,valThb:vr*fx}; }
+function pkCell(code, pieces, r){ pieces=+pieces||0; const d=pkItem(code, r); if(!d||!pieces) return {boxes:0,cbm:0}; const boxes=d.pcs>0?pieces/d.pcs:0; return {boxes, cbm:boxes*pkBoxCbm(code, r)}; }
+function pkRowSum(r){ const rmb=pkRowCost(r).rmb||0, fx=pkFxVal(); let pcs=0,box=0,cbm=0; window.pkContainers.forEach((ct,c)=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p,r); pcs+=p; box+=cc.boxes; cbm+=cc.cbm; }); const vr=pcs*rmb; return {pcs,box,cbm,valRmb:vr,valThb:vr*fx}; }
+function pkContSum(c){ const fx=pkFxVal(); let pcs=0,box=0,cbm=0,vr=0; window.packingRows.forEach(r=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p,r); const rmb=pkRowCost(r).rmb||0; pcs+=p; box+=cc.boxes; cbm+=cc.cbm; vr+=p*rmb; }); return {pcs,box,cbm,valRmb:vr,valThb:vr*fx}; }
 function pkMoney(v){ return (Math.round(v)).toLocaleString('en-US'); }
 function pkMoney2(v){ return (+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function pkYuan(v){ return Number(v).toLocaleString('en-US',{maximumFractionDigits:2}); }
@@ -8296,7 +8308,7 @@ function renderContainers(){
   let boxes='';
   window.pkContainers.forEach((ct,c)=>{
     let used=0, parts=[];
-    window.packingRows.forEach((r,i)=>{ const cc=pkCell(r.item, (r.loads||[])[c]); if(cc.cbm>0){ const d=pkItem(r.item); const cellLot=(window.pkMode==='released')?(pkRowCost(r).lot||''):((r.lots||[])[c]||''); parts.push({i,cbm:cc.cbm,code:(pkDisplayName(r.item)||('แถว '+(i+1))),name:d?d.desc:('แถว '+(i+1)),lot:cellLot}); used+=cc.cbm; } });
+    window.packingRows.forEach((r,i)=>{ const cc=pkCell(r.item, (r.loads||[])[c], r); if(cc.cbm>0){ const d=pkItem(r.item, r); const cellLot=(window.pkMode==='released')?(pkRowCost(r).lot||''):((r.lots||[])[c]||''); parts.push({i,cbm:cc.cbm,code:(pkDisplayName(r.item)||('แถว '+(i+1))),name:d?d.desc:('แถว '+(i+1)),lot:cellLot}); used+=cc.cbm; } });
     grand+=used;
     const pct=Math.round(used/CAP*100), over=used>CAP+1e-9;
     // สเกล: โหมด cap เทียบความจุตู้ (เห็นว่าเต็มแค่ไหน) · โหมด fill เทียบยอดที่โหลด (เห็นสัดส่วนสินค้าชัดแม้ CBM น้อย)
@@ -8462,7 +8474,7 @@ function renderPacking(){
   // rows
   let rows='';
   window.packingRows.forEach((r,i)=>{
-    const d=pkItem(r.item), rs=pkRowSum(r);
+    const d=pkItem(r.item, r), rs=pkRowSum(r);
     // ต้นทุนจาก PO: dropdown เลือก Lot → RMB Cost → THB Cost (ตัวเลือกตามโหมด)
     const lotList=pkLotList(r.item), rc=pkRowCost(r);
     const _cov=pkCoverInfo(r.item);   // {stock, mo} สำหรับ "อยู่ได้กี่เดือน" ต่อสินค้า
@@ -8512,7 +8524,7 @@ function renderPacking(){
       facTd=`<td style="min-width:150px;"><input type="text" value="${vv}" onchange="pkSetVendor(${i},this.value)" placeholder="Vendor (กรอกเอง)" title="Vendor${r.term?(' · TERM: '+r.term.replace(/"/g,'&quot;')):''}" style="${inpSt}"></td>`
         +`<td style="min-width:120px;"><input type="text" value="${ff}" onchange="pkSetFactory(${i},this.value)" placeholder="Factory (กรอกเอง)" title="Factory" style="${inpSt}"></td>`;
     }
-    const cPcs=`<td class="num" style="white-space:nowrap;">${r.item?`<input type="number" min="1" step="1" value="${d?d.pcs:1}" onchange="pkDimSet(${i},'pcs',this.value)" title="ชิ้น/กล่อง (PCS/CTN) — แก้แล้วมีผลเฉพาะตู้นี้เท่านั้น" style="width:56px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}${(r.item&&pkHasDimEdit(r.item))?` <a href="#" onclick="pkDimReset(${i});return false;" title="คืนค่าขนาดเดิม" style="font-size:11px;color:var(--muted);text-decoration:none;">↩︎</a>`:''}</td>`;
+    const cPcs=`<td class="num" style="white-space:nowrap;">${r.item?`<input type="number" min="1" step="1" value="${d?d.pcs:1}" onchange="pkDimSet(${i},'pcs',this.value)" title="ชิ้น/กล่อง (PCS/CTN) — แก้แล้วมีผลเฉพาะตู้นี้เท่านั้น" style="width:56px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}${(r.item&&pkHasDimEdit(r))?` <a href="#" onclick="pkDimReset(${i});return false;" title="คืนค่าขนาดเดิม" style="font-size:11px;color:var(--muted);text-decoration:none;">↩︎</a>`:''}</td>`;
     const cLotCost=`<td>${costSel}${capNote}</td>`;
     const cPrice=`<td class="num" id="pk-rmb-${i}">${rc.rmb==null?'<span class="muted">-</span>':('¥'+pkYuan(rc.rmb))}</td>`;
     const cCtns=`<td class="num" id="pk-rbox-${i}">${fmt1(rs.box)}</td>`;
@@ -8523,9 +8535,9 @@ function renderPacking(){
     rows += `<tr>
       <td style="white-space:nowrap;"><input type="checkbox" ${(window.pkRowSel&&window.pkRowSel.has(i))?'checked':''} onchange="pkToggleRow(${i},this.checked)" title="เลือกเพื่อลบหลายแถว" style="vertical-align:middle;margin-right:5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${pkColor(i)};vertical-align:middle;"></span> <b>${i+1}</b></td>
       <td>${cust?`<span class="tag" style="background:#ecfeff;color:#0e7490;font-size:11px;white-space:nowrap;">✎ กรอกเอง (นอก PO)</span>${editDims?`<input type="text" value="${(d?d.desc:'').replace(/"/g,'&quot;')}" onchange="pkCustSet(${i},'desc',this.value)" placeholder="ชื่อสินค้า (กรอกเอง)" style="width:100%;box-sizing:border-box;font-size:12px;margin-top:4px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:''}`:`<div style="min-width:230px;"><input list="pk-itemdl" value="${pkItemLabel(r.item).replace(/"/g,'&quot;')}" onchange="pkPickItem(${i},this.value)" onfocus="this.select()" placeholder="🔍 ชื่อย่อ (Item เลือก)" autocomplete="off" style="width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"><input list="pk-itemno-dl" value="${(r.item||'').replace(/"/g,'&quot;')}" onchange="pkPickItemByNo(${i},this.value)" onfocus="this.select()" placeholder="🔢 Item No. (รหัส)" autocomplete="off" style="width:100%;box-sizing:border-box;font-size:11.5px;margin-top:3px;padding:4px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--muted);">${r.item?`<div class="muted" style="font-size:10.5px;margin-top:3px;line-height:1.35;">${(pkFullDesc(r.item)||'').replace(/</g,'&lt;')}</div>`:''}${editDims?`<input type="text" value="${(d?d.desc:'').replace(/"/g,'&quot;')}" onchange="pkCustSet(${i},'desc',this.value)" placeholder="ชื่อสินค้า (กรอกเอง)" style="width:100%;box-sizing:border-box;font-size:12px;margin-top:4px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`:''}</div>`}</td>
-      <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.L:0}" onchange="pkDimSet(${i},'L',this.value)" title="กว้าง (ซม.) · แก้ไขได้ · เซฟทับอัตโนมัติ" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
-      <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.W:0}" onchange="pkDimSet(${i},'W',this.value)" title="ยาว (ซม.)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
-      <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.H:0}" onchange="pkDimSet(${i},'H',this.value)" title="สูง (ซม.)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r.item)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r.item)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
+      <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.L:0}" onchange="pkDimSet(${i},'L',this.value)" title="กว้าง (ซม.) · แก้ไขได้ · เซฟทับอัตโนมัติ" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
+      <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.W:0}" onchange="pkDimSet(${i},'W',this.value)" title="ยาว (ซม.)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
+      <td class="num">${r.item?`<input type="number" min="0" step="0.1" value="${d?d.H:0}" onchange="pkDimSet(${i},'H',this.value)" title="สูง (ซม.)" style="width:54px;text-align:right;font-size:12px;padding:3px 4px;border-radius:5px;border:1px solid ${pkHasDimEdit(r)?'#ea580c':'var(--line)'};background:${pkHasDimEdit(r)?'#fff7ed':'var(--bg)'};color:var(--ink);">`:'-'}</td>
       ${qtyCells}
       ${mid}
       <td><a href="#" onclick="pkDelRow(${i});return false;">ลบ</a></td>
@@ -8923,10 +8935,10 @@ function pkSnapshot(){
   const conts = window.pkContainers.map((ct,c)=>({name: ct.name||pkDefName(c), dates: Object.assign({}, ct.dates||{}), dateLog: (ct.dateLog||[]).slice()}));
   const fx=pkFxVal();
   const rows = window.packingRows.map(r=>{
-    const d=pkItem(r.item), rs=pkRowSum(r), rc=pkRowCost(r);
+    const d=pkItem(r.item, r), rs=pkRowSum(r), rc=pkRowCost(r);
     const rmb=rc.rmb||0;
-    const per = window.pkContainers.map((ct,c)=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p); const cellLot=(window.pkMode==='released')?(rc.lot||''):((r.lots||[])[c]||''); return {pcs:p, lot:cellLot, boxes:cc.boxes, cbm:cc.cbm, valRmb:p*rmb}; });
-    return {item:r.item, custom:!!r.custom, desc:d?d.desc:'', L:d?d.L:0, W:d?d.W:0, H:d?d.H:0, pcsPerBox:d?d.pcs:0, po:rc.po||'', vendor:r.vendor||'', factory:r.factory||'', term:r.term||'', costIdx:(r.costIdx==null?null:r.costIdx), lotMax:(r.lotMax==null?(r.freeQty?rs.pcs:null):r.lotMax), costLot:rc.lot||'', rmb:rc.rmb, thb:rc.thb, rmbFixed:(r.rmbFixed!=null&&r.rmbFixed!==''?+r.rmbFixed:undefined), per, pcs:rs.pcs, boxes:rs.box, cbm:rs.cbm, valRmb:rs.valRmb, valThb:rs.valThb};
+    const per = window.pkContainers.map((ct,c)=>{ const p=+((r.loads||[])[c])||0; const cc=pkCell(r.item,p,r); const cellLot=(window.pkMode==='released')?(rc.lot||''):((r.lots||[])[c]||''); return {pcs:p, lot:cellLot, boxes:cc.boxes, cbm:cc.cbm, valRmb:p*rmb}; });
+    return {item:r.item, custom:!!r.custom, desc:d?d.desc:'', L:d?d.L:0, W:d?d.W:0, H:d?d.H:0, pcsPerBox:d?d.pcs:0, dim:(r.dim?Object.assign({},r.dim):undefined), po:rc.po||'', vendor:r.vendor||'', factory:r.factory||'', term:r.term||'', costIdx:(r.costIdx==null?null:r.costIdx), lotMax:(r.lotMax==null?(r.freeQty?rs.pcs:null):r.lotMax), costLot:rc.lot||'', rmb:rc.rmb, thb:rc.thb, rmbFixed:(r.rmbFixed!=null&&r.rmbFixed!==''?+r.rmbFixed:undefined), per, pcs:rs.pcs, boxes:rs.box, cbm:rs.cbm, valRmb:rs.valRmb, valThb:rs.valThb};
   }).filter(r=>r.item);
   const contTotals = window.pkContainers.map((ct,c)=>{ const cs=pkContSum(c); return {pcs:cs.pcs, boxes:cs.box, cbm:cs.cbm, valRmb:cs.valRmb, valThb:cs.valThb}; });
   let gp=0,gb=0,gc=0,gvr=0,gvt=0; rows.forEach(r=>{gp+=r.pcs;gb+=r.boxes;gc+=r.cbm;gvr+=r.valRmb;gvt+=r.valThb;});
@@ -9064,17 +9076,18 @@ function pkLoadRound(idx){
   const s=window.pkLog[idx]; if(!s) return;
   window.pkContainers = s.containers.map(c=>({name:c.name, dates: Object.assign({}, c.dates||{}), dateLog: (c.dateLog||[]).slice()}));
   window.pkCustomDims = window.pkCustomDims || {};
-  window.pkRoundDims  = {};   // ขนาด/ชิ้นต่อกล่อง "ของตู้นี้" — freeze ตามที่บันทึกไว้ กันข้อมูลถูกคำนวณใหม่จากค่ากลาง
-  (s.rows||[]).forEach(r=>{ if(!r.item) return; window.pkRoundDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1)}; });
+  window.pkRoundDims  = {};   // เลิกใช้ freeze แบบผูกรหัส — ย้ายไปเก็บมิติ "ต่อแถว" (r.dim) แทน กันบรรทัดเดียวกันลิงก์กัน
+  // มิติต่อแถวจากที่บันทึกไว้ (บรรทัดใครบรรทัดมัน) — ถ้ามี r.dim ที่เซฟไว้ใช้อันนั้น ไม่งั้นสร้างจาก L/W/H/pcsPerBox ที่ resolve ไว้ตอนเซฟ
+  const _rowDim=r=>{ if(r.dim && Object.keys(r.dim).length) return Object.assign({},r.dim); return {L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1)}; };
   window.packingRows  = s.rows.map(r=>{
     let lm=(r.lotMax==null?null:r.lotMax);
-    if(r.custom){ window.pkCustomDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1), desc:r.desc||'', rmb:(r.rmb==null?'':r.rmb)}; return {item:r.item, custom:true, vendor:r.vendor||undefined, factory:r.factory||undefined, term:r.term||undefined, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:null, lotMax:null}; }
+    if(r.custom){ window.pkCustomDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1), desc:r.desc||'', rmb:(r.rmb==null?'':r.rmb)}; return {item:r.item, custom:true, dim:_rowDim(r), vendor:r.vendor||undefined, factory:r.factory||undefined, term:r.term||undefined, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:null, lotMax:null}; }
     // สินค้าผูก PO แต่ไม่มีมิติกล่องในระบบ → กู้มิติที่กรอกไว้กลับมาใน overlay
     if(r.item && !(window.BC_PACKING&&window.BC_PACKING[r.item])){ window.pkCustomDims[r.item]={L:+r.L||0, W:+r.W||0, H:+r.H||0, pcs:(+r.pcsPerBox>0?+r.pcsPerBox:1), desc:r.desc||'', rmb:(window.pkCustomDims[r.item]&&window.pkCustomDims[r.item].rmb)||''}; }
     if(s.mode==='released' && r.po){ const cp=pkPackCap(r.po,r.item); if(cp.cap!=null){ let others=0; (window.pkLog||[]).forEach((ss,i)=>{ if(i===idx) return; (ss.rows||[]).forEach(rr=>{ if(rr.po===r.po && rr.item===r.item) others+=(rr.pcs||0); }); }); lm=Math.max((+r.pcs||0), cp.cap-others); } }   // ห้ามต่ำกว่าจำนวนที่ตู้นี้จัดไว้แล้ว (ยึดข้อมูลที่บันทึกล่าสุด)
     if(s.imported) lm=null;   // ตู้ import = บันทึกย้อนหลังของที่ส่งจริง → ไม่จำกัดเพดานตาม PO ค้างรับ — ยึดตามที่แก้ไขล่าสุด   // เหลือจัดได้ = จำนวนสั่งผลิต/ค้างรับ − ที่จัดในรอบอื่น
     const _rf=(r.rmbFixed!=null&&r.rmbFixed!=='')?+r.rmbFixed:((r.rmb!=null&&r.rmb!=='')?+r.rmb:undefined);   // fallback ต้นทุนล่าสุดที่บันทึกไว้ (กันหายตอนแก้ไขตู้ปิด/import ที่ Lot ไม่อยู่ในระบบแล้ว)
-    return {item:r.item, po:r.po||'', costLot:r.costLot||'', freeQty:!!s.imported, vendor:r.vendor||undefined, factory:r.factory||undefined, term:r.term||undefined, rmbFixed:_rf, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:(r.costIdx==null?null:r.costIdx), lotMax:lm};   // po/costLot: ยึดค่าที่บันทึกไว้ในตู้ (กันถูกล้างตอนกดบันทึกซ้ำ)
+    return {item:r.item, po:r.po||'', costLot:r.costLot||'', freeQty:!!s.imported, dim:_rowDim(r), vendor:r.vendor||undefined, factory:r.factory||undefined, term:r.term||undefined, rmbFixed:_rf, loads:r.per.map(p=>p.pcs||''), lots:r.per.map(p=>p.lot||''), costIdx:(r.costIdx==null?null:r.costIdx), lotMax:lm};   // po/costLot: ยึดค่าที่บันทึกไว้ในตู้ (กันถูกล้างตอนกดบันทึกซ้ำ)
   });
   if(!window.packingRows.length) window.packingRows=[{item:'',loads:[],lots:[],costIdx:null}];
   if(s.mode){ window.pkMode=s.mode; const rb=document.querySelector('input[name="pk-mode"][value="'+s.mode+'"]'); if(rb) rb.checked=true; }
@@ -9838,7 +9851,35 @@ function pkArrivedContainers(){
   return out;
 }
 function pkArrSelect(ym){ window.pkArrSel=(window.pkArrSel===ym)?'':ym; renderArrivedMatrix(); }
+// มูลค่าสต๊อกคงเหลือรวม = Σ (จำนวนคงเหลือจริง × ต้นทุน/หน่วย เป็นบาท)
+// จำนวนคงเหลือ: ใช้ยอดสด BC_ILE[no].oh (ทับจาก bc-onhand.js) ถ้ามี ไม่งั้น fallback เป็น inventory จาก Items List
+function pkStockValue(){
+  let qty=0, val=0, priced=0, noCost=0;
+  const ile=window.BC_ILE||{};
+  (typeof ITEMS!=='undefined'?ITEMS:[]).forEach(it=>{
+    const rec=ile[it.no];
+    const oh = (rec && rec.oh!=null) ? +rec.oh : (+it.inventory||0);
+    if(!oh || oh<=0) return;
+    const c = +it.unitCost||0;
+    qty += oh;
+    if(c>0){ val += oh*c; priced+=oh; } else { noCost+=oh; }
+  });
+  return {qty, val, priced, noCost};
+}
+function pkRenderStockValue(){
+  const box=document.getElementById('pk-stockval'); if(!box) return;
+  const s=pkStockValue();
+  const live = window.STOCK_LIVE ? 'สต๊อกสด' : 'สต๊อกจาก Items List';
+  const noCostNote = s.noCost>0 ? `<div class="muted" style="font-size:9.5px;margin-top:1px;">* ${fmtNum(s.noCost)} ชิ้นไม่มีต้นทุน จึงไม่รวมในมูลค่า</div>` : '';
+  box.innerHTML=`<div style="display:inline-block;text-align:right;padding:10px 16px;border-radius:12px;background:linear-gradient(135deg,#0f655a,#0b8f7a);color:#fff;box-shadow:0 2px 8px rgba(15,101,90,.28);">
+    <div style="font-size:11px;font-weight:700;opacity:.92;letter-spacing:.3px;">📦 มูลค่าสต๊อกคงเหลือรวม</div>
+    <div style="font-size:23px;font-weight:800;line-height:1.15;">฿${fmtNum(Math.round(s.val))}</div>
+    <div style="font-size:10.5px;opacity:.9;">รวม ${fmtNum(s.qty)} ชิ้น · ${live}</div>
+    ${noCostNote}
+  </div>`;
+}
 function renderArrivedMatrix(){
+  pkRenderStockValue();
   const el=document.getElementById('pk-arrived-matrix'); if(!el) return;
   if(!window.pkLog||!window.pkLog.length){ if(typeof pkLoadLog==='function') pkLoadLog(); }
   const cont=pkArrivedContainers();
