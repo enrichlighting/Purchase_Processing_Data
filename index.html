@@ -9522,7 +9522,7 @@ function renderPkLog(){
       <td class="num">${s.rows.length}</td>
       <td class="num">${s.pending?'<span class="muted">—</span>':`<b>${pkContNum(s)||'-'}</b>${s.containers.length>1?`<div class="muted" style="font-size:9px;">${s.containers.length} ตู้</div>`:''}`}</td>
       <td class="num">${fmtNum(s.grand.pcs)}</td>
-      <td class="num"><b>${s.grand.cbm.toFixed(2)}</b></td>
+      <td class="num"><b>${s.grand.cbm.toFixed(3)}</b></td>
       <td class="num">¥${pkMoney(s.grand.valRmb)}<br>฿${pkMoney(s.grand.valThb)}</td>
       <td style="font-size:11px;">${cont}</td>
       <td style="min-width:180px;">${s.pending?'<span style="font-size:11px;font-weight:700;color:#92400e;">⏳ รอเปิด PO</span><div class="muted" style="font-size:10px;">ยังไม่ทราบเลขตู้/วันที่ · จับคู่ PO แล้วไปทำต่อ Released PO</div>':s.containers.map((c,i)=>`<div style="margin-bottom:7px;"><span style="font-size:11px;font-weight:700;">${c.name}</span>${pkShipStatusHtml(c.dates)}</div>`).join('')}</td>
