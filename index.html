@@ -231,7 +231,7 @@
   var KEY = 'richestGateOK';
   var g = document.getElementById('pw-gate');
   function ss(fn){ try{ return fn(); }catch(e){ return null; } }   // กัน sessionStorage ถูกบล็อกในบาง sandbox
-  function unlock(){ if(g && g.parentNode) g.parentNode.removeChild(g); ss(function(){ sessionStorage.setItem(KEY,'1'); }); }
+  function unlock(){ if(g && g.parentNode) g.parentNode.removeChild(g); ss(function(){ sessionStorage.setItem(KEY,'1'); }); if(window.appPresenceStart) setTimeout(window.appPresenceStart, 400); }
   if(ss(function(){ return sessionStorage.getItem(KEY); })==='1'){ unlock(); return; }
   var i=document.getElementById('pw-input'), b=document.getElementById('pw-btn'), er=document.getElementById('pw-err');
   function tryPw(){ if(i.value===PASSCODE){ unlock(); } else { er.textContent='รหัสผ่านไม่ถูกต้อง'; i.value=''; i.focus(); } }
@@ -264,6 +264,7 @@
     <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
       <div class="datasrc" id="datasrc" style="margin-left:0;">แหล่งข้อมูล: <b>ตัวอย่าง (Demo)</b> · พร้อมต่อ Business Central OData</div>
       <div id="data-refresh" style="font-size:11px;color:var(--muted);text-align:right;line-height:1.55;"></div>
+      <div id="online-users" style="font-size:11px;text-align:right;line-height:1.5;color:var(--muted);"></div>
     </div>
   </header>
 
@@ -11537,6 +11538,52 @@ document.getElementById('il-vendor').onchange = ()=>{ fillFactoryDropdown('il-fa
 document.getElementById('il-factory').onchange = renderItemList;
 
 /* --- init: ใช้ Item Card จริงถ้ามี ไม่งั้น fallback เป็นตัวอย่าง --- */
+// ===== Presence: ใครออนไลน์บ้าง (ผ่าน SharePoint) — เฉพาะ GitHub Pages + ผู้ที่เข้าสู่ระบบ =====
+const PRESENCE_NAMES=['ADMIN/IT','คุณบัว','คุณนัท','คุณเอฟ','คุณน้อยหน่า','คุณปลา'];
+const PRESENCE_TTL=180000;   // ถือว่ายังออนไลน์ถ้า heartbeat ภายใน 3 นาที
+function presEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function presClientId(){ let id=null; try{ id=localStorage.getItem('appClientIdV1'); }catch(e){} if(!id){ id='c'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36); try{ localStorage.setItem('appClientIdV1',id); }catch(e){} } return id; }
+function presName(){ try{ return localStorage.getItem('appUserV1')||''; }catch(e){ return ''; } }
+function presSetName(n){ try{ localStorage.setItem('appUserV1',n); }catch(e){} }
+function presPickModal(){
+  let ov=document.getElementById('pres-ov'); if(ov) ov.remove();
+  const cur=presName();
+  ov=document.createElement('div'); ov.id='pres-ov';
+  ov.style.cssText='position:fixed;inset:0;z-index:100010;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px;';
+  const opts='<option value="">— เลือกชื่อ —</option>'+PRESENCE_NAMES.map(n=>`<option value="${presEsc(n)}" ${n===cur?'selected':''}>${presEsc(n)}</option>`).join('');
+  ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:20px 22px;max-width:360px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);">
+    <div style="font-weight:800;font-size:16px;margin-bottom:6px;">👋 คุณคือใคร?</div>
+    <div class="muted" style="font-size:12px;margin-bottom:12px;line-height:1.5;">เลือกชื่อของคุณ เพื่อให้ทีมเห็นว่าคุณกำลังใช้งานอยู่</div>
+    <select id="pres-sel" style="width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:15px;">${opts}</select>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+      <button onclick="document.getElementById('pres-ov').remove()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:700;">ข้าม</button>
+      <button onclick="presSavePick()" style="padding:7px 16px;border-radius:8px;border:0;background:var(--brand);color:#fff;cursor:pointer;font-weight:800;">ยืนยัน</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+}
+function presSavePick(){ const v=(document.getElementById('pres-sel')||{}).value||''; if(!v){ if(typeof pkToast==='function') pkToast('กรุณาเลือกชื่อ','bad'); return; } presSetName(v); const ov=document.getElementById('pres-ov'); if(ov) ov.remove(); presTick(); }
+async function presHeartbeat(){ const nm=presName(); if(!nm) return; if(!(window.GraphStorage && window.GraphStorage.presenceSet)) return; try{ await window.GraphStorage.presenceSet('presence-'+presClientId(), {name:nm, ts:Date.now()}); }catch(e){} }
+async function presRender(){
+  const el=document.getElementById('online-users'); if(!el) return;
+  const nm=presName();
+  if(!nm){ el.innerHTML='<a onclick="presPickModal()" style="cursor:pointer;color:var(--brand);font-weight:700;">👋 ระบุตัวตน (คุณคือใคร?)</a>'; return; }
+  if(!(window.GraphStorage && window.GraphStorage.presenceList)){ el.innerHTML='👤 '+presEsc(nm)+' <a onclick="presPickModal()" style="cursor:pointer;color:var(--muted);font-size:10px;">เปลี่ยน</a>'; return; }
+  let rows=null; try{ rows=await window.GraphStorage.presenceList('presence-'); }catch(e){ rows=null; }
+  if(rows==null){ el.innerHTML=`👤 ${presEsc(nm)} · <a onclick="if(window.cloudPullNow)cloudPullNow()" title="ต้องเข้าสู่ระบบ (ปุ่มดึงข้อมูลล่าสุด) เพื่อแสดงผู้ใช้ออนไลน์" style="cursor:pointer;color:var(--brand);">เข้าสู่ระบบเพื่อดูออนไลน์</a>`; return; }
+  const now=Date.now(), seen={}, names=[];
+  rows.forEach(r=>{ let v={}; try{ v=JSON.parse(r.value||'{}'); }catch(e){} if(v&&v.name&&v.ts&&(now-(+v.ts)<PRESENCE_TTL)){ if(!seen[v.name]){ seen[v.name]=1; names.push(v.name); } } });
+  if(!names.length){ el.innerHTML=`👤 ${presEsc(nm)}`; return; }
+  names.sort();
+  el.innerHTML=`<span title="อัปเดตทุก ~1 นาที · นับเฉพาะทีมที่เข้าสู่ระบบ">🟢 <b>ขณะนี้มีคนเข้าใช้งาน ${names.length} คน</b>: ${names.map(presEsc).join(', ')}</span> · <a onclick="presPickModal()" style="cursor:pointer;color:var(--muted);font-size:10px;">เปลี่ยนชื่อ</a>`;
+}
+function presTick(){ presHeartbeat(); presRender(); }
+window.appPresenceStart=function(){
+  if(window._presStarted) return; window._presStarted=true;
+  try{ if(!presName()) presPickModal(); }catch(e){}
+  presTick();
+  setInterval(presTick, 60000);
+  window.addEventListener('beforeunload', function(){ try{ if(window.GraphStorage&&window.GraphStorage.presenceDelete) window.GraphStorage.presenceDelete('presence-'+presClientId()); }catch(e){} });
+};
 function init(){
   comboInit('s-item', renderSearch);      // ช่องค้นหาสินค้าแบบพิมพ์ได้
   comboInit('l-item', renderLeadtime);

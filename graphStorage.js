@@ -81,8 +81,52 @@ async function loadData(key) {
   return null;
 }
 
+// ============================================================
+// Presence (ใครออนไลน์บ้าง) — ใช้ token แบบเงียบ (ไม่เด้ง popup) · แต่ละเครื่องเขียน key ของตัวเอง (presence-<clientId>)
+// ============================================================
+async function _presToken() {
+  return (window.GraphAuth && window.GraphAuth.getGraphTokenSilent) ? await window.GraphAuth.getGraphTokenSilent() : null;
+}
+async function _presFetch(token, url, options = {}) {
+  const r = await fetch(url, { ...options, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(options.headers || {}) } });
+  if (!r.ok) throw new Error('presence graph ' + r.status);
+  if (r.status === 204) return null;
+  return r.json();
+}
+// เขียน/อัปเดต heartbeat ของเครื่องนี้ (คืน false ถ้ายังไม่ได้ล็อกอิน)
+async function presenceSet(key, value) {
+  const token = await _presToken(); if (!token) return false;
+  const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+  const findUrl = `${GRAPH_BASE}/items?expand=fields(select=Title,Value)&$filter=fields/Title eq '${encodeURIComponent(key)}'`;
+  const fd = await _presFetch(token, findUrl, { headers: { Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' } });
+  const id = (fd && fd.value && fd.value[0]) ? fd.value[0].id : null;
+  if (id) await _presFetch(token, `${GRAPH_BASE}/items/${id}/fields`, { method: 'PATCH', body: JSON.stringify({ Value: stringValue }) });
+  else await _presFetch(token, `${GRAPH_BASE}/items`, { method: 'POST', body: JSON.stringify({ fields: { Title: key, Value: stringValue } }) });
+  return true;
+}
+// อ่านรายการ presence ทั้งหมด (คืน null ถ้ายังไม่ได้ล็อกอิน) · กรอง prefix ฝั่ง client
+async function presenceList(prefix) {
+  const token = await _presToken(); if (!token) return null;
+  const url = `${GRAPH_BASE}/items?expand=fields(select=Title,Value)&$top=500`;
+  const d = await _presFetch(token, url);
+  return (d && d.value ? d.value : [])
+    .map(it => ({ id: it.id, key: (it.fields && it.fields.Title) || '', value: (it.fields && it.fields.Value) || '' }))
+    .filter(x => x.key.indexOf(prefix) === 0);
+}
+// ลบ heartbeat ของเครื่องนี้ (ตอนปิดแท็บ · best-effort)
+async function presenceDelete(key) {
+  const token = await _presToken(); if (!token) return;
+  const findUrl = `${GRAPH_BASE}/items?expand=fields(select=Title)&$filter=fields/Title eq '${encodeURIComponent(key)}'`;
+  const fd = await _presFetch(token, findUrl, { headers: { Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' } });
+  const id = (fd && fd.value && fd.value[0]) ? fd.value[0].id : null;
+  if (id) await _presFetch(token, `${GRAPH_BASE}/items/${id}`, { method: 'DELETE' });
+}
+
 window.GraphStorage = {
   saveData,
   loadData,
   findItemIdByKey,
+  presenceSet,
+  presenceList,
+  presenceDelete,
 };

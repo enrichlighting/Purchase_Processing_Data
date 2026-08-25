@@ -99,10 +99,22 @@ async function getGraphToken() {
      }
    }
 
+   // ขอ token แบบเงียบเท่านั้น (ไม่เด้ง popup) — คืน null ถ้ายังไม่ได้ล็อกอิน · ใช้กับฟีเจอร์ presence ที่ไม่ควรรบกวนผู้ใช้
+   async function getGraphTokenSilent() {
+     try {
+       await ensureMsalInitialized();
+       const account = msalInstance.getActiveAccount() || (msalInstance.getAllAccounts()[0]);
+       if (!account) return null;
+       const response = await msalInstance.acquireTokenSilent({ ...loginRequest, account });
+       return response.accessToken;
+     } catch (e) { return null; }
+   }
+
    // เปิดให้ไฟล์อื่น (เช่น graphStorage.js หรือ bc-*.js) เรียกใช้งานผ่าน window.GraphAuth
    window.GraphAuth = {
      signIn,
      getGraphToken,
+     getGraphTokenSilent,
      getFlowToken,
      msalInstance,
    };
