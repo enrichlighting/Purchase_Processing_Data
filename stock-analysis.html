@@ -273,7 +273,6 @@
     <div class="tab" data-tab="search" title="ค้นหาสต๊อก &amp; รายการสินค้า">🔎</div>
     <div class="tab" data-tab="packing" title="Packing List">📦 Packing List</div>
     <div class="tab" data-tab="payment" title="Payment — อัพเดทการโอนเงินรายเดือน">💰 Payment</div>
-    <div class="tab" data-tab="payment2" title="Payment (แยกตาม Lot No. + PI/INV/PL No)">🏦</div>
   </div>
 
   <!-- ============ PAGE: FLOWCHART ============ -->
@@ -423,30 +422,6 @@
         <button onclick="payAddExtra()" title="เพิ่มบรรทัดค่าใช้จ่ายที่ไม่ใช่สินค้า (กรอกวันที่โอน · SUPPLIER · CT No. · จำนวนเงินเอง)" style="font-size:13px;font-weight:800;padding:6px 13px;border-radius:8px;border:0;background:#7f1d1d;color:#fff;cursor:pointer;">🧾 เพิ่มค่าใช้จ่ายอื่น (ไม่ใช่สินค้า)</button>
       </div>
       <div id="pay-body"></div>
-    </div>
-  </div>
-
-  <!-- ============ PAGE: PAYMENT 2 (แยกตาม Lot No. + PI/INV/PL No) ============ -->
-  <div class="page" id="page-payment2">
-    <div class="card">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-size:16px;font-weight:800;">
-        <span>🏦 Payment (แยกตาม Lot No.)</span>
-        <span>ปี</span>
-        <select id="pay2-year" onchange="renderPayment2()" style="width:150px;max-width:150px;font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;"></select>
-        <span>เดือน</span>
-        <select id="pay2-month" onchange="renderPayment2()" style="width:170px;max-width:170px;font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;"></select>
-        <span>Vendor</span>
-        <select id="pay2-vendor" onchange="renderPayment2()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;max-width:220px;"></select>
-        <span>เลขตู้</span>
-        <select id="pay2-ct" onchange="renderPayment2()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;max-width:160px;"></select>
-        <span style="width:1px;height:22px;background:var(--line);margin:0 4px;"></span>
-        <label style="font-size:13px;font-weight:700;">Exchange Rate: <input type="number" id="pay2-fx" value="5" min="0" step="0.01" onchange="renderPayment2()" oninput="renderPayment2()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/หยวน</label>
-        <label style="font-size:13px;font-weight:700;">USD: <input type="number" id="pay2-usd" value="34" min="0" step="0.01" onchange="renderPayment2()" oninput="renderPayment2()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/ดอลลาร์</label>
-        <span style="width:1px;height:22px;background:var(--line);margin:0 4px;"></span>
-        <button onclick="payAddExtra()" title="เพิ่มบรรทัดค่าใช้จ่ายที่ไม่ใช่สินค้า" style="font-size:13px;font-weight:800;padding:6px 13px;border-radius:8px;border:0;background:#7f1d1d;color:#fff;cursor:pointer;">🧾 เพิ่มค่าใช้จ่ายอื่น (ไม่ใช่สินค้า)</button>
-      </div>
-      <p class="hint" style="margin:-6px 0 12px;">แยกยอดตาม <b>Lot No.</b> ที่ระบุในแต่ละตู้ · ช่อง <b>PI / INV / PL No</b> กรอกเอง (บันทึก+ซิงก์อัตโนมัติ)</p>
-      <div id="pay2-body"></div>
     </div>
   </div>
 
@@ -8653,7 +8628,7 @@ function pkSaveLogStore(){ try{ localStorage.setItem(PK_LOGKEY, JSON.stringify(w
 // ข้อมูล Packing เปลี่ยน → รีเฟรชทุกหน้าที่อ่านจาก pkLog ชุดเดียวกัน (Payment · Flowchart · Lead Time)
 // เรียกทุกครั้งหลัง pkSaveLogStore() เพื่อให้หน้า Payment ตรงกับ Packing List เสมอ ไม่ต้องรีโหลด
 function pkRerenderLinked(){
-  ['renderPayment','renderPayment2','renderFlowchart','renderLeadtime','renderArrivedMatrix'].forEach(function(fn){
+  ['renderPayment','renderFlowchart','renderLeadtime','renderArrivedMatrix'].forEach(function(fn){
     try{ if(typeof window[fn]==='function') window[fn](); }catch(e){ console.warn('pkRerenderLinked: '+fn, e); }
   });
 }
@@ -11467,7 +11442,6 @@ function renderTab(tab){
   else if(tab==='leadtime'){ poLoadFollow(); const _pr=poPruneStaleFollow(); if(_pr && _pr.length && typeof pkToast==='function') pkToast('ล้างรายการติดตาม PO เก่าที่ไม่ตรงข้อมูล BC แล้ว '+_pr.length+' รายการ','good'); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderUrgent(); renderPoFollow(); renderArrivedMatrix(); }
   else if(tab==='packing'){ renderPacking(); pkLoadLog(); renderPkLog(); if(typeof renderArrivedMatrix==='function') renderArrivedMatrix(); }
   else if(tab==='payment'){ renderPayment(); }
-  else if(tab==='payment2'){ renderPayment2(); }
   window.tabRendered[tab]=true;
 }
 document.querySelectorAll('.tab').forEach(t=>{
@@ -11607,7 +11581,7 @@ async function paySyncFromCloud(){ if(!window.GraphStorage) return;
   const dc=await window.GraphStorage.loadData('payDocsV1'); if(dc){ window.payDocs= typeof dc==='string'?JSON.parse(dc):dc; if(!window.payDocs||typeof window.payDocs!=='object') window.payDocs={}; try{ localStorage.setItem('payDocsV1', JSON.stringify(window.payDocs)); }catch(e){} }
 }
 async function payPushToCloud(){ if(!window.GraphStorage) return; payLoadOv(); payLoadCheck(); payLoadExtra(); payLoadDocs(); await window.GraphStorage.saveData('payXferOvV1', window.payXferOv||{}); await window.GraphStorage.saveData('payCheckV1', window.payCheck||{}); await window.GraphStorage.saveData('payExtraV1', window.payExtra||[]); await window.GraphStorage.saveData('payDocsV1', window.payDocs||{}); }
-function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent','renderPayment','renderPayment2'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
+function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent','renderPayment'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
 async function cloudPullNow(){ const b=document.getElementById('bc-pull'); if(b) b.disabled=true;
   try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); cloudRerenderAll(); bcSetTs('bcCloudSyncAt'); pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
   catch(e){ console.error(e); pkToast('ดึงข้อมูลไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
