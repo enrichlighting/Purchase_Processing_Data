@@ -7967,6 +7967,31 @@ function pkDimEditExport(){
 function pkIsCustom(code){ return !!(code && window.pkCustomDims && window.pkCustomDims[code]); }
 // สินค้านี้ส่งขาย Mr.DIY หรือไม่ (มี PLU ที่ Mr.DIY)
 function pkIsDiyItem(code){ if(!code) return false; const d=(window.BC_MRDIY&&window.BC_MRDIY[code])||null; if(d && d.plu) return true; const it=(typeof getItem==='function')?getItem(code):null; return !!(it && it.hasPLU); }
+// จำนวนที่กรอกทั้งหมดของสินค้านี้ในหน้า Packing ปัจจุบัน (ทุกบรรทัด × ทุกตู้) — สินค้าเดียวกันคนละบรรทัดต้องรวมกัน
+function pkItemEnteredQty(code){ let s=0; (window.packingRows||[]).forEach(r=>{ if(r.item!==code) return; (r.loads||[]).forEach(v=>{ s+=(+v||0); }); }); return s; }
+// อยู่ได้กี่เดือน (หน้า Packing) = (หมวด② + จำนวนที่กรอกทั้งหมดของสินค้านี้) ÷ อัตราขายเฉลี่ย 3 เดือน
+//  · สินค้าไม่ส่ง Mr.DIY → หาร "ยอดขายทุกกลุ่มเฉลี่ย 3 ด."
+//  · สินค้าส่ง Mr.DIY   → หาร "Others 3 ด. (ไม่รวม DIY) + Sales Out Mr.DIY 3 ด."
+//  · สีเกณฑ์เดียวกับ หมวด② On hand Cover (flowOhcColor)
+function pkCoverStock(code){
+  const it=(typeof getItem==='function')?getItem(code):null;
+  if(!it || typeof reorderCalc!=='function') return null;
+  const rc=reorderCalc(it);
+  const base=(rc.c2||0)+pkItemEnteredQty(code);   // หมวด② + จำนวนที่กรอก (รวมทุกบรรทัดของสินค้านี้)
+  const diy=pkIsDiyItem(code);
+  const denom = diy ? ((flowExDiyAvg(it,3)||0)+(flowStoreAvg(it,3)||0)) : (flowAvg3(it)||0);
+  const m = denom>0 ? base/denom : (base>0?Infinity:0);
+  return {months:m, diy:diy, base:base, denom:denom};
+}
+function pkCoverCellHtml(code){
+  const cv=pkCoverStock(code); if(!cv) return '';
+  const mShown=isFinite(cv.months)?Math.round(cv.months*10)/10:cv.months;
+  const moTxt=isFinite(cv.months)?((typeof fmtMo==='function')?fmtMo(cv.months):cv.months.toFixed(1)):'∞';
+  const tip=(cv.diy?'ส่ง Mr.DIY: หมวด② ÷ (Others 3ด. + Sales Out DIY 3ด.)':'ไม่ส่ง Mr.DIY: หมวด② ÷ ยอดขายทุกกลุ่ม 3ด.')+' · รวมจำนวนที่กรอกทั้งหมดของสินค้านี้แล้ว';
+  return `<div style="margin-top:3px;font-size:10px;font-weight:800;padding:1px 5px;border-radius:5px;display:inline-block;${(typeof flowOhcColor==='function')?flowOhcColor(mShown):''}" title="${tip}">อยู่ได้ ${moTxt} ด.</div>`;
+}
+// รีเฟรช "อยู่ได้ X ด." ทุกแถว (เรียกตอนแก้จำนวน — สินค้าเดียวกันคนละบรรทัดต้องอัปเดตพร้อมกัน)
+function pkUpdateCovers(){ (window.packingRows||[]).forEach((r,i)=>{ const el=document.getElementById('pk-cover-'+i); if(el) el.innerHTML=r.item?pkCoverCellHtml(r.item):''; }); }
 // เพิ่มแถวสินค้ากรอกเอง (นอก PO) — มิติ/ชื่อ/RMB กรอกเอง · ใช้ได้ทั้ง Forecast และ Released
 function pkAddCustomRow(){
   window.pkCustomDims = window.pkCustomDims || {};
@@ -8293,6 +8318,7 @@ function pkSetCell(i, c, v){
   if(e=document.getElementById('pk-rvt-'+i)) e.innerHTML=(rs.valThb>0?'<b>฿'+pkMoney(rs.valThb)+'</b>':'<span class="muted">-</span>');
   const wn=document.getElementById('pk-warn-'+i); if(wn) wn.innerHTML=pkRowWarn(i);   // อัปเดตแจ้งเตือนสั่งผลิตแบบสด
   pkFootCont(c); pkGrand(); renderContainers();
+  if(typeof pkUpdateCovers==='function') pkUpdateCovers();   // อัปเดต "อยู่ได้ X ด." แบบสด (รวมจำนวนที่กรอกทุกบรรทัดของสินค้านี้)
 }
 function pkSetLot(i, c, v){
   if(!window.packingRows[i].lots) window.packingRows[i].lots=[];
@@ -8513,7 +8539,7 @@ function renderPacking(){
     conts.forEach((ct,c)=>{
       const maxAttr=(window.pkMode==='released'&&r.lotMax!=null)?` max="${r.lotMax}"`:'';
       const pieceInput=`<input id="pk-in-${i}-${c}" type="number" value="${(r.loads||[])[c]===''||(r.loads||[])[c]==null?'':(r.loads||[])[c]}" min="0" step="1"${maxAttr} oninput="pkSetCell(${i},${c},this.value)" style="width:90px;text-align:right" title="จำนวนชิ้น">`;
-      qtyCells+=`<td class="num" style="vertical-align:top">${pieceInput}</td>`;   // เฉพาะจำนวน (ย้ายมาหลัง H · ตัด "อยู่ได้" ออก)
+      qtyCells+=`<td class="num" style="vertical-align:top">${pieceInput}${c===0?('<br><span id="pk-cover-'+i+'">'+(r.item?pkCoverCellHtml(r.item):'')+'</span>'):''}</td>`;   // จำนวน + "อยู่ได้ X ด." (ใต้ช่องตู้แรก)
       let lotPart;
       if(window.pkMode==='released'){
         const lot=rc.lot||'';   // ยึด Lot No จาก Lot ที่เลือกในคอลัมน์ LOT (ต้นทุน)
