@@ -10988,6 +10988,7 @@ function payAddExtra(){ payExtraModal(null); }
 function payEditExtra(id){ payExtraModal(id); }
 function payExtraModal(id){
   payLoadExtra();
+  window._pexDelArm=null;   // รีเซ็ตสถานะยืนยันลบทุกครั้งที่เปิดฟอร์ม
   const e = id ? (window.payExtra.find(x=>x.id===id)||{}) : {};
   const conts=payAllContainers();
   let ov=document.getElementById('pay-extra-ov'); if(ov) ov.remove();
@@ -11010,7 +11011,7 @@ function payExtraModal(id){
     <div class="muted" style="font-size:11px;margin-top:8px;line-height:1.5;">คอลัมน์ TERM จะแสดง "ประเภทค่าใช้จ่าย" แทน (ไม่ควานหา TERM เพราะไม่มีรหัสสินค้า) · TOTAL BAHT = AMOUNT × Exchange Rate (สูตรเดิม) · คอลัมน์อื่นคำนวณอัตโนมัติ</div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;">
       <button onclick="document.getElementById('pay-extra-ov').remove()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:700;">ยกเลิก</button>
-      ${id?`<button onclick="payDeleteExtra('${id}')" style="padding:7px 14px;border-radius:8px;border:1px solid #b91c1c;background:var(--card);color:#b91c1c;cursor:pointer;font-weight:700;">🗑 ลบ</button>`:''}
+      ${id?`<button id="pex-del" onclick="payDeleteExtraConfirm('${id}')" style="padding:7px 14px;border-radius:8px;border:1px solid #b91c1c;background:var(--card);color:#b91c1c;cursor:pointer;font-weight:700;">🗑 ลบ</button>`:''}
       <button onclick="paySaveExtraRow('${id||''}')" style="padding:7px 14px;border-radius:8px;border:0;background:var(--brand);color:#fff;cursor:pointer;font-weight:800;">บันทึก</button>
     </div>
   </div>`;
@@ -11034,7 +11035,15 @@ function paySaveExtraRow(id){
   const ov=document.getElementById('pay-extra-ov'); if(ov) ov.remove();
   payRefresh(); pkToast('บันทึกค่าใช้จ่ายแล้ว','good');
 }
-function payDeleteExtra(id){ payLoadExtra(); window.payExtra=(window.payExtra||[]).filter(x=>x.id!==id); paySaveExtra(); const ov=document.getElementById('pay-extra-ov'); if(ov) ov.remove(); payRefresh(); pkToast('ลบค่าใช้จ่ายแล้ว','good'); }
+// ลบแบบยืนยัน 2 ขั้น — คลิกครั้งแรกเปลี่ยนปุ่มเป็น "ยืนยันลบ" · คลิกซ้ำจึงลบจริง
+function payDeleteExtraConfirm(id){
+  const btn=document.getElementById('pex-del');
+  if(window._pexDelArm===id){ payDeleteExtra(id); return; }
+  window._pexDelArm=id;
+  if(btn){ btn.textContent='⚠️ คลิกอีกครั้งเพื่อยืนยันลบ'; btn.style.background='#b91c1c'; btn.style.color='#fff'; btn.style.borderColor='#b91c1c'; }
+  if(typeof pkToast==='function') pkToast('กดปุ่มลบอีกครั้งเพื่อยืนยัน','info');
+}
+function payDeleteExtra(id){ window._pexDelArm=null; payLoadExtra(); window.payExtra=(window.payExtra||[]).filter(x=>x.id!==id); paySaveExtra(); const ov=document.getElementById('pay-extra-ov'); if(ov) ov.remove(); payRefresh(); pkToast('ลบค่าใช้จ่ายแล้ว','good'); }
 // ===== PI / INV / PL No. (กรอกเอง) สำหรับหน้า Payment 2 — เก็บ localStorage + ซิงก์คลาวด์ · key = _key ของแถว =====
 function payLoadDocs(){ if(window.payDocs) return; try{ window.payDocs=JSON.parse(localStorage.getItem('payDocsV1')||'{}'); }catch(e){ window.payDocs={}; } }
 function paySetDoc(enc, field, val){ const key=decodeURIComponent(enc); payLoadDocs(); const o=window.payDocs[key]||(window.payDocs[key]={}); val=(val||'').trim(); if(val) o[field]=val; else { delete o[field]; if(!Object.keys(o).length) delete window.payDocs[key]; } try{ localStorage.setItem('payDocsV1', JSON.stringify(window.payDocs)); }catch(e){} if(typeof payPushToCloud==='function'){ try{ payPushToCloud(); }catch(e){} } }
