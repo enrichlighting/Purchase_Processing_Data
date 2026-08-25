@@ -11057,7 +11057,7 @@ function payExtraModal(id){
     <label style="font-size:13px;font-weight:700;display:block;margin-top:10px;">CT No. (เลือกจากตู้ที่บันทึกไว้ → ดึง Loading date ให้อัตโนมัติ)<br><select id="pex-ct" style="${inp}">${ctOpts}</select></label>
     <label style="font-size:13px;font-weight:700;display:block;margin-top:10px;">AMOUNT (เลือกสกุลเงินได้)<br>
       <div style="display:flex;gap:8px;margin-top:4px;">
-        <input type="number" id="pex-amt" value="${amtVal}" min="0" step="0.01" placeholder="จำนวนเงิน" style="flex:1;min-width:0;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:14px;">
+        <input type="number" id="pex-amt" value="${amtVal}" step="0.01" placeholder="จำนวนเงิน (ติดลบได้ = ลดหนี้)" title="กรอกติดลบได้ เช่น -1320 สำหรับใบลดหนี้/เครดิตโน้ต" style="flex:1;min-width:0;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:14px;">
         <select id="pex-cur" style="width:118px;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:14px;">
           <option value="RMB" ${curVal==='RMB'?'selected':''}>¥ RMB</option>
           <option value="USD" ${curVal==='USD'?'selected':''}>$ USD</option>
@@ -11094,7 +11094,7 @@ function paySaveExtraRow(id){
   if(!xfer){ pkToast('กรุณาระบุวันที่โอน','bad'); return; }
   if(!kind){ pkToast('กรุณาเลือกประเภทค่าใช้จ่าย','bad'); return; }
   if(!vendor){ pkToast('กรุณาเลือก SUPPLIER (Vendor)','bad'); return; }
-  if(!(amt>0)){ pkToast('กรุณาระบุจำนวนเงิน (AMOUNT)','bad'); return; }
+  if(!amt){ pkToast('กรุณาระบุจำนวนเงิน (AMOUNT) — ติดลบได้สำหรับลดหนี้ แต่ต้องไม่เท่ากับ 0','bad'); return; }
   payLoadExtra();
   if(id){ const e=window.payExtra.find(x=>x.id===id); if(e){ e.xfer=xfer; e.kind=kind; e.vendor=vendor; e.factory=factory; e.cont=cont; e.amt=amt; e.cur=cur; delete e.amtRmb; } }
   else { window.payExtra.push({id:payGenId(), xfer, kind, vendor, factory, cont, amt, cur}); }
@@ -11369,7 +11369,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
        + `<td style="${bTd}background:${vbg};text-align:center;white-space:nowrap;color:#374151;">${payThaiDate(r.load)}</td>`
        + `<td style="${bTd}background:${vbg};text-align:center;white-space:nowrap;font-weight:700;color:#111;">${payEsc(r.cont)}</td>`
        + (opt.splitLot?`<td style="${bTd}background:${vbg};text-align:center;white-space:nowrap;color:#111;">${r.lot?('<b>'+payEsc(r.lot)+'</b>'):'<span style="color:#9ca3af;">-</span>'}</td>`:'')
-       + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:700;color:#111;">${(r._cur==='USD')?('$'+f2(r.amtUsd)):('¥'+f2(r.amtRmb))}${r.seg?`<div style="font-size:9px;font-weight:700;color:#7f1d1d;">${payEsc(r.seg)}</div>`:''}</td>`
+       + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:700;color:${((r._cur==='USD'?(+r.amtUsd||0):(+r.amtRmb||0))<0)?'#b91c1c':'#111'};">${(r._cur==='USD')?('$'+f2(r.amtUsd)):('¥'+f2(r.amtRmb))}${r.seg?`<div style="font-size:9px;font-weight:700;color:#7f1d1d;">${payEsc(r.seg)}</div>`:''}</td>`
        + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?((venShow.usd>0)?('$'+f2(venShow.usd)):('¥'+f2(venShow.rmb))):''}</td>`
        + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?('฿'+f2(venShow.rmb*fx + venShow.usd*usd)):''}</td>`
        + (opt.docs?(payDocCell(r,'pi',bTd)+payDocCell(r,'inv',bTd)+payDocCell(r,'pl',bTd)):'');
