@@ -7984,19 +7984,31 @@ function pkCoverStock(code){
   const it=(typeof getItem==='function')?getItem(code):null;
   if(!it || typeof reorderCalc!=='function') return null;
   const rc=reorderCalc(it);
-  // หมวด② (รวม packed ที่บันทึกแล้ว) + จำนวนที่กรอกในหน้านี้ − ส่วนที่ถูกบันทึกในตู้ที่กำลังแก้ไข (กันนับซ้ำ)
-  const base=(rc.c2||0)+pkItemEnteredQty(code)-pkPackedInOpenRound(code);
+  const c2=(rc.c2||0);
+  const added=pkItemEnteredQty(code)-pkPackedInOpenRound(code);   // จำนวนที่กรอก (สุทธิ หลังกันนับซ้ำกับตู้ที่บันทึกแล้ว)
+  const base=c2+added;   // หมวด② + จำนวนที่กรอก
   const diy=pkIsDiyItem(code);
-  const denom = diy ? ((flowExDiyAvg(it,3)||0)+(flowStoreAvg(it,3)||0)) : (flowAvg3(it)||0);
+  const exdiy3=diy?(flowExDiyAvg(it,3)||0):0, store3=diy?(flowStoreAvg(it,3)||0):0, avg3=diy?0:(flowAvg3(it)||0);
+  const denom = diy ? (exdiy3+store3) : avg3;
   const m = denom>0 ? base/denom : (base>0?Infinity:0);
-  return {months:m, diy:diy, base:base, denom:denom};
+  return {months:m, diy:diy, base:base, denom:denom, c2:c2, added:added, exdiy3:exdiy3, store3:store3, avg3:avg3};
 }
 function pkCoverCellHtml(code){
   const cv=pkCoverStock(code); if(!cv) return '';
   const mShown=isFinite(cv.months)?Math.round(cv.months*10)/10:cv.months;
   const moTxt=isFinite(cv.months)?((typeof fmtMo==='function')?fmtMo(cv.months):cv.months.toFixed(1)):'∞';
-  const tip=(cv.diy?'ส่ง Mr.DIY: หมวด② ÷ (Others 3ด. + Sales Out DIY 3ด.)':'ไม่ส่ง Mr.DIY: หมวด② ÷ ยอดขายทุกกลุ่ม 3ด.')+' · รวมจำนวนที่กรอกทั้งหมดของสินค้านี้แล้ว';
-  return `<div style="margin-top:3px;font-size:10px;font-weight:800;padding:1px 5px;border-radius:5px;display:inline-block;${(typeof flowOhcColor==='function')?flowOhcColor(mShown):''}" title="${tip}">อยู่ได้ ${moTxt} ด.</div>`;
+  const n=v=>(typeof fmtNum==='function')?fmtNum(Math.round(v)):Math.round(v);
+  const addTxt = cv.added>=0 ? ('+ จำนวนที่กรอก '+n(cv.added)) : ('− ปรับ '+n(-cv.added));
+  const denomLine = cv.diy
+    ? ('÷ (Others เฉลี่ย 3ด. '+n(cv.exdiy3)+' + Sales Out Mr.DIY เฉลี่ย 3ด. '+n(cv.store3)+' = '+n(cv.denom)+'/ด.)')
+    : ('÷ ยอดขายทุกกลุ่มเฉลี่ย 3ด. '+n(cv.avg3)+'/ด.');
+  const tip='วิธีคำนวณ Cover Stock ('+(cv.diy?'สินค้าส่ง Mr.DIY':'สินค้าไม่ส่ง Mr.DIY')+')\n'
+    +'หมวด② (คลัง+จัดตู้แล้ว) '+n(cv.c2)+' '+addTxt+' = '+n(cv.base)+' ชิ้น\n'
+    +denomLine+'\n'
+    +'= อยู่ได้ '+moTxt+' เดือน\n'
+    +'(รวมจำนวนที่กรอกทุกบรรทัดของสินค้านี้ · กันนับซ้ำกับตู้ที่บันทึกแล้ว)\n'
+    +'สี: ≤2 ส้ม · >2–2.5 เหลือง · >2.5 เขียว · ≥9 ชมพู · ≥12 ม่วง';
+  return `<div style="margin-top:3px;font-size:10px;font-weight:800;padding:1px 5px;border-radius:5px;display:inline-block;cursor:help;${(typeof flowOhcColor==='function')?flowOhcColor(mShown):''}" title="${tip.replace(/"/g,'&quot;')}">อยู่ได้ ${moTxt} ด.</div>`;
 }
 // รีเฟรช "อยู่ได้ X ด." ทุกแถว (เรียกตอนแก้จำนวน — สินค้าเดียวกันคนละบรรทัดต้องอัปเดตพร้อมกัน)
 function pkUpdateCovers(){ (window.packingRows||[]).forEach((r,i)=>{ const el=document.getElementById('pk-cover-'+i); if(el) el.innerHTML=r.item?pkCoverCellHtml(r.item):''; }); }
