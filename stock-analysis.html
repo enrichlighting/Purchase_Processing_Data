@@ -6707,6 +6707,14 @@ const getItem    = no => ITEMS.find(i=>i.no===no);
 // วันที่ข้อมูลล่าสุด (มุมขวาบน) — สต๊อก/ยอดขายมาจากไฟล์ Item Ledger (ไม่เรียลไทม์) · รายการสินค้ามาจาก Power Automate
 function fmtThaiDate(iso){ if(!iso) return '-'; const M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; const p=String(iso).split('-'); if(p.length<3) return iso; return (+p[2])+' '+M[(+p[1])-1]+' '+p[0]; }
 // อ่านเวลารีเฟรชจากคอมเมนต์หัวไฟล์ bc-onhand.js (/* ... refresh YYYY-MM-DD HH:MM */) — ครั้งเดียว
+// แปลงเวลา refresh ที่ Power Automate เขียนเป็น UTC → เวลาไทย (+7 ชม.) · รองรับข้ามวัน
+function paUtcToThai(dateStr, timeStr){
+  const dm=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr||'')); const tm=/^(\d{1,2}):(\d{2})$/.exec(String(timeStr||''));
+  if(!dm||!tm) return {date:dateStr, time:timeStr};
+  const ms=Date.UTC(+dm[1],+dm[2]-1,+dm[3],+tm[1],+tm[2]) + 7*3600*1000;   // +7 ชม. = เวลาไทย
+  const d=new Date(ms), p=n=>String(n).padStart(2,'0');
+  return {date:d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate()), time:p(d.getUTCHours())+':'+p(d.getUTCMinutes())};
+}
 function fetchOnhandRefresh(){
   fetch('bc-onhand.js',{cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
     const m=/refresh\s+(\d{4}-\d{2}-\d{2})\s+([0-9]{1,2}:[0-9]{2})/i.exec(t||'');
@@ -6718,7 +6726,8 @@ function renderDataRefresh(){
   if(!window._ohRefreshFetched){ window._ohRefreshFetched=true; try{ fetchOnhandRefresh(); }catch(e){} }
   let maxLd=''; const D=window.BC_ILE||{}; for(const k in D){ const d=D[k]&&D[k].ld; if(d&&d>maxLd) maxLd=d; }
   const isPA=(window.BC_ITEMS||[]).some(x=>x.No==='500022');   // ไฟล์เต็มจาก Power Automate จะมีรายการ non-ENRICH เช่น 500022
-  const rf=window.BC_ONHAND_REFRESH;   // {date,time} จากคอมเมนต์ไฟล์ (ถ้าอ่านได้)
+  const rf0=window.BC_ONHAND_REFRESH;   // {date,time} จากคอมเมนต์ไฟล์ (Power Automate เขียนเป็น UTC)
+  const rf = (rf0&&rf0.date&&rf0.time) ? paUtcToThai(rf0.date, rf0.time) : rf0;   // แปลง UTC → เวลาไทย (+7)
   const asofTxt = (rf&&rf.date) ? (fmtThaiDate(rf.date)+' '+rf.time+' น.') : (window.BC_ONHAND_ASOF?fmtThaiDate(window.BC_ONHAND_ASOF):'');
   const stockLine = window.STOCK_LIVE
     ? `<div title="ยอดคงเหลือ+รายคลัง ดึงอัตโนมัติผ่าน Power Automate ทุก 30 นาที (bc-onhand.js)">📦 <b>สต๊อก (คงเหลือ/รายคลัง): สด · อัตโนมัติ</b>${asofTxt?` · ${asofTxt}`:''} <span style="opacity:.7;">(Power Automate)</span></div>`
