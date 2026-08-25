@@ -7973,11 +7973,19 @@ function pkItemEnteredQty(code){ let s=0; (window.packingRows||[]).forEach(r=>{ 
 //  · สินค้าไม่ส่ง Mr.DIY → หาร "ยอดขายทุกกลุ่มเฉลี่ย 3 ด."
 //  · สินค้าส่ง Mr.DIY   → หาร "Others 3 ด. (ไม่รวม DIY) + Sales Out Mr.DIY 3 ด."
 //  · สีเกณฑ์เดียวกับ หมวด② On hand Cover (flowOhcColor)
+// จำนวนของสินค้านี้ในตู้ที่ "กำลังแก้ไข" ซึ่งถูกบันทึกและนับรวมใน packed/หมวด② ไปแล้ว (กันนับซ้ำ)
+function pkPackedInOpenRound(code){
+  if(window.pkEditIdx==null) return 0;
+  const s=(window.pkLog||[])[window.pkEditIdx]; if(!s || s.pending) return 0;
+  if(typeof pkRoundArrived==='function' && pkRoundArrived(s)) return 0;   // ตู้ถึงคลัง/รอเปิด PO = ไม่อยู่ใน packed
+  let q=0; (s.rows||[]).forEach(r=>{ if(r.item!==code || !r.po) return; q+=(+r.pcs||0); }); return q;
+}
 function pkCoverStock(code){
   const it=(typeof getItem==='function')?getItem(code):null;
   if(!it || typeof reorderCalc!=='function') return null;
   const rc=reorderCalc(it);
-  const base=(rc.c2||0)+pkItemEnteredQty(code);   // หมวด② + จำนวนที่กรอก (รวมทุกบรรทัดของสินค้านี้)
+  // หมวด② (รวม packed ที่บันทึกแล้ว) + จำนวนที่กรอกในหน้านี้ − ส่วนที่ถูกบันทึกในตู้ที่กำลังแก้ไข (กันนับซ้ำ)
+  const base=(rc.c2||0)+pkItemEnteredQty(code)-pkPackedInOpenRound(code);
   const diy=pkIsDiyItem(code);
   const denom = diy ? ((flowExDiyAvg(it,3)||0)+(flowStoreAvg(it,3)||0)) : (flowAvg3(it)||0);
   const m = denom>0 ? base/denom : (base>0?Infinity:0);
