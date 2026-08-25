@@ -231,7 +231,7 @@
   var KEY = 'richestGateOK';
   var g = document.getElementById('pw-gate');
   function ss(fn){ try{ return fn(); }catch(e){ return null; } }   // กัน sessionStorage ถูกบล็อกในบาง sandbox
-  function unlock(){ if(g && g.parentNode) g.parentNode.removeChild(g); ss(function(){ sessionStorage.setItem(KEY,'1'); }); if(window.appPresenceStart) setTimeout(window.appPresenceStart, 400); }
+  function unlock(){ if(g && g.parentNode) g.parentNode.removeChild(g); ss(function(){ sessionStorage.setItem(KEY,'1'); }); setTimeout(function(){ try{ if(window.appPresenceStart) window.appPresenceStart(); }catch(e){} }, 600); }
   if(ss(function(){ return sessionStorage.getItem(KEY); })==='1'){ unlock(); return; }
   var i=document.getElementById('pw-input'), b=document.getElementById('pw-btn'), er=document.getElementById('pw-err');
   function tryPw(){ if(i.value===PASSCODE){ unlock(); } else { er.textContent='รหัสผ่านไม่ถูกต้อง'; i.value=''; i.focus(); } }
@@ -11584,6 +11584,8 @@ window.appPresenceStart=function(){
   setInterval(presTick, 60000);
   window.addEventListener('beforeunload', function(){ try{ if(window.GraphStorage&&window.GraphStorage.presenceDelete) window.GraphStorage.presenceDelete('presence-'+presClientId()); }catch(e){} });
 };
+// safety net: เริ่ม presence เมื่อผ่านด่านรหัสแล้ว (เผื่อ hook ใน unlock ไม่ทำงาน) — ลองซ้ำจนกว่าด่านจะหาย
+(function(){ let n=0; const iv=setInterval(function(){ n++; if(window._presStarted || n>40){ clearInterval(iv); return; } if(!document.getElementById('pw-gate')){ try{ window.appPresenceStart&&window.appPresenceStart(); }catch(e){} clearInterval(iv); } }, 500); })();
 function init(){
   comboInit('s-item', renderSearch);      // ช่องค้นหาสินค้าแบบพิมพ์ได้
   comboInit('l-item', renderLeadtime);
