@@ -11558,14 +11558,21 @@ function presPickModal(){
   ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:20px 22px;max-width:360px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);">
     <div style="font-weight:800;font-size:16px;margin-bottom:6px;">👋 คุณคือใคร?</div>
     <div class="muted" style="font-size:12px;margin-bottom:12px;line-height:1.5;">เลือกชื่อของคุณ เพื่อให้ทีมเห็นว่าคุณกำลังใช้งานอยู่</div>
-    <select id="pres-sel" style="width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:15px;">${opts}</select>
+    <select id="pres-sel" onchange="presAdminToggle()" style="width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:15px;">${opts}</select>
+    <div id="pres-admin-wrap" style="margin-top:10px;display:${cur==='ADMIN/IT'?'block':'none'};">
+      <label style="font-size:12px;font-weight:700;">🔒 รหัสยืนยันสำหรับ ADMIN/IT<br><input type="password" id="pres-admin-pw" placeholder="กรอกรหัส" style="margin-top:4px;width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:15px;"></label>
+    </div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
       <button onclick="document.getElementById('pres-ov').remove()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:700;">ข้าม</button>
       <button onclick="presSavePick()" style="padding:7px 16px;border-radius:8px;border:0;background:var(--brand);color:#fff;cursor:pointer;font-weight:800;">ยืนยัน</button>
     </div></div>`;
   document.body.appendChild(ov);
 }
-function presSavePick(){ const v=(document.getElementById('pres-sel')||{}).value||''; if(!v){ if(typeof pkToast==='function') pkToast('กรุณาเลือกชื่อ','bad'); return; } presSetName(v); const ov=document.getElementById('pres-ov'); if(ov) ov.remove(); presTick(); }
+const PRES_ADMIN_PW='WoW99';   // รหัสยืนยันสำหรับ ADMIN/IT
+function presAdminToggle(){ const v=(document.getElementById('pres-sel')||{}).value||''; const w=document.getElementById('pres-admin-wrap'); if(w) w.style.display=(v==='ADMIN/IT')?'block':'none'; }
+function presSavePick(){ const v=(document.getElementById('pres-sel')||{}).value||''; if(!v){ if(typeof pkToast==='function') pkToast('กรุณาเลือกชื่อ','bad'); return; }
+  if(v==='ADMIN/IT'){ const pw=(document.getElementById('pres-admin-pw')||{}).value||''; if(pw!==PRES_ADMIN_PW){ if(typeof pkToast==='function') pkToast('รหัสยืนยัน ADMIN/IT ไม่ถูกต้อง','bad'); const el=document.getElementById('pres-admin-pw'); if(el){ el.value=''; el.focus(); } return; } }
+  presSetName(v); const ov=document.getElementById('pres-ov'); if(ov) ov.remove(); presTick(); }
 const PRES_PAGE_LABEL={flowchart:'Flowchart',leadtime:'🚨 ต้องรีบสั่ง',search:'ค้นหาสต๊อก',packing:'Packing List',payment:'Payment'};
 // บันทึก "การกระทำล่าสุด" แบบหยาบ + ส่ง heartbeat ทันที (ให้เพื่อนเห็นเร็ว)
 function presAct(text){ window._presAct={t:text, ts:Date.now()}; try{ presHeartbeat(); }catch(e){} }
