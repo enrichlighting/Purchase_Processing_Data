@@ -155,19 +155,6 @@
   #page-packing #pk-result table th, #page-packing #pk-result table td { padding:8px 9px; font-size:12.5px; }
   #page-packing #pk-result table td:nth-child(3){ max-width:260px; }
   code.k { background:var(--bg); border:1px solid var(--line); padding:1px 6px; border-radius:6px; font-size:12px; }
-  /* แถบสารบัญด้านซ้าย (ล็อคขณะเลื่อน) */
-  #toc { position:fixed; left:0; top:0; bottom:0; width:190px; background:var(--card); border-right:1px solid var(--line); z-index:600; overflow-y:auto; padding:14px 10px 40px; box-sizing:border-box; font-size:13px; }
-  #toc-head { display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:14px; margin-bottom:4px; }
-  #toc-close { cursor:pointer; padding:1px 9px; border-radius:6px; font-size:15px; color:var(--muted); }
-  #toc-close:hover { background:var(--line); }
-  #toc .toc-grp { font-weight:800; font-size:11.5px; color:var(--muted); margin:12px 4px 3px; letter-spacing:.2px; }
-  #toc a { display:block; padding:7px 9px; border-radius:7px; color:var(--ink); text-decoration:none; cursor:pointer; line-height:1.3; }
-  #toc a:hover { background:var(--brand-soft); }
-  #toc-open-btn { position:fixed; left:10px; top:78px; z-index:600; background:var(--brand); color:#fff; border-radius:9px; padding:8px 11px; cursor:pointer; font-size:16px; box-shadow:0 4px 12px rgba(0,0,0,.22); display:none; }
-  body.toc-open { padding-left:190px; }
-  body:not(.toc-open) #toc { display:none; }
-  body:not(.toc-open) #toc-open-btn { display:block; }
-  @media (max-width:820px){ body.toc-open { padding-left:0; } body.toc-open #toc { box-shadow:6px 0 40px rgba(0,0,0,.35); } }
 
   /* ===== ปลาทองพ่นฟองอากาศ (หน้า Payment) — ฟองลอยขึ้นทีละฟอง ===== */
   .pay-bubbles .bub{ position:absolute; bottom:0; width:12px; height:12px; border-radius:50%; opacity:0;
@@ -240,20 +227,6 @@
   try{ i.focus(); }catch(e){}
 })();
 </script>
-<nav id="toc">
-  <div id="toc-head">📑 สารบัญ <span id="toc-close" onclick="tocToggle(false)" title="ซ่อนแถบ">✕</span></div>
-  <div class="toc-grp">🚨 ต้องรีบสั่ง &amp; วางแผน</div>
-  <a onclick="tocGo('leadtime','sec-urgent')">• สินค้าที่ต้องรีบสั่งซื้อ</a>
-  <a onclick="tocGo('leadtime','po-follow-card')">• อันดับค้างรับ &amp; กรอก Lead Time</a>
-  <div class="toc-grp">🔎 ค้นหาสต๊อก</div>
-  <a onclick="tocGo('search','sec-search')">• ค้นหา / เลือกสินค้า</a>
-  <a onclick="tocGo('search','sec-itemlist')">• รายการสินค้าทั้งหมด</a>
-  <a onclick="tocGo('search','sec-cust-s')">• ยอดขายรายลูกค้า</a>
-  <div class="toc-grp">📦 Packing List</div>
-  <a onclick="tocGo('packing','sec-packing')">• จัดตู้ (คำนวณ CBM)</a>
-  <a onclick="tocGo('packing','pk-logcard')">• ประวัติการบันทึก</a>
-</nav>
-<div id="toc-open-btn" onclick="tocToggle(true)" title="เปิดสารบัญ">📑</div>
 <div class="wrap">
   <header class="top">
     <div class="logo">R</div>
@@ -11247,17 +11220,20 @@ function payRowsData(splitLot){
         // Lot No. เดียวกับที่แสดงในหน้า Packing List (Lot ที่บันทึก → ที่เลือกเอง → ดึงจาก POA) — ใช้กับคอลัมน์ใน Excel
         const lotAll = (((per&&per.lot)||r.costLot||((typeof pkLotFromPO==='function')?pkLotFromPO(r.item, r.po||''):'')||'')).trim();
         const gk=f+'||'+ven+(splitLot?('||'+lot):'');   // แยกกลุ่มตาม Vendor + Factory (+ Lot ถ้าเปิด splitLot)
-        const g=groups[gk]||(groups[gk]={factory:f, vendor:ven, lot:lot, rmb:0, item:r.item, po:r.po||'', pos:new Set(), lots:new Set()});
+        const g=groups[gk]||(groups[gk]={factory:f, vendor:ven, lot:lot, rmb:0, item:r.item, po:r.po||'', pos:new Set(), lots:new Set(), brk:{}});
         g.rmb+=(+per.valRmb||0); if(!g.item) g.item=r.item; if(!g.po) g.po=r.po||'';
-        if(r.po) g.pos.add(r.po); if(lotAll) g.lots.add(lotAll);   // 1 กลุ่ม (ตู้×Vendor×Factory) อาจมีหลาย POA / หลาย Lot
+        if(r.po) g.pos.add(r.po); if(lotAll) g.lots.add(lotAll);
+        const bk=(r.po||'')+'\u0001'+lotAll; g.brk[bk]=(g.brk[bk]||0)+(+per.valRmb||0);   // มูลค่าแยกราย PO × Lot No.   // 1 กลุ่ม (ตู้×Vendor×Factory) อาจมีหลาย POA / หลาย Lot
       });
       Object.keys(groups).forEach(gk=>{ const g=groups[gk]; const term=payCreditTerm(g.item,g.vendor,g.factory);
         const docDate=(window.BC_PODATE&&window.BC_PODATE[g.po])||'';
         const segs=payPaymentSegments(term, load, eta, docDate);
         const base={cont:ct.name||('ตู้'+(ci+1)), load, eta, factory:g.factory, vendor:g.vendor||'(ไม่ทราบ vendor)', term, lot:g.lot||'',
-                    poList:[...g.pos].sort().join(', '), lotList:[...g.lots].sort().join(', ')};
+                    poList:[...g.pos].sort().join(', '), lotList:[...g.lots].sort().join(', '),
+                    lotRows: Object.keys(g.brk).sort().map(k=>({po:k.split('\u0001')[0], lot:k.split('\u0001')[1], rmb:g.brk[k]}))};
         if(!segs.length){ out.push(Object.assign({}, base, {amtRmb:g.rmb, xfer:'', seg:''})); }
-        else segs.forEach(sg=>{ out.push(Object.assign({}, base, {amtRmb:g.rmb*sg.r, xfer:sg.date, seg:sg.label})); });
+        else segs.forEach(sg=>{ out.push(Object.assign({}, base, {amtRmb:g.rmb*sg.r, xfer:sg.date, seg:sg.label,
+          lotRows: base.lotRows.map(x=>({po:x.po, lot:x.lot, rmb:x.rmb*sg.r}))})); });   // แบ่งตามสัดส่วนงวดจ่าย
       });
     });
   });
@@ -11274,17 +11250,47 @@ function payExportExcel(sfx){
   wrap.querySelectorAll('input[type=checkbox]').forEach(i=>{ const td=i.closest('td'); if(td) td.textContent=i.checked?'✔':''; });
   wrap.querySelectorAll('[onclick],[onchange]').forEach(n=>{ n.removeAttribute('onclick'); n.removeAttribute('onchange'); });
   const bTh='border:1px solid #a8801f;background:#d4af37;color:#3a2a00;font-weight:800;text-align:center;font-size:11.5px;padding:5px 6px;';
-  const bTd='border:1px solid #d8c893;padding:3px 7px;color:#111;font-size:11px;text-align:center;';
-  let nPo=0, nLot=0, nRow=0;
+  const bTd='border:1px solid #d8c893;padding:3px 7px;color:#111;font-size:11px;text-align:center;white-space:nowrap;';
+  const bTdR=bTd+'text-align:right;font-weight:700;';
+  const fx=payFx(opt.fxEl);
+  const f2=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const NEWCOLS=4;   // PO · LOT NO. · มูลค่า ¥ · มูลค่า ฿
+  let nRow=0, nLot=0;
   wrap.querySelectorAll('table.pay-main').forEach(tb=>{
-    [...tb.rows].forEach(tr=>{
-      if(tr.cells.length && tr.cells[0].tagName==='TH'){                     // แถวหัวตาราง
-        ['POA','LOT NO.'].forEach(h=>{ const th=document.createElement('th'); th.setAttribute('style',bTh); th.textContent=h; tr.appendChild(th); });
+    const rows=[...tb.rows];
+    // แต่ละแถวจะถูกแตกเป็นกี่บรรทัด (ตามจำนวน Lot)
+    const lotsOf=tr=>{ const j=tr.getAttribute('data-lotrows'); if(!j) return null;
+      try{ const a=JSON.parse(j); return (a&&a.length)?a:null; }catch(e){ return null; } };
+    const expand=rows.map(tr=>{ const a=lotsOf(tr); return a?a.length:1; });
+    // rowspan เดิมนับเป็น "แถวเดิม" → ต้องขยายตามจำนวนบรรทัดที่แตกออกมาในช่วงนั้น
+    rows.forEach((tr,i)=>{ [...tr.cells].forEach(td=>{ const R=+td.getAttribute('rowspan')||1;
+      if(R>1){ let sum=0; for(let k=i;k<Math.min(rows.length,i+R);k++) sum+=expand[k]; if(sum!==R) td.setAttribute('rowspan',sum); } }); });
+    rows.forEach((tr,i)=>{
+      if(tr.cells.length && tr.cells[0].tagName==='TH'){          // หัวตาราง: แทรก 4 คอลัมน์หลัง CT NO.
+        const hs=[...tr.cells]; let at=hs.findIndex(c=>c.textContent.trim().toUpperCase()==='CT NO.');
+        const ref=(at>=0&&hs[at+1])?hs[at+1]:null;
+        ['PO','LOT NO.','มูลค่าตาม Lot (¥)','มูลค่าตาม Lot (฿)'].forEach(h=>{
+          const th=document.createElement('th'); th.setAttribute('style',bTh); th.textContent=h;
+          if(ref) tr.insertBefore(th,ref); else tr.appendChild(th); });
         return;
       }
-      const po=tr.getAttribute('data-po')||'', lot=tr.getAttribute('data-lot')||'';
-      if(po||lot){ nRow++; if(po) nPo++; if(lot) nLot++; }
-      [po,lot].forEach(v=>{ const td=document.createElement('td'); td.setAttribute('style',bTd+'white-space:nowrap;'); td.textContent=v; tr.appendChild(td); });
+      const div=[...tr.cells].find(c=>(+c.getAttribute('colspan')||1)>1 && !c.textContent.trim());
+      if(div && tr.cells.length<=4){ div.setAttribute('colspan',(+div.getAttribute('colspan')||1)+NEWCOLS); return; }   // แถวเส้นคั่นวีค
+      const arr=lotsOf(tr) || [{po:(tr.getAttribute('data-po')||''), lot:'', rmb:(+tr.getAttribute('data-amt')||0)}];
+      const ctCell=tr.querySelector('td.pay-ct-cell');
+      const k=arr.length;
+      if(k>1){ [...tr.cells].forEach(td=>{ if(!td.getAttribute('rowspan')) td.setAttribute('rowspan',k); }); }   // ช่องเดิม merge คร่อมบรรทัดย่อย
+      const mk=(o)=>{ const c1=document.createElement('td'); c1.setAttribute('style',bTd); c1.textContent=o.po||'';
+        const c2=document.createElement('td'); c2.setAttribute('style',bTd); c2.textContent=o.lot||'';
+        const c3=document.createElement('td'); c3.setAttribute('style',bTdR); c3.textContent=o.rmb?('¥'+f2(o.rmb)):'';
+        const c4=document.createElement('td'); c4.setAttribute('style',bTdR); c4.textContent=o.rmb?('฿'+f2(o.rmb*fx)):'';
+        return [c1,c2,c3,c4]; };
+      const first=mk(arr[0]); const ref=ctCell?ctCell.nextSibling:null;
+      first.forEach(c=>{ if(ctCell) tr.insertBefore(c,ref); else tr.appendChild(c); });
+      let prev=tr;
+      for(let j=1;j<k;j++){ const ntr=document.createElement('tr'); mk(arr[j]).forEach(c=>ntr.appendChild(c));
+        prev.parentNode.insertBefore(ntr, prev.nextSibling); prev=ntr; }
+      nRow+=k; arr.forEach(o=>{ if(o.lot) nLot++; });
     });
   });
   const ySel=(document.getElementById(opt.ySel)||{}).value||'', mSel=(document.getElementById(opt.mSel)||{}).value||'';
@@ -11302,7 +11308,7 @@ function payExportExcel(sfx){
   const safe=v=>String(v).replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'');
   const name='Payment'+(opt.sfx||'')+'_'+safe(mTxt)+'_'+safe(yTxt)+'.xls';
   pkWriteFile(name, new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'}));
-  pkToast('Export Payment แล้ว — '+mTxt+' '+yTxt+'\n'+nRow+' แถว · มี POA '+nPo+' แถว · มี Lot No. '+nLot+' แถว','good');
+  pkToast('Export Payment แล้ว — '+mTxt+' '+yTxt+'\n'+nRow+' บรรทัด (แตกย่อยราย Lot) · ระบุ Lot No. ได้ '+nLot+' บรรทัด','good');
 }
 const PAY_OPT1={sfx:'', body:'pay-body', mSel:'pay-month', ySel:'pay-year', vSel:'pay-vendor', ctSel:'pay-ct', fxEl:'pay-fx', usdEl:'pay-usd', splitLot:false, docs:false};
 const PAY_OPT2={sfx:'2', body:'pay2-body', mSel:'pay2-month', ySel:'pay2-year', vSel:'pay2-vendor', ctSel:'pay2-ct', fxEl:'pay2-fx', usdEl:'pay2-usd', splitLot:true, docs:true};
@@ -11374,7 +11380,9 @@ function payVendorColor(v){ v=String(v||'').trim(); if(!v) return '#ffffff';
 // สร้างตาราง Payment ของเดือนเดียว (y,m) จาก data ที่กรองแล้ว · showSide=แสดงปฏิทิน+มังกร
 // attribute ของแถว — เก็บ POA / Lot No. ไว้ให้ payExportExcel() ดึงไปสร้างคอลัมน์เพิ่มในไฟล์ Excel
 function payRowAttrs(r){ if(!r) return '';
-  return (r.poList?(' data-po="'+payEsc(r.poList)+'"'):'')+(r.lotList?(' data-lot="'+payEsc(r.lotList)+'"'):''); }
+  const lr=(r.lotRows&&r.lotRows.length)?(' data-lotrows="'+payEsc(JSON.stringify(r.lotRows)).replace(/"/g,'&quot;')+'"'):'';   // ต้อง escape เครื่องหมายคำพูดด้วย ไม่งั้น attribute ขาด
+  const am=(' data-amt="'+(+r.amtRmb||0)+'"');
+  return (r.poList?(' data-po="'+payEsc(r.poList)+'"'):'')+(r.lotList?(' data-lot="'+payEsc(r.lotList)+'"'):'')+lr+am; }
 function payMonthBlock(y, m, data, fx, showSide, opt){
   opt=opt||{};
   const usd=payUsd(opt.usdEl);
@@ -11422,7 +11430,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
        + `<td style="${bTd}background:${vbg};text-align:left;white-space:normal;min-width:135px;">${exBadge}<b style="color:#111;">${payEsc(r.vendor)}</b><div style="font-size:10.5px;color:#6b7280;">${payEsc(r.factory)}</div></td>`
        + `<td style="${bTd}background:${vbg};text-align:left;white-space:normal;font-size:11px;line-height:1.3;min-width:150px;color:#4b5563;">${r._extra ? (r._kind?('<b style="color:#7f1d1d;">'+payEsc(payExtraKindLabel(r._kind))+'</b>'):'<span style="color:#9ca3af;">-</span>') : (payEsc(r.term)||'<span style="color:#9ca3af;">-</span>')}</td>`
        + `<td style="${bTd}background:${vbg};text-align:center;white-space:nowrap;color:#374151;">${payThaiDate(r.load)}</td>`
-       + `<td style="${bTd}background:${vbg};text-align:center;white-space:nowrap;font-weight:700;color:#111;">${payEsc(r.cont)}</td>`
+       + `<td class="pay-ct-cell" style="${bTd}background:${vbg};text-align:center;white-space:nowrap;font-weight:700;color:#111;">${payEsc(r.cont)}</td>`
        + (opt.splitLot?`<td style="${bTd}background:${vbg};text-align:center;white-space:nowrap;color:#111;">${r.lot?('<b>'+payEsc(r.lot)+'</b>'):'<span style="color:#9ca3af;">-</span>'}</td>`:'')
        + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:700;color:${((r._cur==='USD'?(+r.amtUsd||0):(+r.amtRmb||0))<0)?'#b91c1c':'#111'};">${(r._cur==='USD')?('$'+f2(r.amtUsd)):('¥'+f2(r.amtRmb))}${r.seg?`<div style="font-size:9px;font-weight:700;color:#7f1d1d;">${payEsc(r.seg)}</div>`:''}</td>`
        + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?((venShow.usd>0)?('$'+f2(venShow.usd)):('¥'+f2(venShow.rmb))):''}</td>`
@@ -11706,8 +11714,6 @@ function init(){
   // เรนเดอร์เฉพาะแท็บที่เปิดอยู่ (lazy) — แท็บอื่นเรนเดอร์เมื่อคลิกครั้งแรก
   const active = (document.querySelector('.tab.active')||{}).dataset ? document.querySelector('.tab.active').dataset.tab : 'leadtime';
   renderTab(active);
-  // ค่าเริ่มต้นแถบสารบัญ: เปิดบนจอกว้าง · จำค่าที่ผู้ใช้เลือกไว้
-  { let s=null; try{ s=localStorage.getItem('tocOpen'); }catch(e){} const op = s!=null ? s==='1' : (window.innerWidth>=1000); document.body.classList.toggle('toc-open', op); }
   uiFontInit();          // ปรับขนาดตัวอักษรหน้า Flowchart/Packing ตามค่าที่จำไว้
   if(typeof flowFillVF==='function') flowFillVF();   // เติมรายชื่อ Vendor/Factory ในช่องค้นหา
 }
@@ -11724,13 +11730,6 @@ function setUIFont(pt){
 }
 function uiFontStep(d){ setUIFont(uiFontGet()+d); }
 function uiFontInit(){ setUIFont(uiFontGet()); }
-/* ===== แถบสารบัญด้านซ้าย ===== */
-function tocToggle(open){ document.body.classList.toggle('toc-open', open); try{ localStorage.setItem('tocOpen', open?'1':'0'); }catch(e){} }
-function tocGo(tab, anchor){
-  const t=document.querySelector('.tab[data-tab="'+tab+'"]'); if(t && !t.classList.contains('active')) t.click();
-  setTimeout(function(){ const el=document.getElementById(anchor); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 80);
-  if(window.innerWidth<=820) tocToggle(false);   // จอเล็ก: ปิดแถบหลังเลือก
-}
 init();
 
 /* ============== ซิงค์ข้อมูลกับ SharePoint ส่วนกลาง (ใช้ auth.js + graphStorage.js บน GitHub Pages) ==============
