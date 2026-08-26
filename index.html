@@ -9045,6 +9045,7 @@ function pkRowWarn(i){
   return `<div class="muted" style="font-size:10px;margin-top:2px;">สั่งผลิต ${fmtNum(pr.prod)} ชิ้น · จัดแล้ว ${fmtNum(total)}${pr.out!=null?' · ค้างรับ '+fmtNum(pr.out):''}</div>`;
 }
 function pkSaveRound(asNew){
+  try{ if(typeof presAct==='function') presAct('บันทึกจัดตู้ (Packing List)'); }catch(e){}
   const editIdx = asNew ? null : window.pkEditIdx;   // asNew = บันทึกเป็นรอบใหม่ ไม่ทับของเดิม
   // ดึงค่าจากช่องกรอกวันที่ (ที่ยังไม่ได้กดบันทึกวันที่) มาใส่ ct.dates ก่อนสร้าง snapshot (โหมด Released)
   if(window.pkMode==='released'){ window.pkContainers.forEach((ct,c)=>{ if(!ct.dates) ct.dates={}; PK_DATEF.forEach(f=>{ const inp=document.getElementById('pk-d-'+c+'-'+f.k); if(inp && inp.value && !ct.dates[f.k]) ct.dates[f.k]=inp.value; }); }); }
@@ -9665,7 +9666,7 @@ function poSchedule(po,item){
   return {doc,lead,total,valid:true, f1date:poAddDays(doc,total*0.30), f2date:poAddDays(doc,total*0.60), endDate:poAddDays(doc,total)};
 }
 // setters (รายสินค้า)
-function poSetLead(po,item,v){ poFI(po,item).leadDays = v===''?'':Math.max(0,+v||0); poSaveFollow(); poRefresh(); }
+function poSetLead(po,item,v){ try{ if(typeof presAct==='function') presAct('กรอก Lead Time (🚨)'); }catch(e){} poFI(po,item).leadDays = v===''?'':Math.max(0,+v||0); poSaveFollow(); poRefresh(); }
 function poSetQty(po,item,v,max){ let q=v===''?'':Math.max(0,+v||0); if(q!=='' && max!=null && q>max) q=max; poFI(po,item).orderQty=q; poSaveFollow(); poRefresh(); }
 window.poFilter = window.poFilter || 'all';
 function poSetFilter(k){ window.poFilter=k; renderPoFollow(); }
@@ -10610,6 +10611,7 @@ function flowSuggestCell(it, rc){
   </td>`;
 }
 function flowSetSug(no, val){
+  try{ if(typeof presAct==='function') presAct('แก้ Suggestion (Flowchart)'); }catch(e){}
   window.flowSug=window.flowSug||{};
   const n=Math.max(0, +String(val).replace(/,/g,'')||0);
   if(val===''||val==null||String(val).replace(/[^0-9]/g,'')==='') delete window.flowSug[no]; else window.flowSug[no]=n;
@@ -11003,7 +11005,7 @@ function payEditXfer(enc){
   </div>`;
   document.body.appendChild(ov);
 }
-function paySaveXfer(enc){ const key=decodeURIComponent(enc); const d=document.getElementById('pay-xfer-date').value; const reason=(document.getElementById('pay-xfer-reason').value||'').trim();
+function paySaveXfer(enc){ try{ if(typeof presAct==='function') presAct('แก้วันที่โอน (Payment)'); }catch(e){} const key=decodeURIComponent(enc); const d=document.getElementById('pay-xfer-date').value; const reason=(document.getElementById('pay-xfer-reason').value||'').trim();
   if(!d){ pkToast('กรุณาระบุวันที่โอน','bad'); return; }
   if(!reason){ pkToast('กรุณาระบุเหตุผลในการแก้ไข','bad'); return; }
   payLoadOv(); window.payXferOv[key]={date:d, reason:reason}; paySaveOv();
@@ -11084,6 +11086,7 @@ function payExtraVendorChg(){
   if(fw){ fw.style.opacity=noFac?'.45':'1'; }
 }
 function paySaveExtraRow(id){
+  try{ if(typeof presAct==='function') presAct('บันทึกค่าใช้จ่ายอื่น (Payment)'); }catch(e){}
   const xfer=(document.getElementById('pex-xfer').value||'').trim();
   const kind=(document.getElementById('pex-kind').value||'').trim();
   const vendor=(document.getElementById('pex-vendor').value||'').trim();
@@ -11460,6 +11463,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
   </div>`;
 }
 function renderTab(tab){
+  try{ window._presPage=(typeof PRES_PAGE_LABEL!=='undefined'&&PRES_PAGE_LABEL[tab])||tab; if(window._presStarted && typeof presHeartbeat==='function') presHeartbeat(); }catch(e){}   // presence: อัปเดตหน้าที่กำลังเปิด
   if(tab==='flowchart'){ if(typeof poLoadFollow==='function') poLoadFollow(); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderFlowchart(); }
   else if(tab==='search'){ renderSearch(); renderItemList(); }   // หน้าค้นหารวมรายการสินค้าแล้ว
   else if(tab==='leadtime'){ poLoadFollow(); const _pr=poPruneStaleFollow(); if(_pr && _pr.length && typeof pkToast==='function') pkToast('ล้างรายการติดตาม PO เก่าที่ไม่ตรงข้อมูล BC แล้ว '+_pr.length+' รายการ','good'); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderUrgent(); renderPoFollow(); renderArrivedMatrix(); }
@@ -11562,7 +11566,13 @@ function presPickModal(){
   document.body.appendChild(ov);
 }
 function presSavePick(){ const v=(document.getElementById('pres-sel')||{}).value||''; if(!v){ if(typeof pkToast==='function') pkToast('กรุณาเลือกชื่อ','bad'); return; } presSetName(v); const ov=document.getElementById('pres-ov'); if(ov) ov.remove(); presTick(); }
-async function presHeartbeat(){ const nm=presName(); if(!nm) return; if(!(window.GraphStorage && window.GraphStorage.presenceSet)) return; try{ await window.GraphStorage.presenceSet('presence-'+presClientId(), {name:nm, ts:Date.now()}); }catch(e){} }
+const PRES_PAGE_LABEL={flowchart:'Flowchart',leadtime:'🚨 ต้องรีบสั่ง',search:'ค้นหาสต๊อก',packing:'Packing List',payment:'Payment'};
+// บันทึก "การกระทำล่าสุด" แบบหยาบ + ส่ง heartbeat ทันที (ให้เพื่อนเห็นเร็ว)
+function presAct(text){ window._presAct={t:text, ts:Date.now()}; try{ presHeartbeat(); }catch(e){} }
+async function presHeartbeat(){ const nm=presName(); if(!nm) return; if(!(window.GraphStorage && window.GraphStorage.presenceSet)) return;
+  const act=(window._presAct && (Date.now()-window._presAct.ts<600000)) ? window._presAct.t : '';   // การกระทำล่าสุดภายใน 10 นาที
+  const actTs=(window._presAct)?window._presAct.ts:0;
+  try{ await window.GraphStorage.presenceSet('presence-'+presClientId(), {name:nm, ts:Date.now(), page:window._presPage||'', act:act, actTs:actTs}); }catch(e){} }
 async function presRender(){
   const el=document.getElementById('online-users'); if(!el) return;
   const nm=presName();
@@ -11570,11 +11580,38 @@ async function presRender(){
   if(!(window.GraphStorage && window.GraphStorage.presenceList)){ el.innerHTML='👤 '+presEsc(nm)+' <a onclick="presPickModal()" style="cursor:pointer;color:var(--muted);font-size:10px;">เปลี่ยน</a>'; return; }
   let rows=null; try{ rows=await window.GraphStorage.presenceList('presence-'); }catch(e){ rows=null; }
   if(rows==null){ el.innerHTML=`👤 ${presEsc(nm)} · <a onclick="if(window.cloudPullNow)cloudPullNow()" title="ต้องเข้าสู่ระบบ (ปุ่มดึงข้อมูลล่าสุด) เพื่อแสดงผู้ใช้ออนไลน์" style="cursor:pointer;color:var(--brand);">เข้าสู่ระบบเพื่อดูออนไลน์</a>`; return; }
-  const now=Date.now(), seen={}, names=[];
-  rows.forEach(r=>{ let v={}; try{ v=JSON.parse(r.value||'{}'); }catch(e){} if(v&&v.name&&v.ts&&(now-(+v.ts)<PRESENCE_TTL)){ if(!seen[v.name]){ seen[v.name]=1; names.push(v.name); } } });
+  const now=Date.now(), byName={};
+  rows.forEach(r=>{ let v={}; try{ v=JSON.parse(r.value||'{}'); }catch(e){} if(v&&v.name&&v.ts&&(now-(+v.ts)<PRESENCE_TTL)){ const ex=byName[v.name]; if(!ex || (+v.ts)>(+ex.ts)) byName[v.name]=v; } });   // ต่อชื่อ เก็บ heartbeat ล่าสุด
+  window._presData=byName;   // เก็บไว้ให้ panel ใช้
+  const names=Object.keys(byName).sort();
   if(!names.length){ el.innerHTML=`👤 ${presEsc(nm)}`; return; }
-  names.sort();
-  el.innerHTML=`<span title="อัปเดตทุก ~1 นาที · นับเฉพาะทีมที่เข้าสู่ระบบ">🟢 <b>ขณะนี้มีคนเข้าใช้งาน ${names.length} คน</b>: ${names.map(presEsc).join(', ')}</span> · <a onclick="presPickModal()" style="cursor:pointer;color:var(--muted);font-size:10px;">เปลี่ยนชื่อ</a>`;
+  el.innerHTML=`<a onclick="presPanel()" title="คลิกดูรายละเอียด: ใครอยู่หน้าไหน · ทำอะไรล่าสุด" style="cursor:pointer;">🟢 <b>ขณะนี้มีคนเข้าใช้งาน ${names.length} คน</b>: ${names.map(presEsc).join(', ')} <span style="font-size:10px;color:var(--brand);">▸ รายละเอียด</span></a> · <a onclick="presPickModal()" style="cursor:pointer;color:var(--muted);font-size:10px;">เปลี่ยนชื่อ</a>`;
+}
+// กล่องรายละเอียด: แต่ละคน อยู่หน้าไหน · ทำอะไรล่าสุด · ใช้งานล่าสุดเมื่อไหร่
+function presPanel(){
+  const bn=window._presData||{}; const names=Object.keys(bn).sort(); const now=Date.now();
+  const ago=ts=>{ const s=Math.max(0,Math.round((now-(+ts))/1000)); if(s<60) return s+' วิ'; const m=Math.round(s/60); return m+' นาที'; };
+  let ov=document.getElementById('pres-panel'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='pres-panel';
+  ov.style.cssText='position:fixed;inset:0;z-index:100011;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';
+  const rows=names.map(n=>{ const v=bn[n]; const fresh=(now-(+v.ts))<90000; const actFresh=(v.actTs && (now-(+v.actTs))<600000);
+    return `<tr>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;"><b>${fresh?'🟢':'⚪'} ${presEsc(n)}</b></td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;">${v.page?('📄 '+presEsc(v.page)):'<span class="muted">-</span>'}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--line);">${(actFresh&&v.act)?('✏️ '+presEsc(v.act)+' <span class="muted" style="font-size:10px;">('+ago(v.actTs)+'ที่แล้ว)</span>'):'<span class="muted">-</span>'}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;color:var(--muted);font-size:11px;">${ago(v.ts)}ที่แล้ว</td>
+    </tr>`; }).join('');
+  ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:18px 20px;max-width:560px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);max-height:85vh;overflow:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">
+      <div style="font-weight:800;font-size:15px;">🟢 ผู้ใช้ออนไลน์ (${names.length} คน)</div>
+      <button onclick="document.getElementById('pres-panel').remove()" style="padding:5px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:700;">ปิด</button>
+    </div>
+    <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="background:var(--brand-soft);">
+      <th style="padding:6px 10px;text-align:left;">ชื่อ</th><th style="padding:6px 10px;text-align:left;">หน้าที่เปิด</th><th style="padding:6px 10px;text-align:left;">การกระทำล่าสุด</th><th style="padding:6px 10px;text-align:left;">ใช้งานล่าสุด</th>
+    </tr></thead><tbody>${rows||'<tr><td colspan="4" style="padding:10px;" class="muted">ไม่มีใครออนไลน์</td></tr>'}</tbody></table></div>
+    <div class="muted" style="font-size:10.5px;margin-top:8px;">🟢 = ใช้งานอยู่ (ภายใน 1.5 นาที) · ⚪ = เพิ่งใช้งาน · อัปเดตอัตโนมัติทุก ~1 นาที</div>
+  </div>`;
+  document.body.appendChild(ov);
 }
 function presTick(){ presHeartbeat(); presRender(); }
 window.appPresenceStart=function(){
