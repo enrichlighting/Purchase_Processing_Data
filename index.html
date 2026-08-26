@@ -11244,20 +11244,65 @@ function payRowsData(splitLot){
         const f=(r.factory||'').trim(); if(!f) return;
         const ven=(payRowVendor(s, r, f)||'').trim();   // ตู้ import → ยึด CSV · ตู้ที่คีย์เอง → ยึด Vendor ของ PO จาก BC
         const lot = splitLot ? (((per&&per.lot)||r.costLot||'').trim()) : '';   // แยกตาม Lot No. ที่ระบุในตู้ (เฉพาะหน้า Payment 2)
+        // Lot No. เดียวกับที่แสดงในหน้า Packing List (Lot ที่บันทึก → ที่เลือกเอง → ดึงจาก POA) — ใช้กับคอลัมน์ใน Excel
+        const lotAll = (((per&&per.lot)||r.costLot||((typeof pkLotFromPO==='function')?pkLotFromPO(r.item, r.po||''):'')||'')).trim();
         const gk=f+'||'+ven+(splitLot?('||'+lot):'');   // แยกกลุ่มตาม Vendor + Factory (+ Lot ถ้าเปิด splitLot)
-        const g=groups[gk]||(groups[gk]={factory:f, vendor:ven, lot:lot, rmb:0, item:r.item, po:r.po||''});
+        const g=groups[gk]||(groups[gk]={factory:f, vendor:ven, lot:lot, rmb:0, item:r.item, po:r.po||'', pos:new Set(), lots:new Set()});
         g.rmb+=(+per.valRmb||0); if(!g.item) g.item=r.item; if(!g.po) g.po=r.po||'';
+        if(r.po) g.pos.add(r.po); if(lotAll) g.lots.add(lotAll);   // 1 กลุ่ม (ตู้×Vendor×Factory) อาจมีหลาย POA / หลาย Lot
       });
       Object.keys(groups).forEach(gk=>{ const g=groups[gk]; const term=payCreditTerm(g.item,g.vendor,g.factory);
         const docDate=(window.BC_PODATE&&window.BC_PODATE[g.po])||'';
         const segs=payPaymentSegments(term, load, eta, docDate);
-        const base={cont:ct.name||('ตู้'+(ci+1)), load, eta, factory:g.factory, vendor:g.vendor||'(ไม่ทราบ vendor)', term, lot:g.lot||''};
+        const base={cont:ct.name||('ตู้'+(ci+1)), load, eta, factory:g.factory, vendor:g.vendor||'(ไม่ทราบ vendor)', term, lot:g.lot||'',
+                    poList:[...g.pos].sort().join(', '), lotList:[...g.lots].sort().join(', ')};
         if(!segs.length){ out.push(Object.assign({}, base, {amtRmb:g.rmb, xfer:'', seg:''})); }
         else segs.forEach(sg=>{ out.push(Object.assign({}, base, {amtRmb:g.rmb*sg.r, xfer:sg.date, seg:sg.label})); });
       });
     });
   });
   return out;
+}
+// ===== Export หน้า Payment เป็น Excel — ใช้ตารางที่แสดงอยู่เป็นต้นแบบ + เพิ่มคอลัมน์ POA / LOT NO. =====
+// ยึดตามตัวกรองที่เลือกอยู่ (ปี · เดือน · Vendor · เลขตู้) เพราะดึงจาก DOM ที่เรนเดอร์แล้ว
+function payExportExcel(sfx){
+  const opt=(String(sfx||'')==='2')?PAY_OPT2:PAY_OPT1;
+  const src=document.getElementById(opt.body);
+  if(!src || !src.querySelector('table.pay-main')){ pkToast('ไม่พบตาราง Payment ที่จะ export','bad'); return; }
+  const wrap=document.createElement('div'); wrap.innerHTML=src.innerHTML;
+  wrap.querySelectorAll('.pay-tools, .pay-side, svg').forEach(n=>n.remove());   // ตัดปุ่ม/ปฏิทิน/รูปออก
+  wrap.querySelectorAll('input[type=checkbox]').forEach(i=>{ const td=i.closest('td'); if(td) td.textContent=i.checked?'✔':''; });
+  wrap.querySelectorAll('[onclick],[onchange]').forEach(n=>{ n.removeAttribute('onclick'); n.removeAttribute('onchange'); });
+  const bTh='border:1px solid #a8801f;background:#d4af37;color:#3a2a00;font-weight:800;text-align:center;font-size:11.5px;padding:5px 6px;';
+  const bTd='border:1px solid #d8c893;padding:3px 7px;color:#111;font-size:11px;text-align:center;';
+  let nPo=0, nLot=0, nRow=0;
+  wrap.querySelectorAll('table.pay-main').forEach(tb=>{
+    [...tb.rows].forEach(tr=>{
+      if(tr.cells.length && tr.cells[0].tagName==='TH'){                     // แถวหัวตาราง
+        ['POA','LOT NO.'].forEach(h=>{ const th=document.createElement('th'); th.setAttribute('style',bTh); th.textContent=h; tr.appendChild(th); });
+        return;
+      }
+      const po=tr.getAttribute('data-po')||'', lot=tr.getAttribute('data-lot')||'';
+      if(po||lot){ nRow++; if(po) nPo++; if(lot) nLot++; }
+      [po,lot].forEach(v=>{ const td=document.createElement('td'); td.setAttribute('style',bTd+'white-space:nowrap;'); td.textContent=v; tr.appendChild(td); });
+    });
+  });
+  const ySel=(document.getElementById(opt.ySel)||{}).value||'', mSel=(document.getElementById(opt.mSel)||{}).value||'';
+  const yTxt=(ySel==='__all__')?'ทุกปี':(ySel||String(APP_TODAY.getFullYear()+543));
+  const mTxt=(mSel==='__all__')?'ทุกเดือน':(PAY_MONTHS_TH[(+mSel||(APP_TODAY.getMonth()+1))-1]||'');
+  const head=`<div style="font-family:Tahoma;font-size:15px;font-weight:800;margin-bottom:6px;">อัพเดท Payment${opt.sfx||''} — ${mTxt} ${yTxt}`
+    + `<span style="font-weight:400;font-size:12px;"> · Exchange Rate ${payFx(opt.fxEl)} บาท/หยวน · ออกเมื่อ ${pkNowStr()}</span></div>`;
+  const html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">'
+    + '<head><meta charset="utf-8">'
+    + '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>'
+    + '<x:Name>Payment</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>'
+    + '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->'
+    + '<style>body,table{font-family:Tahoma,sans-serif;} table{border-collapse:collapse;}</style></head>'
+    + '<body>'+head+wrap.innerHTML+'</body></html>';
+  const safe=v=>String(v).replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'');
+  const name='Payment'+(opt.sfx||'')+'_'+safe(mTxt)+'_'+safe(yTxt)+'.xls';
+  pkWriteFile(name, new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'}));
+  pkToast('Export Payment แล้ว — '+mTxt+' '+yTxt+'\n'+nRow+' แถว · มี POA '+nPo+' แถว · มี Lot No. '+nLot+' แถว','good');
 }
 const PAY_OPT1={sfx:'', body:'pay-body', mSel:'pay-month', ySel:'pay-year', vSel:'pay-vendor', ctSel:'pay-ct', fxEl:'pay-fx', usdEl:'pay-usd', splitLot:false, docs:false};
 const PAY_OPT2={sfx:'2', body:'pay2-body', mSel:'pay2-month', ySel:'pay2-year', vSel:'pay2-vendor', ctSel:'pay2-ct', fxEl:'pay2-fx', usdEl:'pay2-usd', splitLot:true, docs:true};
@@ -11315,7 +11360,10 @@ function renderPayment(opt){
     if(!combos.length) combos=[{y:(y0||APP_TODAY.getFullYear()), m:(allMonth?(APP_TODAY.getMonth()+1):(+mSel||APP_TODAY.getMonth()+1))}];
   }
   const multi=combos.length>1;
-  el.innerHTML=combos.map(c=>payMonthBlock(c.y, c.m, data, fx, !multi, opt)).join('<div style="height:26px;border-top:2px dashed #d8c893;margin-top:14px;"></div>');
+  const tools=`<div class="pay-tools" style="display:flex;justify-content:flex-end;margin:0 0 4px;">`
+    +`<button onclick="payExportExcel('${opt.sfx||''}')" title="Export ตารางนี้เป็น Excel (ตามปี/เดือน/Vendor/ตู้ ที่เลือกอยู่) — มีคอลัมน์ POA และ Lot No. เพิ่มให้"`
+    +` style="border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:7px;padding:2px 8px;font-size:14px;line-height:1.3;cursor:pointer;">🖨️</button></div>`;
+  el.innerHTML=tools+combos.map(c=>payMonthBlock(c.y, c.m, data, fx, !multi, opt)).join('<div style="height:26px;border-top:2px dashed #d8c893;margin-top:14px;"></div>');
 }
 // สีพื้นหลังพาสเทลต่อ Vendor — แจกสีไล่ลำดับ (Vendor คนละตัว = คนละสี) จัดใน payAssignVendorColors()
 const PAY_VC_PALETTE=['#fde2e4','#d6ecf5','#e3f0d4','#efe4f7','#fff3d1','#dff5ea','#fce3d6','#e6e2f8','#d9f0f2','#f7e5ee','#eaf3d9','#f0e2d0','#dbeafe','#fae1f0','#e2f5d9','#f5e6c8'];
@@ -11324,6 +11372,9 @@ function payVendorColor(v){ v=String(v||'').trim(); if(!v) return '#ffffff';
   if(window._payVCmap && window._payVCmap[v]) return window._payVCmap[v];
   let h=0; for(let i=0;i<v.length;i++) h=(h*31+v.charCodeAt(i))>>>0; return PAY_VC_PALETTE[h%PAY_VC_PALETTE.length]; }
 // สร้างตาราง Payment ของเดือนเดียว (y,m) จาก data ที่กรองแล้ว · showSide=แสดงปฏิทิน+มังกร
+// attribute ของแถว — เก็บ POA / Lot No. ไว้ให้ payExportExcel() ดึงไปสร้างคอลัมน์เพิ่มในไฟล์ Excel
+function payRowAttrs(r){ if(!r) return '';
+  return (r.poList?(' data-po="'+payEsc(r.poList)+'"'):'')+(r.lotList?(' data-lot="'+payEsc(r.lotList)+'"'):''); }
 function payMonthBlock(y, m, data, fx, showSide, opt){
   opt=opt||{};
   const usd=payUsd(opt.usdEl);
@@ -11410,7 +11461,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
     const dataRows = rows.length ? rows : [null];
     const cells = rows.length ? groupCells(rows,wi) : [restCells(null,null,wi,wkTotBaht[wi],1,true)];
     const wl = rows.length ? wkLabel(wi+1,rng,rows.length) : wkLabel(wi+1,rng,1);
-    cells.forEach((cc,ri)=>{ const _rx=(dataRows[ri]&&dataRows[ri].xfer)?(' data-xfer="'+dataRows[ri].xfer+'"'):''; let tr='<tr'+_rx+'>'+(ri===0?wl:'')+cc;
+    cells.forEach((cc,ri)=>{ const _rx=(dataRows[ri]&&dataRows[ri].xfer)?(' data-xfer="'+dataRows[ri].xfer+'"'):''; let tr='<tr'+_rx+payRowAttrs(dataRows[ri])+'>'+(ri===0?wl:'')+cc;
       if(ri===0 && !emitted[half]){ tr+=rightGroup(half, half===1?phys1:phys2); emitted[half]=true; }
       tr+=cfCells(dataRows[ri]||null);   // checkbox CF ต่อบรรทัด (แถวว่าง=blank)
       body+=tr+'</tr>';
@@ -11418,7 +11469,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
     body+=wkDivider;
   });
   if(other.length){ const oc=groupCells(other,-1);
-    oc.forEach((cc,ri)=>{ let tr='<tr>'+(ri===0?`<td rowspan="${other.length}" style="border:1px solid #5c0f0f;font-weight:800;background:#a33;text-align:center;white-space:nowrap;padding:4px 8px;color:#ffe;">อื่นๆ<div style="font-weight:500;font-size:9px;color:#ffd9d9;">นอกเดือน/ยังไม่กำหนด</div></td>`:'')+cc;
+    oc.forEach((cc,ri)=>{ let tr='<tr'+payRowAttrs(other[ri])+'>'+(ri===0?`<td rowspan="${other.length}" style="border:1px solid #5c0f0f;font-weight:800;background:#a33;text-align:center;white-space:nowrap;padding:4px 8px;color:#ffe;">อื่นๆ<div style="font-weight:500;font-size:9px;color:#ffd9d9;">นอกเดือน/ยังไม่กำหนด</div></td>`:'')+cc;
       if(ri===0) tr+=rightBlank(other.length); tr+=cfCells(other[ri]||null); body+=tr+'</tr>'; });
   }
   const usdTot=grandUsd;   // รวมยอดฝั่ง USD (จากค่าใช้จ่ายที่เลือกสกุล USD)
@@ -11430,7 +11481,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
       <tr><td colspan="2" style="border:none;"></td><td style="${tdT}font-weight:800;background:#d4af37;color:#3a2a00;">TOTAL BAHT</td><td style="${tdT}background:#d4af37;color:#3a2a00;"><b>฿${f2(grand*fx + usdTot*usd)}</b></td></tr>
     </table></div>`;
   const title = showSide?'':`<div style="font-weight:800;font-size:15px;color:#7f1d1d;margin:2px 0 6px;">📅 ${PAY_MONTHS_TH[m-1]} ${y+543}</div>`;
-  const side = showSide?`<div style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;">
+  const side = showSide?`<div class="pay-side" style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;">
       ${payCalendarHtml(y,m,xferSet)}
       <div title="ปลามังกรพ่นน้ำ รับทรัพย์ (มงคล ปีมังกร)" style="width:8cm;display:flex;justify-content:flex-end;padding-right:8px;user-select:none;">
         <div style="position:relative;display:inline-block;line-height:1;filter:drop-shadow(0 4px 7px rgba(0,0,0,.22));">
@@ -11456,7 +11507,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
     </div>`:'';
   return `${title}<div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:nowrap;">
     <div style="flex:1 1 auto;min-width:0;overflow-x:auto;">
-      <table style="border-collapse:collapse;font-size:12px;min-width:100%;">${head}${body}</table>
+      <table class="pay-main" style="border-collapse:collapse;font-size:12px;min-width:100%;">${head}${body}</table>
       ${totals}
     </div>
     ${side}
