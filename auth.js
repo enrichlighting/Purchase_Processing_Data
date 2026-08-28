@@ -7,7 +7,10 @@ const msalConfig = {
   auth: {
     clientId: '5bf2fbde-fbfa-4469-b7d6-7a035a01ef1b', // Application (client) ID
     authority: 'https://login.microsoftonline.com/77ec4080-3602-4d2e-b2fb-eee9ed878b1c', // Tenant ID
-    redirectUri: 'https://enrichlighting.github.io/Purchase_Processing_Data/', // ต้องตรงกับ Redirect URI ที่ลงทะเบียนไว้ใน Entra ID เป๊ะๆ
+    //redirectUri: 'https://enrichlighting.github.io/Purchase_Processing_Data/', // ต้องตรงกับ Redirect URI ที่ลงทะเบียนไว้ใน Entra ID เป๊ะๆ
+       redirectUri: window.location.hostname.includes('dynamics.com')
+     ? 'https://org747e4176.crm5.dynamics.com/main.aspx?appid=f0d7fc49-839f-f111-b8de-70a8a502a6cf&pagetype=webresource&webresourceName=rich_index.html'
+     : 'https://enrichlighting.github.io/Purchase_Processing_Data/', // เลือก Redirect URI อัตโนมัติตามโดเมนที่รันอยู่ (GitHub Pages หรือ Dataverse)
   },
   cache: {
     cacheLocation: 'sessionStorage',
