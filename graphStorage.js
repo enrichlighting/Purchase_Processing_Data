@@ -167,9 +167,16 @@ async function verifyLogin(username, password) {
   if (!response.ok) throw new Error(`Graph API error (${response.status})`);
   const data = await response.json();
   if (!data.value || !data.value.length) return null;
-  const f = data.value[0].fields;
+  const item = data.value[0];
+  const f = item.fields;
   const hash = await _sha256Hex(password);
   if (hash !== f.PasswordHash) return null;
+  // บันทึกเวลาใช้งานล่าสุด (ยิงแบบไม่รอผล กัน login ช้าถ้าเน็ตช้า)
+  fetch(`${APPUSERS_BASE}/items/${item.id}/fields`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ LastLogin: new Date().toISOString() }),
+  }).catch(()=>{});
   return { username: f.Title, role: f.Role, displayName: f.DisplayName || f.Title };
 }
 
