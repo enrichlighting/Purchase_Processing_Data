@@ -122,6 +122,27 @@ async function presenceDelete(key) {
   if (id) await _presFetch(token, `${GRAPH_BASE}/items/${id}`, { method: 'DELETE' });
 }
 
+// ============================================================
+// อัปโหลดไฟล์ (Excel/รูปภาพ) ตรงเข้า SharePoint Document Library แบบอัตโนมัติ
+// ทุกคนที่ login เข้าแอปจะเซฟตรงที่เดียวกันได้เลย ไม่ต้องตั้งโฟลเดอร์ในเครื่อง
+// ============================================================
+const UPLOAD_FOLDER = 'Packing list log'; // ชื่อโฟลเดอร์ปลายทางใน SharePoint (Documents)
+async function uploadFile(filename, blob) {
+  const token = await window.GraphAuth.getGraphToken();
+  const path = `${encodeURIComponent(UPLOAD_FOLDER)}/${encodeURIComponent(filename)}`;
+  const url = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/drive/root:/${path}:/content`;
+  const buf = await blob.arrayBuffer();
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: buf,
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Graph upload error (${response.status}): ${errText}`);
+  }
+  return response.json();
+}
 window.GraphStorage = {
   saveData,
   loadData,
@@ -129,4 +150,5 @@ window.GraphStorage = {
   presenceSet,
   presenceList,
   presenceDelete,
+  uploadFile,
 };
