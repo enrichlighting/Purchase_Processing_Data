@@ -218,7 +218,7 @@
   var KEY = 'richestGateOK';
   var g = document.getElementById('pw-gate');
   function ss(fn){ try{ return fn(); }catch(e){ return null; } }   // กัน sessionStorage ถูกบล็อกในบาง sandbox
-  function unlock(){ if(g && g.parentNode) g.parentNode.removeChild(g); ss(function(){ sessionStorage.setItem(KEY,'1'); }); setTimeout(function(){ try{ if(window.appPresenceStart) window.appPresenceStart(); }catch(e){} }, 600); }
+  function unlock(){ if(g && g.parentNode) g.parentNode.removeChild(g); ss(function(){ sessionStorage.setItem(KEY,'1'); }); setTimeout(function(){ try{ if(window.appAuthGateStart) window.appAuthGateStart(); }catch(e){} }, 600); }
   if(ss(function(){ return sessionStorage.getItem(KEY); })==='1'){ unlock(); return; }
   var i=document.getElementById('pw-input'), b=document.getElementById('pw-btn'), er=document.getElementById('pw-err');
   function tryPw(){ if(i.value===PASSCODE){ unlock(); } else { er.textContent='รหัสผ่านไม่ถูกต้อง'; i.value=''; i.focus(); } }
@@ -238,6 +238,7 @@
       <div class="datasrc" id="datasrc" style="margin-left:0;">แหล่งข้อมูล: <b>ตัวอย่าง (Demo)</b> · พร้อมต่อ Business Central OData</div>
       <div id="data-refresh" style="font-size:11px;color:var(--muted);text-align:right;line-height:1.55;"></div>
       <div id="online-users" style="font-size:11px;text-align:right;line-height:1.5;color:var(--muted);"></div>
+      <div id="app-user-bar" style="font-size:11px;text-align:right;line-height:1.5;color:var(--muted);margin-top:2px;"></div>
     </div>
   </header>
 
@@ -11695,6 +11696,93 @@ function presPanel(){
   document.body.appendChild(ov);
 }
 function presTick(){ presHeartbeat(); presRender(); }
+// ============================================================
+// Login ตาม Role (Admin/Purchase/Account) — ทำงานหลังผ่านด่านรหัสรวมแล้ว
+// ต้องเข้าสู่ระบบด้วย username/password ที่สร้างไว้ใน SharePoint List "AppUsers" ก่อนถึงจะใช้แอปได้
+// ============================================================
+const ROLE_PAGES = {
+  Admin: ['flowchart','leadtime','search','packing','payment'],
+  Purchase: ['flowchart','leadtime','search','packing','payment'],
+  Account: ['payment'],
+};
+function appAuthInfo(){ try{ const s=sessionStorage.getItem('appAuthV1'); return s?JSON.parse(s):null; }catch(e){ return null; } }
+function appSetAuthInfo(info){ try{ sessionStorage.setItem('appAuthV1', JSON.stringify(info)); }catch(e){} }
+function appClearAuthInfo(){ try{ sessionStorage.removeItem('appAuthV1'); }catch(e){} }
+
+function appApplyRoleTabs(role){
+  const allow = ROLE_PAGES[role] || [];
+  let activeHidden=false;
+  document.querySelectorAll('.tab').forEach(t=>{
+    const ok = allow.indexOf(t.dataset.tab) !== -1;
+    t.style.display = ok ? '' : 'none';
+    if(!ok && t.classList.contains('active')) activeHidden=true;
+  });
+  if(activeHidden){
+    const visible = Array.from(document.querySelectorAll('.tab')).find(t=>t.style.display!=='none');
+    if(visible) visible.click();
+  }
+  const bar=document.getElementById('app-user-bar');
+  if(bar){ const info=appAuthInfo(); if(info){ bar.innerHTML = '👤 '+presEsc(info.displayName||info.username)+' ('+presEsc(info.role)+') · <a onclick="appLogout()" style="cursor:pointer;color:var(--brand);font-weight:700;">ออกจากระบบ</a>'; } }
+}
+
+function appLoginModal(){
+  let ov=document.getElementById('app-login-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='app-login-ov';
+  ov.style.cssText='position:fixed;inset:0;z-index:100020;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:14px;padding:26px 24px;max-width:340px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35);text-align:center;">
+    <div style="font-size:28px;margin-bottom:4px;">🔑</div>
+    <div style="font-weight:800;font-size:16px;margin-bottom:14px;">เข้าสู่ระบบ</div>
+    <input id="app-login-user" type="text" placeholder="Username" autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px 12px;margin-bottom:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:14px;">
+    <input id="app-login-pass" type="password" placeholder="Password" autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:14px;">
+    <div id="app-login-err" style="min-height:16px;margin:8px 0 0;font-size:12px;color:var(--bad);"></div>
+    <button id="app-login-btn" onclick="appTryLogin()" style="margin-top:10px;width:100%;padding:11px;font-size:15px;font-weight:700;border:none;border-radius:10px;background:var(--brand);color:#fff;cursor:pointer;">เข้าสู่ระบบ</button>
+  </div>`;
+  document.body.appendChild(ov);
+  const passEl=document.getElementById('app-login-pass');
+  const userEl=document.getElementById('app-login-user');
+  [userEl,passEl].forEach(el=>el.addEventListener('keydown', function(ev){ if(ev.key==='Enter') appTryLogin(); }));
+  try{ userEl.focus(); }catch(e){}
+}
+
+async function appTryLogin(){
+  const u=(document.getElementById('app-login-user')||{}).value||'';
+  const p=(document.getElementById('app-login-pass')||{}).value||'';
+  const err=document.getElementById('app-login-err');
+  const btn=document.getElementById('app-login-btn');
+  if(!u || !p){ if(err) err.textContent='กรุณากรอก username และ password'; return; }
+  if(btn){ btn.disabled=true; btn.textContent='กำลังตรวจสอบ...'; }
+  try{
+    if(!(window.GraphStorage && window.GraphStorage.verifyLogin)) throw new Error('ระบบยังโหลดไม่เสร็จ ลองใหม่อีกครั้ง');
+    const result = await window.GraphStorage.verifyLogin(u.trim(), p);
+    if(!result){ if(err) err.textContent='Username หรือ Password ไม่ถูกต้อง'; if(btn){ btn.disabled=false; btn.textContent='เข้าสู่ระบบ'; } const pw=document.getElementById('app-login-pass'); if(pw){ pw.value=''; pw.focus(); } return; }
+    appSetAuthInfo(result);
+    try{ presSetName(result.displayName || result.username); }catch(e){}
+    const ov=document.getElementById('app-login-ov'); if(ov) ov.remove();
+    appApplyRoleTabs(result.role);
+    if(window.appPresenceStart) window.appPresenceStart();
+  }catch(e){
+    if(err) err.textContent = 'เข้าสู่ระบบไม่สำเร็จ: '+(e && e.message ? e.message : 'unknown error');
+    if(btn){ btn.disabled=false; btn.textContent='เข้าสู่ระบบ'; }
+  }
+}
+
+function appLogout(){
+  appClearAuthInfo();
+  try{ localStorage.removeItem('appUserV1'); }catch(e){}
+  try{ if(window.GraphStorage && window.GraphStorage.presenceDelete) window.GraphStorage.presenceDelete('presence-'+presClientId()); }catch(e){}
+  location.reload();
+}
+
+window.appAuthGateStart=function(){
+  if(window._authGateStarted) return; window._authGateStarted=true;
+  const info=appAuthInfo();
+  if(info && info.role){
+    appApplyRoleTabs(info.role);
+    if(window.appPresenceStart) window.appPresenceStart();
+  } else {
+    appLoginModal();
+  }
+};
 window.appPresenceStart=function(){
   if(window._presStarted) return; window._presStarted=true;
   try{ if(!presName()) presPickModal(); }catch(e){}
@@ -11703,7 +11791,7 @@ window.appPresenceStart=function(){
   window.addEventListener('beforeunload', function(){ try{ if(window.GraphStorage&&window.GraphStorage.presenceDelete) window.GraphStorage.presenceDelete('presence-'+presClientId()); }catch(e){} });
 };
 // safety net: เริ่ม presence เมื่อผ่านด่านรหัสแล้ว (เผื่อ hook ใน unlock ไม่ทำงาน) — ลองซ้ำจนกว่าด่านจะหาย
-(function(){ let n=0; const iv=setInterval(function(){ n++; if(window._presStarted || n>40){ clearInterval(iv); return; } if(!document.getElementById('pw-gate')){ try{ window.appPresenceStart&&window.appPresenceStart(); }catch(e){} clearInterval(iv); } }, 500); })();
+(function(){ let n=0; const iv=setInterval(function(){ n++; if(window._authGateStarted || n>40){ clearInterval(iv); return; } if(!document.getElementById('pw-gate')){ try{ window.appAuthGateStart&&window.appAuthGateStart(); }catch(e){} clearInterval(iv); } }, 500); })();
 function init(){
   comboInit('s-item', renderSearch);      // ช่องค้นหาสินค้าแบบพิมพ์ได้
   comboInit('l-item', renderLeadtime);
