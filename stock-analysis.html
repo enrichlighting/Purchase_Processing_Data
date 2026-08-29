@@ -9142,6 +9142,10 @@ async function pkEnsurePerm(h){ if(!h||!h.queryPermission) return true; if(await
 function pkDirStatusSet(html){ const st=document.getElementById('pk-dirstatus'); if(st) st.innerHTML=html; }
 
 // เขียนไฟล์: ถ้าตั้งโฟลเดอร์ไว้ → เขียนลงโฟลเดอร์ · ไม่งั้นดาวน์โหลด
+// ดาวน์โหลดไฟล์ลงเครื่องของผู้ใช้เองตรงๆ (ไม่ผ่าน SharePoint/Graph) — ใช้กับปุ่ม Invoice และ PL
+function pkDownloadLocal(name, blob){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+}
 async function pkWriteFile(name, blob){
   // 1) ลองอัปโหลดตรงขึ้น SharePoint ก่อนเสมอ (อัตโนมัติ ไม่ต้องตั้งค่าอะไร — ทำงานได้ทุกเครื่องที่ login แล้ว)
   try{
@@ -9298,7 +9302,7 @@ function invExport(idx, ci){
   const zip=invZipStore(entries);
   const blob=new Blob([zip],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const cname=(cont.name||('ตู้'+(ci+1))).replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'');
-  pkWriteFile('Invoice_'+cname+'_'+pkTsFile(pkTsParts(s).orig)+'.xlsx', blob);
+  pkDownloadLocal('Invoice_'+cname+'_'+pkTsFile(pkTsParts(s).orig)+'.xlsx', blob);
   pkToast('Export Invoice: '+(cont.name||'')+' — '+items.length+' รายการ'+(vendor?(' · '+vendor):''), 'good');
 }
 
@@ -9365,7 +9369,7 @@ function plExport(idx, ci){
   const zip=invZipStore(entries);
   const blob=new Blob([zip],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const cname=(cont.name||('ตู้'+(ci+1))).replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'');
-  pkWriteFile('PackingList_'+cname+'_'+pkTsFile(pkTsParts(s).orig)+'.xlsx', blob);
+  pkDownloadLocal('PackingList_'+cname+'_'+pkTsFile(pkTsParts(s).orig)+'.xlsx', blob);
   pkToast('Export Packing List: '+(cont.name||'')+' — '+items.length+' รายการ'+(vendor?(' · '+vendor):''), 'good');
 }
 
@@ -9569,7 +9573,7 @@ function renderPkLog(){
       <td class="num">¥${pkMoney(s.grand.valRmb)}<br>฿${pkMoney(s.grand.valThb)}</td>
       <td style="font-size:11px;">${cont}</td>
       <td style="min-width:180px;">${s.pending?'<span style="font-size:11px;font-weight:700;color:#92400e;">⏳ รอเปิด PO</span><div class="muted" style="font-size:10px;">ยังไม่ทราบเลขตู้/วันที่ · จับคู่ PO แล้วไปทำต่อ Released PO</div>':s.containers.map((c,i)=>`<div style="margin-bottom:7px;"><span style="font-size:11px;font-weight:700;">${c.name}</span>${pkShipStatusHtml(c.dates)}</div>`).join('')}</td>
-      <td style="white-space:nowrap"><button style="${mini}" onclick="pkEditRound(${idx})">✏️ แก้ไข</button> ${s.pending?'':(s.containers||[]).map((c,ci)=>`<button style="${mini};background:var(--good-soft);color:var(--good);border-color:var(--good);font-weight:700;" onclick="invExport(${idx},${ci})" title="Export Invoice (Excel) — ${c.name||''}">📋 Invoice${(s.containers.length>1)?(' '+(c.name||('#'+(ci+1)))):''}</button> <button style="${mini};background:#e0f2fe;color:#0369a1;border-color:#0369a1;font-weight:700;" onclick="plExport(${idx},${ci})" title="Export Packing List (Excel) — ${c.name||''}">📦 PL${(s.containers.length>1)?(' '+(c.name||('#'+(ci+1)))):''}</button>`).join(' ')} <button style="${mini}" onclick="pkExportExcel(${idx})">📄 Excel</button> <button style="${mini}" onclick="pkPreviewImage(${idx})">🖼️ ภาพตู้</button> <a href="#" style="color:var(--bad);font-size:12px;font-weight:${window.pkDelConfirm===idx?'700':'400'};${window.pkDelConfirm===idx?'background:#fdecec;padding:2px 6px;border-radius:5px;':''}" onclick="pkDelRound(${idx});return false;">${window.pkDelConfirm===idx?'⚠️ คลิกอีกครั้งเพื่อยืนยันลบ':'🗑️ ลบ'}</a></td>
+      <td style="white-space:nowrap"><button style="${mini}" onclick="pkEditRound(${idx})">✏️ แก้ไข</button> ${s.pending?'':(s.containers||[]).map((c,ci)=>`<button style="${mini};background:var(--good-soft);color:var(--good);border-color:var(--good);font-weight:700;" onclick="invExport(${idx},${ci})" title="Export Invoice (Excel) — ${c.name||''}">📋 Invoice${(s.containers.length>1)?(' '+(c.name||('#'+(ci+1)))):''}</button> <button style="${mini};background:#e0f2fe;color:#0369a1;border-color:#0369a1;font-weight:700;" onclick="plExport(${idx},${ci})" title="Export Packing List (Excel) — ${c.name||''}">📦 PL${(s.containers.length>1)?(' '+(c.name||('#'+(ci+1)))):''}</button>`).join(' ')} <a href="#" style="color:var(--bad);font-size:12px;font-weight:${window.pkDelConfirm===idx?'700':'400'};${window.pkDelConfirm===idx?'background:#fdecec;padding:2px 6px;border-radius:5px;':''}" onclick="pkDelRound(${idx});return false;">${window.pkDelConfirm===idx?'⚠️ คลิกอีกครั้งเพื่อยืนยันลบ':'🗑️ ลบ'}</a></td>
     </tr>`;
   });
   const stky='position:sticky;top:0;z-index:6;background:var(--brand-soft);box-shadow:0 2px 0 var(--line);';
