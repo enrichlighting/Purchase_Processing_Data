@@ -9143,12 +9143,22 @@ function pkDirStatusSet(html){ const st=document.getElementById('pk-dirstatus');
 
 // เขียนไฟล์: ถ้าตั้งโฟลเดอร์ไว้ → เขียนลงโฟลเดอร์ · ไม่งั้นดาวน์โหลด
 async function pkWriteFile(name, blob){
+  // 1) ลองอัปโหลดตรงขึ้น SharePoint ก่อนเสมอ (อัตโนมัติ ไม่ต้องตั้งค่าอะไร — ทำงานได้ทุกเครื่องที่ login แล้ว)
+  try{
+    if(window.GraphStorage && window.GraphStorage.uploadFile){
+      await window.GraphStorage.uploadFile(name, blob);
+      pkDirStatusSet('☁️ อัปโหลด <b>'+name+'</b> ขึ้น SharePoint (Packing list log) เรียบร้อยอัตโนมัติ');
+      return true;
+    }
+  }catch(e){ console.warn('graph upload fail', e); }
+  // 2) สำรอง: ถ้าอัปโหลดไม่ได้ (ออฟไลน์/ยังไม่ login) แต่เคยตั้งโฟลเดอร์ในเครื่องไว้ → เขียนลงโฟลเดอร์นั้นแทน
   if(window.pkDirHandle){
     try{ if(await pkEnsurePerm(window.pkDirHandle)){
       const fh=await window.pkDirHandle.getFileHandle(name,{create:true}); const w=await fh.createWritable(); await w.write(blob); await w.close();
       pkDirStatusSet('✅ บันทึกไฟล์ <b>'+name+'</b> ลงโฟลเดอร์ <b>'+window.pkDirHandle.name+'</b> แล้ว'); return true;
     }}catch(e){ console.warn('write fail',e); }
   }
+  // 3) สำรองสุดท้าย: ดาวน์โหลดลง Downloads
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),3000); return false;
 }
 async function pkSetDir(){
