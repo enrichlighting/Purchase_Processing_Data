@@ -143,6 +143,48 @@ async function uploadFile(filename, blob) {
   }
   return response.json();
 }
+// ============================================================
+// Login ระบบ username/password ของแอป (แยกจาก Microsoft sign-in ที่มีอยู่แล้ว)
+// เก็บใน SharePoint List: AppUsers (site: PackingPO) — คอลัมน์ Title(=username) / PasswordHash / Role / DisplayName
+// รหัสผ่านไม่ได้เก็บตรงๆ — แปลงเป็น hash (SHA-256) ก่อนเทียบ/บันทึกเสมอ แปลงกลับเป็นรหัสผ่านจริงไม่ได้
+// ============================================================
+const APPUSERS_LIST_ID = '52ed1658-b58f-40d9-90b4-db880a52fe78';
+const APPUSERS_BASE = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/lists/${APPUSERS_LIST_ID}`;
+
+async function _sha256Hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ตรวจสอบ username/password กับ AppUsers List
+// สำเร็จ -> คืน {username, role, displayName} · ไม่สำเร็จ -> คืน null
+async function verifyLogin(username, password) {
+  const token = await window.GraphAuth.getGraphToken();
+  const url = `${APPUSERS_BASE}/items?expand=fields(select=Title,PasswordHash,Role,DisplayName)&$filter=fields/Title eq '${encodeURIComponent(username)}'`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' },
+  });
+  if (!response.ok) throw new Error(`Graph API error (${response.status})`);
+  const data = await response.json();
+  if (!data.value || !data.value.length) return null;
+  const f = data.value[0].fields;
+  const hash = await _sha256Hex(password);
+  if (hash !== f.PasswordHash) return null;
+  return { username: f.Title, role: f.Role, displayName: f.DisplayName || f.Title };
+}
+
+// เพิ่ม user ใหม่เข้า AppUsers List (ใช้ตอนสร้าง user ครั้งแรก หรือให้ Admin เพิ่ม user ในแอปทีหลัง)
+async function createUser(username, password, role, displayName) {
+  const token = await window.GraphAuth.getGraphToken();
+  const hash = await _sha256Hex(password);
+  const response = await fetch(`${APPUSERS_BASE}/items`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: { Title: username, PasswordHash: hash, Role: role, DisplayName: displayName || username } }),
+  });
+  if (!response.ok) { const t = await response.text(); throw new Error(`Graph API error (${response.status}): ${t}`); }
+  return response.json();
+}
 window.GraphStorage = {
   saveData,
   loadData,
@@ -151,4 +193,6 @@ window.GraphStorage = {
   presenceList,
   presenceDelete,
   uploadFile,
+  verifyLogin,
+  createUser,
 };
