@@ -9060,7 +9060,7 @@ function pkSaveRound(asNew){
   }
   pkSaveLogStore(); renderPkLog(); pkUpdateSaveBtn(); pkRerenderLinked();
   if(window.tabRendered && window.tabRendered.leadtime) poRefresh();   // อัปเดตสถานะ PO ในหน้า Lead Time
-  if(window.pkDirHandle){ pkExportExcel(savedIdx); pkExportImage(savedIdx); }
+  pkExportExcel(savedIdx); pkExportImage(savedIdx);
   const b=document.getElementById('pk-save'); if(b){ const t=b.textContent; b.textContent='✅ บันทึกแล้ว'; setTimeout(()=>{ b.textContent=t; pkUpdateSaveBtn(); },1500); }
 }
 function pkUpdateSaveBtn(){ const b=document.getElementById('pk-save'); if(!b) return; if(window.pkEditIdx!=null){ b.textContent='💾 อัปเดตข้อมูลการจัดตู้'; b.style.background='var(--warn)'; } else { b.textContent='💾 บันทึกข้อมูลการจัดตู้'; b.style.background='var(--brand)'; } }
