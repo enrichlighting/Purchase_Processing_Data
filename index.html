@@ -9142,6 +9142,10 @@ async function pkEnsurePerm(h){ if(!h||!h.queryPermission) return true; if(await
 function pkDirStatusSet(html){ const st=document.getElementById('pk-dirstatus'); if(st) st.innerHTML=html; }
 
 // เขียนไฟล์: ถ้าตั้งโฟลเดอร์ไว้ → เขียนลงโฟลเดอร์ · ไม่งั้นดาวน์โหลด
+// ดาวน์โหลดไฟล์ลงเครื่องของผู้ใช้เองตรงๆ (ไม่ผ่าน SharePoint/Graph) — ใช้กับปุ่ม Invoice และ PL
+function pkDownloadLocal(name, blob){
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+}
 async function pkWriteFile(name, blob){
   // 1) ลองอัปโหลดตรงขึ้น SharePoint ก่อนเสมอ (อัตโนมัติ ไม่ต้องตั้งค่าอะไร — ทำงานได้ทุกเครื่องที่ login แล้ว)
   try{
@@ -9298,7 +9302,7 @@ function invExport(idx, ci){
   const zip=invZipStore(entries);
   const blob=new Blob([zip],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const cname=(cont.name||('ตู้'+(ci+1))).replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'');
-  pkWriteFile('Invoice_'+cname+'_'+pkTsFile(pkTsParts(s).orig)+'.xlsx', blob);
+  pkDownloadLocal('Invoice_'+cname+'_'+pkTsFile(pkTsParts(s).orig)+'.xlsx', blob);
   pkToast('Export Invoice: '+(cont.name||'')+' — '+items.length+' รายการ'+(vendor?(' · '+vendor):''), 'good');
 }
 
@@ -9365,7 +9369,7 @@ function plExport(idx, ci){
   const zip=invZipStore(entries);
   const blob=new Blob([zip],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const cname=(cont.name||('ตู้'+(ci+1))).replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'');
-  pkWriteFile('PackingList_'+cname+'_'+pkTsFile(pkTsParts(s).orig)+'.xlsx', blob);
+  pkDownloadLocal('PackingList_'+cname+'_'+pkTsFile(pkTsParts(s).orig)+'.xlsx', blob);
   pkToast('Export Packing List: '+(cont.name||'')+' — '+items.length+' รายการ'+(vendor?(' · '+vendor):''), 'good');
 }
 
