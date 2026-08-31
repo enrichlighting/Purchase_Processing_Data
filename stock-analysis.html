@@ -11861,6 +11861,11 @@ async function appTryLogin(){
   if(!u || !p){ if(err) err.textContent='กรุณากรอก username และ password'; return; }
   if(btn){ btn.disabled=true; btn.textContent='กำลังตรวจสอบ...'; }
   try{
+    let _waited = 0;
+    while(!(window.GraphStorage && window.GraphStorage.verifyLogin) && _waited < 8000){
+      await new Promise(r => setTimeout(r, 200));
+      _waited += 200;
+    }
     if(!(window.GraphStorage && window.GraphStorage.verifyLogin)) throw new Error('ระบบยังโหลดไม่เสร็จ ลองใหม่อีกครั้ง');
     const result = await window.GraphStorage.verifyLogin(u.trim(), p);
     if(!result){ if(err) err.textContent='Username หรือ Password ไม่ถูกต้อง'; if(btn){ btn.disabled=false; btn.textContent='เข้าสู่ระบบ'; } const pw=document.getElementById('app-login-pass'); if(pw){ pw.value=''; pw.focus(); } return; }
@@ -12004,7 +12009,7 @@ window.addEventListener('load', function(){ let n=0; const t=setInterval(functio
 </script>
 <!-- ===== SharePoint sync (โหลดเฉพาะบน GitHub Pages ที่มีไฟล์เหล่านี้ · ลิงก์ Artifact จะบล็อก/404 แล้วข้ามไป) ===== -->
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.0/lib/msal-browser.min.js" onerror="void 0"></script>
-<script>document.write('<script src="auth.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
-<script>document.write('<script src="graphStorage.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script src="auth.js" onerror="void 0"></script>
+<script src="graphStorage.js" onerror="void 0"></script>
 </body>
 </html>
