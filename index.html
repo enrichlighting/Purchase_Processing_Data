@@ -10874,6 +10874,15 @@ function flowItemRow(it, basis, grp, salesCols){
   const detail=`<tr><td colspan="${totalCols}" style="padding:4px 16px 14px;background:var(--bg);border-top:1px dashed var(--line);">${flowSales(it)}<div style="text-align:right;margin-top:4px;"><a href="#" onclick="event.stopPropagation();openLeadtime('${it.no}');return false;" style="font-size:11.5px;color:var(--brand);font-weight:700;">→ เปิดหน้าวางแผนสั่งซื้อ</a></div></td></tr>`;
   return tr+detail;
 }
+// สินค้า "มีความเคลื่อนไหว" (โชว์ใน Flowchart) = ขายภายใน 3 ปี(36ด.) หรือ มี PO หรือ เคยจัดตู้ · ไม่เข้าเลยทั้ง 3 ข้อ = ซ่อน
+function flowItemEverPacked(no){ if((!window.pkLog||!window.pkLog.length) && typeof pkLoadLog==='function') pkLoadLog(); return !!(window.pkLog||[]).some(s=> !s.pending && (s.rows||[]).some(r=> r.item===no && ((+r.pcs>0) || ((r.per||[]).some(p=>+p.pcs>0))))); }
+function flowItemActive(it){
+  const no=it&&it.no; if(!no) return false;
+  const map=flowMonMap(it); if(flowMonthsBack(36).some(k=> (+map[k]||0)!==0 )) return true;   // ① ขายภายใน 3 ปี
+  if(window.BC_PO && window.BC_PO[no] && (window.BC_PO[no].pos||[]).length>0) return true;      // ② มีการทำ PO
+  if(flowItemEverPacked(no)) return true;                                                        // ③ เคยจัดตู้
+  return false;
+}
 function renderFlowchart(){
   const el=document.getElementById('flow-body'); if(!el) return;
   flowCaptureScroll();          // จำตำแหน่งเลื่อนก่อนรีเรนเดอร์
@@ -10893,7 +10902,7 @@ function renderFlowchart(){
   if(!window.flowMoqT){ try{ window.flowMoqT=JSON.parse(localStorage.getItem('flowMoqTV1')||'{}'); }catch(e){ window.flowMoqT={}; } }
   if(window.flowMoqMode===undefined){ try{ window.flowMoqMode=localStorage.getItem('flowMoqModeV1')||'qty'; }catch(e){ window.flowMoqMode='qty'; } }
   if(window.flowMoqUnit===undefined){ try{ window.flowMoqUnit=localStorage.getItem('flowMoqUnitV1')||'month'; }catch(e){ window.flowMoqUnit='month'; } }
-  let items=ITEMS.slice();   // แสดงทุกสินค้า (เอากรอง "ต้องมียอดขาย/PO" ออกตามที่ผู้ใช้สั่ง — สินค้าที่ไม่มีความเคลื่อนไหวก็โชว์)
+  let items=ITEMS.filter(flowItemActive);   // ซ่อนสินค้าที่ไม่มียอดขาย 3 ปี + ไม่มี PO + ไม่เคยจัดตู้ (ตามที่ผู้ใช้สั่ง)
   items=items.filter(i=> !FLOW_EXCLUDE.has(i.no));               // เอาสินค้าที่เลิกใช้ออกจากตาราง
   if(window.flowDiyMode==='diy') items=items.filter(i=> flowIsDiyItem(i));            // เฉพาะสินค้าที่ขายให้ Mr.DIY
   else if(window.flowDiyMode==='nondiy') items=items.filter(i=> !flowIsDiyItem(i));   // เฉพาะสินค้าที่ไม่ได้ขายให้ Mr.DIY
