@@ -1264,7 +1264,7 @@ window.BC_ITEMS = [
 </script>
 
 <!-- ถ้ามีไฟล์ bc-items.js ภายนอก (export ใหม่) จะ override ข้อมูลที่ฝังไว้ด้านบน -->
-<script src="bc-items.js" onerror="void 0"></script>
+<script>document.write('<script src="bc-items.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 
 <script>
 /* ===== Lead Time 359 รายการ (Brand ENRICH) ฝังในไฟล์โดยตรง ===== */
