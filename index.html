@@ -182,6 +182,12 @@
   #page-packing #pk-result{ max-height:78vh; overflow:auto; }
   #pk-result > table > tbody > tr:first-child th,
   #pk-result > table > tr:first-child th{ position:sticky; top:0; z-index:6; background:var(--card); box-shadow:inset 0 -2px 0 #bfe3d9, 0 3px 5px rgba(0,0,0,.07); }
+  /* หน้า 🔎 รายการสินค้า: ย่อให้เห็น ~20 แถวแล้ว scroll ดูต่อ + ล็อกหัวตาราง */
+  #il-result .il-scroll{ max-height:720px; overflow:auto; border:1px solid var(--line); border-radius:8px; }
+  #il-result .il-scroll table tr:first-child th{ position:sticky; top:0; z-index:5; background:var(--card); box-shadow:0 2px 0 var(--line); }
+  /* ตารางมิติ/ชื่อจีน/pcs (แก้ไขได้) */
+  #dimtbl-wrap .dim-scroll{ max-height:70vh; overflow:auto; border:1px solid var(--line); border-radius:8px; }
+  #dimtbl-wrap .dim-scroll table tr:first-child th{ position:sticky; top:0; z-index:5; background:var(--card); box-shadow:0 2px 0 var(--line); }
   #page-packing .kpi{ background:rgba(226,244,238,.7); border-color:#bfe3d9; }
   @media (prefers-color-scheme: dark){
     #page-packing .card{ border-color:#1f5148; border-top-color:#0f655a; }
@@ -448,6 +454,18 @@
       </div>
     </div>
     <div class="card" id="il-result"></div>
+    <div class="card" id="dimtbl-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <h2 style="margin:0;">📐 ตารางมิติ / ชื่อจีน / จำนวนต่อลัง (แก้ไขได้)</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="go" id="dimtbl-toggle" onclick="dimTblToggle()" style="background:#0891b2;">แสดงตาราง</button>
+          <button class="go" id="dimtbl-reload" onclick="dimReload()" style="background:var(--bg);color:var(--brand);border:1px solid var(--brand);display:none;">⬇️ โหลดจาก SharePoint</button>
+          <button class="go" id="dimtbl-save" onclick="dimSaveCloud()" style="background:var(--good);display:none;">💾 บันทึกขึ้น SharePoint</button>
+        </div>
+      </div>
+      <p class="hint">แก้ไขขนาดกล่อง (กว้าง×ยาว×สูง ซม.) · ชื่อจีน · จำนวนชิ้นต่อลัง ของสินค้าทุกตัว · เพิ่มรายการใหม่ได้ · <b>กด "บันทึกขึ้น SharePoint" เพื่อเก็บถาวร</b> (ทุกเครื่องดึงกลับได้ · ข้อมูลไม่หาย) · ค่าที่แก้จะไปใช้คำนวณกล่อง/CBM ในหน้า Packing List ด้วย</p>
+      <div id="dimtbl-wrap" style="display:none;margin-top:10px;"></div>
+    </div>
   </div>
 
   <!-- ============ PAGE 2: LEAD TIME ============ -->
@@ -7521,9 +7539,85 @@ function renderItemList(){
     ${kpi('มูลค่าสต๊อกรวม', '฿'+fmtNum(totVal),'')}
   </div>`;
   html += list.length
-    ? `<div class="chartbox"><table><tr><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>SubType</th><th class="num">Lead Time (วัน)</th><th>Vendor→Factory</th><th class="num">คงเหลือ</th><th class="num">มูลค่า</th></tr>${rows}</table></div>`
+    ? `<div class="chartbox"><div class="il-scroll"><table><tr><th>รหัสสินค้า</th><th>ชื่อสินค้า</th><th>SubType</th><th class="num">Lead Time (วัน)</th><th>Vendor→Factory</th><th class="num">คงเหลือ</th><th class="num">มูลค่า</th></tr>${rows}</table></div></div>`
     : '<div class="empty">ไม่พบสินค้าตามเงื่อนไข</div>';
   document.getElementById('il-result').innerHTML = html;
+}
+
+// ===== ตารางมิติ/ชื่อจีน/pcs ต่อลัง (แก้ไขได้ · เก็บถาวรใน SharePoint) — หน้า 🔎 =====
+window.PACK_CENTRAL = window.PACK_CENTRAL || null;   // override กลาง (ทับ BC_PACKING) จาก SharePoint · {item:{cn,L,W,H,pcs,desc}}
+function dimEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function packCentralLoad(){   // โหลดจาก localStorage ก่อน (ทันที) แล้วค่อยดึงจาก SharePoint มาทับ (แบบเงียบ · ครั้งเดียว · ไม่เด้ง login)
+  if(window.PACK_CENTRAL==null){ try{ window.PACK_CENTRAL=JSON.parse(localStorage.getItem('packCentralV1')||'{}'); }catch(e){ window.PACK_CENTRAL={}; } if(!window.PACK_CENTRAL||typeof window.PACK_CENTRAL!=='object') window.PACK_CENTRAL={}; }
+  if(window._packCentralFetched) return;
+  if(window.GraphAuth && window.GraphAuth.getGraphTokenSilent && window.GraphStorage && window.GraphStorage.loadData){
+    window.GraphAuth.getGraphTokenSilent().then(function(tok){ if(!tok) return;   // ดึงคลาวด์เฉพาะตอนล็อกอินแล้ว (เงียบ)
+      window._packCentralFetched=true;
+      window.GraphStorage.loadData('packEditV1').then(function(r){ if(r){ try{ const o=(typeof r==='string')?JSON.parse(r):r; if(o&&typeof o==='object'){ window.PACK_CENTRAL=o; try{ localStorage.setItem('packCentralV1', JSON.stringify(o)); }catch(e){} const w=document.getElementById('dimtbl-wrap'); if(w && w.style.display!=='none') renderDimTable(); if(typeof renderPacking==='function' && document.getElementById('page-packing') && document.getElementById('page-packing').classList.contains('active')) renderPacking(); } }catch(e){} } }).catch(function(){}); }).catch(function(){});
+  }
+}
+function packCentralSaveLocal(){ try{ localStorage.setItem('packCentralV1', JSON.stringify(window.PACK_CENTRAL||{})); }catch(e){} }
+function dimTblToggle(){ const w=document.getElementById('dimtbl-wrap'), b=document.getElementById('dimtbl-toggle'); if(!w) return;
+  if(w.style.display==='none'){ w.style.display='block'; if(b) b.textContent='ซ่อนตาราง'; document.getElementById('dimtbl-save').style.display=''; document.getElementById('dimtbl-reload').style.display=''; packCentralLoad(); renderDimTable(); }
+  else { w.style.display='none'; if(b) b.textContent='แสดงตาราง'; document.getElementById('dimtbl-save').style.display='none'; document.getElementById('dimtbl-reload').style.display='none'; }
+}
+function dimMerged(code){ const base=(window.BC_PACKING&&window.BC_PACKING[code])||{}; const ov=(window.PACK_CENTRAL&&window.PACK_CENTRAL[code])||{}; return Object.assign({}, base, ov); }
+function renderDimTable(){
+  const w=document.getElementById('dimtbl-wrap'); if(!w) return;
+  packCentralLoad();
+  const q=(document.getElementById('dim-q')?document.getElementById('dim-q').value:'').trim().toLowerCase();
+  const keys=[...new Set([...Object.keys(window.BC_PACKING||{}), ...Object.keys(window.PACK_CENTRAL||{})])].sort();
+  const inp='width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);font-size:12px;';
+  const numInp='width:58px;text-align:right;padding:3px 4px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);font-size:12px;';
+  let n=0;
+  const rows=keys.map(code=>{ const d=dimMerged(code); const nm=(getItem(code)||{}).desc||d.desc||'';
+    if(q && String(code).toLowerCase().indexOf(q)<0 && String(nm).toLowerCase().indexOf(q)<0 && String(d.cn||'').toLowerCase().indexOf(q)<0) return '';
+    n++; const edited=!!(window.PACK_CENTRAL&&window.PACK_CENTRAL[code]);
+    return `<tr${edited?' style="background:#fff7ed;"':''}>
+      <td style="white-space:nowrap;"><b>${dimEsc(code)}</b>${edited?' <span title="แก้ไขแล้ว" style="color:#ea580c;">✎</span>':''}</td>
+      <td style="font-size:11px;color:var(--muted);max-width:220px;">${dimEsc(nm).slice(0,60)}</td>
+      <td><input value="${dimEsc(d.cn||'')}" onchange="dimSet('${dimEsc(code)}','cn',this.value)" placeholder="ชื่อจีน" style="${inp}"></td>
+      <td class="num"><input type="number" step="0.1" value="${d.L!=null?d.L:''}" onchange="dimSet('${dimEsc(code)}','L',this.value)" style="${numInp}"></td>
+      <td class="num"><input type="number" step="0.1" value="${d.W!=null?d.W:''}" onchange="dimSet('${dimEsc(code)}','W',this.value)" style="${numInp}"></td>
+      <td class="num"><input type="number" step="0.1" value="${d.H!=null?d.H:''}" onchange="dimSet('${dimEsc(code)}','H',this.value)" style="${numInp}"></td>
+      <td class="num"><input type="number" step="1" min="1" value="${d.pcs!=null?d.pcs:''}" onchange="dimSet('${dimEsc(code)}','pcs',this.value)" style="${numInp}"></td>
+      <td style="white-space:nowrap;">${edited?`<a href="#" onclick="dimResetRow('${dimEsc(code)}');return false;" style="font-size:11px;color:var(--muted);">↩︎ คืนค่าเดิม</a>`:''}</td>
+    </tr>`; }).join('');
+  w.innerHTML=`
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+      <input type="search" id="dim-q" value="${dimEsc(q)}" oninput="renderDimTable()" placeholder="🔍 ค้นหา รหัส/ชื่อ/ชื่อจีน" style="flex:1;min-width:200px;max-width:340px;box-sizing:border-box;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;">
+      <button class="go" onclick="dimAddRow()" style="background:#2563eb;">➕ เพิ่มรายการ</button>
+      <span class="muted" style="font-size:11px;">แสดง ${fmtNum(n)} รายการ · ✎ = แก้ไขแล้ว (ยังไม่บันทึกขึ้น SharePoint จนกว่าจะกด 💾)</span>
+    </div>
+    <div class="dim-scroll"><table style="width:100%;font-size:12px;"><tr>
+      <th>รหัส</th><th>ชื่อสินค้า</th><th>ชื่อจีน</th><th class="num">กว้าง L</th><th class="num">ยาว W</th><th class="num">สูง H</th><th class="num">pcs/ลัง</th><th></th>
+    </tr>${rows||'<tr><td colspan="8" class="muted" style="padding:10px;">ไม่พบรายการ</td></tr>'}</table></div>`;
+  const qel=document.getElementById('dim-q'); if(qel && document.activeElement!==qel){} // keep value
+}
+function dimSet(code, field, val){
+  window.PACK_CENTRAL=window.PACK_CENTRAL||{};
+  const o=window.PACK_CENTRAL[code]||(window.PACK_CENTRAL[code]={});
+  if(field==='cn'){ o.cn=String(val||'').trim(); }
+  else if(field==='pcs'){ o.pcs=Math.max(1, +val||1); }
+  else { o[field]=Math.max(0, +val||0); }
+  packCentralSaveLocal();
+  // อัปเดตหน้า Packing ถ้าเปิดอยู่ (ค่าจะไหลไป pkItem)
+  if(typeof renderPacking==='function' && document.getElementById('page-packing') && document.getElementById('page-packing').classList.contains('active')){ try{ renderPacking(); }catch(e){} }
+}
+function dimResetRow(code){ if(window.PACK_CENTRAL && window.PACK_CENTRAL[code]){ delete window.PACK_CENTRAL[code]; packCentralSaveLocal(); renderDimTable(); if(typeof pkToast==='function') pkToast('คืนค่าเดิมของ '+code+' แล้ว (กด 💾 เพื่อบันทึกขึ้น SharePoint)','good'); } }
+function dimAddRow(){ const code=(prompt('กรอกรหัสสินค้าใหม่ (เช่น R-ENR-000999):')||'').trim(); if(!code) return;
+  window.PACK_CENTRAL=window.PACK_CENTRAL||{}; if(!window.PACK_CENTRAL[code]) window.PACK_CENTRAL[code]={cn:'',L:0,W:0,H:0,pcs:1}; packCentralSaveLocal(); renderDimTable(); if(typeof pkToast==='function') pkToast('เพิ่มรายการ '+code+' แล้ว — กรอกข้อมูลแล้วกด 💾 บันทึกขึ้น SharePoint','good'); }
+async function dimSaveCloud(){ const b=document.getElementById('dimtbl-save'); if(b) b.disabled=true;
+  try{ if(!(window.GraphStorage&&window.GraphStorage.saveData)) throw new Error('ยังไม่ได้เชื่อม SharePoint'); if(typeof pkToast==='function') pkToast('กำลังบันทึกขึ้น SharePoint...','info');
+    await window.GraphStorage.saveData('packEditV1', window.PACK_CENTRAL||{}); packCentralSaveLocal(); if(typeof pkToast==='function') pkToast('บันทึกขึ้น SharePoint สำเร็จ ✅ (ข้อมูลถาวร ดึงกลับได้ทุกเครื่อง)','good'); }
+  catch(e){ if(typeof pkToast==='function') pkToast('บันทึกไม่สำเร็จ: '+((e&&e.message)||e)+' — ลองกดเข้าสู่ระบบ (⬇️ ดึงข้อมูลล่าสุด) ก่อน','bad'); }
+  if(b) b.disabled=false;
+}
+async function dimReload(){ const b=document.getElementById('dimtbl-reload'); if(b) b.disabled=true;
+  try{ if(!(window.GraphStorage&&window.GraphStorage.loadData)) throw new Error('ยังไม่ได้เชื่อม SharePoint'); if(typeof pkToast==='function') pkToast('กำลังโหลดจาก SharePoint...','info');
+    const r=await window.GraphStorage.loadData('packEditV1'); const o=r?((typeof r==='string')?JSON.parse(r):r):{}; window.PACK_CENTRAL=(o&&typeof o==='object')?o:{}; packCentralSaveLocal(); renderDimTable(); if(typeof pkToast==='function') pkToast('โหลดจาก SharePoint แล้ว ✅','good'); }
+  catch(e){ if(typeof pkToast==='function') pkToast('โหลดไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
+  if(b) b.disabled=false;
 }
 
 // คลิกรหัสสินค้า -> ไปแท็บค้นหาแล้วแสดงรายละเอียดสินค้านั้น
@@ -7885,7 +7979,9 @@ window.pkRoundDims = window.pkRoundDims || {};   // ขนาดกล่อง/
 function pkItem(code, r){
   const rd=(window.pkRoundDims && window.pkRoundDims[code]) || null;   // ค่าของตู้นี้มาก่อนเสมอ (กันค่ากลางมาทับตอนบันทึกซ้ำ)
   let d=null;
-  const base=(window.BC_PACKING && window.BC_PACKING[code]) ? window.BC_PACKING[code] : null;
+  const central=(window.PACK_CENTRAL && window.PACK_CENTRAL[code]) || null;   // override กลางจาก SharePoint (ตารางมิติหน้า 🔎)
+  let base=(window.BC_PACKING && window.BC_PACKING[code]) ? window.BC_PACKING[code] : null;
+  if(central) base = Object.assign({}, base||{}, central);   // ทับ BC_PACKING ด้วยค่ากลาง (หรือเป็น base ถ้าเป็นสินค้าใหม่ที่เพิ่งเพิ่ม)
   if(base){ const ov=window.pkDimEdit && window.pkDimEdit[code]; d = ov ? Object.assign({}, base, ov) : base; }   // ทับด้วยขนาดที่แก้ (ถ้ามี)
   else d=(window.pkCustomDims && window.pkCustomDims[code]) ? window.pkCustomDims[code] : null;
   if(!d) return null;
@@ -11539,6 +11635,8 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
 }
 function renderTab(tab){
   try{ window._presPage=(typeof PRES_PAGE_LABEL!=='undefined'&&PRES_PAGE_LABEL[tab])||tab; if(window._presStarted && typeof presHeartbeat==='function') presHeartbeat(); }catch(e){}   // presence: อัปเดตหน้าที่กำลังเปิด
+  try{ if(typeof packCentralLoad==='function') packCentralLoad(); }catch(e){}   // โหลดมิติกลาง (SharePoint) มาใช้กับ pkItem/Packing
+
   if(tab==='flowchart'){ if(typeof poLoadFollow==='function') poLoadFollow(); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderFlowchart(); }
   else if(tab==='search'){ renderSearch(); renderItemList(); }   // หน้าค้นหารวมรายการสินค้าแล้ว
   else if(tab==='leadtime'){ poLoadFollow(); const _pr=poPruneStaleFollow(); if(_pr && _pr.length && typeof pkToast==='function') pkToast('ล้างรายการติดตาม PO เก่าที่ไม่ตรงข้อมูล BC แล้ว '+_pr.length+' รายการ','good'); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderUrgent(); renderPoFollow(); renderArrivedMatrix(); }
