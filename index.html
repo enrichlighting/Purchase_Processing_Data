@@ -10893,7 +10893,7 @@ function renderFlowchart(){
   if(!window.flowMoqT){ try{ window.flowMoqT=JSON.parse(localStorage.getItem('flowMoqTV1')||'{}'); }catch(e){ window.flowMoqT={}; } }
   if(window.flowMoqMode===undefined){ try{ window.flowMoqMode=localStorage.getItem('flowMoqModeV1')||'qty'; }catch(e){ window.flowMoqMode='qty'; } }
   if(window.flowMoqUnit===undefined){ try{ window.flowMoqUnit=localStorage.getItem('flowMoqUnitV1')||'month'; }catch(e){ window.flowMoqUnit='month'; } }
-  let items=ITEMS.filter(i=> i.ileReal || (typeof itemHasReleasedPO==='function' && itemHasReleasedPO(i)));
+  let items=ITEMS.slice();   // แสดงทุกสินค้า (เอากรอง "ต้องมียอดขาย/PO" ออกตามที่ผู้ใช้สั่ง — สินค้าที่ไม่มีความเคลื่อนไหวก็โชว์)
   items=items.filter(i=> !FLOW_EXCLUDE.has(i.no));               // เอาสินค้าที่เลิกใช้ออกจากตาราง
   if(window.flowDiyMode==='diy') items=items.filter(i=> flowIsDiyItem(i));            // เฉพาะสินค้าที่ขายให้ Mr.DIY
   else if(window.flowDiyMode==='nondiy') items=items.filter(i=> !flowIsDiyItem(i));   // เฉพาะสินค้าที่ไม่ได้ขายให้ Mr.DIY
