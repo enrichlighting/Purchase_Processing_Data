@@ -6396,7 +6396,7 @@ const DAY = 86400000;
    การเทียบทำแบบ case-insensitive จึงใส่ 'ENRICH' หรือ 'Enrich' ก็ตรงกัน
    ต่อข้อมูลจริงโดยวางไฟล์ bc-items.js ข้างไฟล์นี้ (window.BC_ITEMS = [...])
    --------------------------------------------------------------------- */
-const BRAND_FILTER = '';
+const BRAND_FILTER = 'ENRICH';   // หน้าอื่นยึด ENRICH เหมือนเดิม · หน้า 🔎 ใช้ ITEMS_ALL (ทุกแบรนด์) แยกต่างหาก
 
 /* กลุ่มคลัง — ปรับรายชื่อได้ตามจริง
    SELL_LOCS = คลังสำหรับขาย (นับเป็นของพร้อมขาย) | RESERVE_LOCS = จอง/กันไว้ (ไม่นับขาย) */
@@ -6489,7 +6489,7 @@ function parseLeadTime(f){
   return days||null;
 }
 
-function loadBCItems(){
+function loadBCItems(allBrands){
   const raw = (typeof window!=='undefined') ? window.BC_ITEMS : null;
   if(!raw) return null;
   const rows = Array.isArray(raw) ? raw : (raw.value || []);
@@ -6513,7 +6513,7 @@ function loadBCItems(){
       avgUse:  0,       // อัตราใช้จริงมาจาก Item Ledger Entries — เชื่อมใน Stage ถัดไป
       _live:   true,
     };
-  }).filter(it => it.no && (BRAND_FILTER==='' || String(it.brand).toUpperCase()===BRAND_FILTER.toUpperCase()));
+  }).filter(it => it.no && (allBrands || BRAND_FILTER==='' || String(it.brand).toUpperCase()===BRAND_FILTER.toUpperCase()));
   return mapped.length ? mapped : null;
 }
 
@@ -6695,7 +6695,7 @@ async function loadFromBusinessCentral(){
    ANALYTICS HELPERS
    ===================================================================== */
 const vendorName = no => (VENDORS.find(v=>v.no===no)||{}).name || no || '-';
-const getItem    = no => ITEMS.find(i=>i.no===no);
+const getItem    = no => ITEMS.find(i=>i.no===no) || (window.ITEMS_ALL ? window.ITEMS_ALL.find(i=>i.no===no) : undefined);   // fallback ITEMS_ALL เผื่อสินค้าแบรนด์อื่น (หน้า 🔎)
 
 // วันที่ข้อมูลล่าสุด (มุมขวาบน) — สต๊อก/ยอดขายมาจากไฟล์ Item Ledger (ไม่เรียลไทม์) · รายการสินค้ามาจาก Power Automate
 function fmtThaiDate(iso){ if(!iso) return '-'; const M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; const p=String(iso).split('-'); if(p.length<3) return iso; return (+p[2])+' '+M[(+p[1])-1]+' '+p[0]; }
@@ -7510,7 +7510,7 @@ function renderItemList(){
   const fac = document.getElementById('il-factory').value;
   const matchQ = i => !q || [i.no, i.desc, i.diyNo, i.diyCode, i.bigcCode, sourcesText(i)]
       .some(v => String(v||'').toLowerCase().includes(q));
-  const list = ITEMS.filter(i =>
+  const list = (window.ITEMS_ALL||ITEMS).filter(i =>
     (!t || i.itemType===t) && (!st || i.subType===st) &&
     itemHasVendor(i,ven) && itemHasFactory(i,fac) && matchQ(i)
   );
@@ -7944,7 +7944,7 @@ function populateSearchItems(){
   const t = document.getElementById('s-type').value;
   const st = document.getElementById('s-subtype').value;
   const vf = document.getElementById('s-vendor').value;   // ชื่อ vendor หรือ factory
-  const list = ITEMS.filter(i =>
+  const list = (window.ITEMS_ALL||ITEMS).filter(i =>
     (!t || i.itemType===t) && (!st || i.subType===st) &&
     (!vf || itemHasVendor(i,vf) || itemHasFactory(i,vf))
   );
@@ -11904,6 +11904,8 @@ function init(){
     mergeCust();                          // รวม Top ลูกค้าต่อสินค้า
     // สินค้าที่ยังไม่มี ILE -> ประมาณอัตราใช้/วันจากยอดคงเหลือ เพื่อให้หน้า Lead Time แสดงผลได้
     ITEMS.forEach(it=>{ if(!it.avgUse) it.avgUse = Math.max(1, Math.round((it.inventory||140)/120)); });
+    // ITEMS_ALL = ทุกแบรนด์ (ใช้เฉพาะหน้า 🔎) — ENRICH ใช้ตัวที่ enrich แล้ว · แบรนด์อื่นใช้ข้อมูลดิบจาก BC_ITEMS (ไม่กระทบหน้าอื่น)
+    try{ const _all=loadBCItems(true)||[]; const _byNo={}; ITEMS.forEach(it=>{ _byNo[it.no]=it; }); window.ITEMS_ALL=_all.map(m=>_byNo[m.no]||m); }catch(e){ window.ITEMS_ALL=ITEMS.slice(); }
     generateDemoData();   // ข้อมูลจริงทั้งหมด: คงเหลือ/อัตราขาย/Lead Time/Vendor-Factory/PO
     setBadge(`<b style="color:var(--good)">ข้อมูลจริงจาก BC</b> · คงเหลือ+ขาย: ILE (${ileMatched}) · Lead Time+Vendor/Factory (${ltMatched}) · PO ค้างรับ (${poMatched}) · <b>Safety Stock ยังเป็น 0</b>`, 'live');
   } else {
