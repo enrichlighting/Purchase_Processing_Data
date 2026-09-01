@@ -1262,8 +1262,9 @@ window.BC_ITEMS = [
 ];
 </script>
 
+<script>window._P = window.location.hostname.includes('dynamics.com') ? 'rich_' : '';</script>
 <!-- ถ้ามีไฟล์ bc-items.js ภายนอก (export ใหม่) จะ override ข้อมูลที่ฝังไว้ด้านบน -->
-<script>document.write('<script src="bc-items.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-items.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 
 <script>
 /* ===== Lead Time 359 รายการ (Brand ENRICH) ฝังในไฟล์โดยตรง ===== */
@@ -1635,7 +1636,7 @@ window.BC_LEADTIME = {
 };
 </script>
 <!-- ถ้ามีไฟล์ bc-leadtime.js ภายนอก (export ใหม่) จะ override ข้อมูลที่ฝังไว้ด้านบน -->
-<script>document.write('<script src="bc-leadtime.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-leadtime.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 
 <script>
 /* ===== Item Ledger Entries สรุป (on-hand + ยอดขาย + paid + แยกคลัง loc) ฝังในไฟล์ ===== */
@@ -2155,8 +2156,8 @@ window.BC_ILE = {
 "R-ENR-000631":{"oh":0,"ld":"2026-07-30","s90":5,"s180":5,"s365":5,"p90":5,"p180":5,"mon":[["2026-07",5]],"loc":{}}
 };
 </script>
-<script>document.write('<script src="bc-ile.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
-<script>document.write('<script src="bc-onhand.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-ile.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-onhand.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 
 <script>
 /* ===== Purchase Orders ค้างรับ (incoming) 164 รายการ ฝังในไฟล์ ===== */
@@ -2306,8 +2307,8 @@ window.BC_PO = {
 "R-ENR-000442":{"in":18,"pos":[["POC26070003",18,"2026-09-01","Star Lighting Ltd.","Released"]]}
 };
 </script>
-<script>document.write('<script src="bc-po.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
-<script>document.write('<script src="bc-povendor.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>   <!-- Vendor ต่อ PO (รวม PO ที่ปิดแล้ว) · ไม่มีไฟล์ = ใช้ bc-po.js + Vendor_No แทน -->
+<script>document.write('<script src="'+window._P+'bc-po.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-povendor.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>   <!-- Vendor ต่อ PO (รวม PO ที่ปิดแล้ว) · ไม่มีไฟล์ = ใช้ bc-po.js + Vendor_No แทน -->
 
 <script>
 /* ===== Top ลูกค้าต่อสินค้า (DOCUS) ฝังในไฟล์ ===== */
@@ -2687,7 +2688,7 @@ window.BC_CUST = {
 "R-ENR-000631":{"tot":5,"n":1,"top":[["DOCUS26070208",5]]}
 };
 </script>
-<script>document.write('<script src="bc-cust.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-cust.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 
 <script>
 /* ===== ชื่อลูกค้า (map รหัส->ชื่อ) ฝังในไฟล์ ===== */
@@ -3858,7 +3859,7 @@ window.BC_CUSTNAME = {
 "DOCUS26080013":"บริษัท สหวงศ์โซล่าร์โซลูชั่น จำกัด"
 };
 </script>
-<script>document.write('<script src="bc-custname.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-custname.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 
 <script>
 /* ===== ยอดขายรายเดือนแยกตามลูกค้า ฝังในไฟล์ ===== */
@@ -4238,7 +4239,7 @@ window.BC_CUSTMON = {
 "R-ENR-000631":{"DOCUS26070208":[["2026-07",5]]}
 };
 </script>
-<script>document.write('<script src="bc-custmon.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-custmon.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 
 <script>
 /* ===== ยอดขายแยกกลุ่มลูกค้า (Mr.DIY / Big C / อื่นๆ) ฝังในไฟล์ ===== */
@@ -4758,7 +4759,7 @@ window.BC_GRPSALES = {
 "R-ENR-000631":[0,0,0,0,5,5]
 };
 </script>
-<script>document.write('<script src="bc-grpsales.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-grpsales.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 
 <script>
 /* ===== ยอดขายหน้าร้าน Mr.DIY (sell-through) ฝังในไฟล์ ===== */
@@ -4866,8 +4867,8 @@ window.BC_MRDIYSTOCK = {
 "R-ENR-000364":{"mon":[["2026-06",1779],["2026-07",6673],["2026-08",4959]]}
 };
 </script>
-<script>document.write('<script src="bc-mrdiy.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
-<script>document.write('<script src="bc-mrdiystock.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-mrdiy.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-mrdiystock.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 
 <script>
 /* ===== ยอดขายรวมรายเดือน (ทุกลูกค้า) ต่อสินค้า ฝังในไฟล์ ===== */
@@ -5250,7 +5251,7 @@ window.BC_ITEMMON = {
 "R-ENR-000631":[["2026-07",5]]
 };
 </script>
-<script>document.write('<script src="bc-itemmon.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-itemmon.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 
 <script>
 /* ===== Packing List (ขนาดกล่อง L/W/H + ชิ้นต่อกล่อง) ฝังในไฟล์ ===== */
@@ -5657,7 +5658,7 @@ window.BC_PACKING = {
 "R-ENR-000576":{"L":0,"W":0,"H":0,"pcs":1,"cn":"","desc":"ENRICH LED PEARL LIGHTS 3W 5M. (WHITE)","model":"PEARL LIGHTS"}
 };
 </script>
-<script>document.write('<script src="bc-packing.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-packing.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 <script>
 /* AUTO-GENERATED จาก Purchase Order Line — Direct Unit Cost (RMB) ต่อ Lot ต่อ Item */
 /* BC_POCOST[itemNo] = [[lotNo, rmbCost, poNo], ...] (ตัด cost<=0, กันซ้ำ lot+cost) */
@@ -6052,7 +6053,7 @@ window.BC_POCOST = {
 "R-ENR-000028":[["RS2404-001",7,"RPO2404-001"]]
 };
 </script>
-<script>document.write('<script src="bc-pocost.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-pocost.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 <script>
 /* AUTO-GENERATED จาก Purchase Order Line — บรรทัดที่ยังค้างรับ (Outstanding>0) */
 /* BC_POREL[itemNo] = [[poNo, lotNo, rmbDirectUnitCost, outstandingQty], ...] (status Released กรองใน JS) */
@@ -6200,7 +6201,7 @@ window.BC_POREL = {
 "R-ENR-000442":[["POC26070003","EN2609-016-C",0.0001,18]]
 };
 </script>
-<script>document.write('<script src="bc-porel.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-porel.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 <script>
 /* AUTO-GENERATED — Document Date (ค.ศ.) เฉพาะ PO ที่ติดตาม (จาก bc-po) */
 window.BC_PODATE = {
@@ -6277,7 +6278,7 @@ window.BC_PODATE = {
 "POC26080001":"2026-08-04"
 };
 </script>
-<script>document.write('<script src="bc-podate.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-podate.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 <script>
 /* AUTO-GENERATED จาก PO DIY (PDF คำสั่งซื้อล่วงหน้าจาก Mr.DIY) — ความต้องการที่ commit ไว้ */
 /* BC_PODIY[itemNo] = [{ref, qty, deliv(ค.ศ.), plu}] · poDiyCommitted() รวมทุกออเดอร์ */
@@ -6313,8 +6314,8 @@ window.BC_PODIY = {
 window.BC_PODIYDRAFT = {
 }
 </script>
-<script>document.write('<script src="bc-podiy.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
-<script>document.write('<script src="bc-podiydraft.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-podiy.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-podiydraft.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 <script>
 /* AUTO-GENERATED — ยอดขายจริงให้ Mr.DIY (DOCUS23120013) รายเดือน/สินค้า | {item:{ym:qty}} */
 window.BC_DIYMON = {
@@ -6374,7 +6375,7 @@ window.BC_DIYMON = {
 "R-ENR-000492":{"2026-01":5800,"2026-03":6000,"2026-04":1800,"2026-05":3200,"2026-06":2350,"2026-07":1100,"2026-08":4700}
 };
 </script>
-<script>document.write('<script src="bc-diymon.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'bc-diymon.js?t='+Date.now()+'" onerror="void 0"><\/script>');</script>
 
 <script>
 /* =====================================================================
@@ -12009,7 +12010,7 @@ window.addEventListener('load', function(){ let n=0; const t=setInterval(functio
 </script>
 <!-- ===== SharePoint sync (โหลดเฉพาะบน GitHub Pages ที่มีไฟล์เหล่านี้ · ลิงก์ Artifact จะบล็อก/404 แล้วข้ามไป) ===== -->
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.0/lib/msal-browser.min.js" onerror="void 0"></script>
-<script src="auth.js" onerror="void 0"></script>
-<script src="graphStorage.js" onerror="void 0"></script>
+<script>document.write('<script src="'+window._P+'auth.js" onerror="void 0"><\/script>');</script>
+<script>document.write('<script src="'+window._P+'graphStorage.js" onerror="void 0"><\/script>');</script>
 </body>
 </html>
