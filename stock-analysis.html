@@ -11917,13 +11917,13 @@ function init(){
     VENDORS.length = 0;   // ใช้ Vendor/Factory จากไฟล์ Lead Time แทน
     const ltMatched = mergeLeadTime();   // รวม Lead Time (โรงงาน+เรือ) + Vendor/Factory + รหัสลูกค้า
     const freshOH = applyFreshOnHand();  // ทับยอดคงเหลือ+รายคลังด้วยค่าสดจาก Power Automate (ถ้ามี bc-onhand.js)
-    const ileMatched = mergeILE();       // รวม on-hand จริง + อัตราขายจริง จาก Item Ledger Entries
     const poMatched = mergePO();         // รวม PO ค้างรับจริง
     mergeCust();                          // รวม Top ลูกค้าต่อสินค้า
     // สินค้าที่ยังไม่มี ILE -> ประมาณอัตราใช้/วันจากยอดคงเหลือ เพื่อให้หน้า Lead Time แสดงผลได้
     ITEMS.forEach(it=>{ if(!it.avgUse) it.avgUse = Math.max(1, Math.round((it.inventory||140)/120)); });
     // ITEMS_ALL = ทุกแบรนด์ (ใช้เฉพาะหน้า 🔎) — ENRICH ใช้ตัวที่ enrich แล้ว · แบรนด์อื่นใช้ข้อมูลดิบจาก BC_ITEMS (ไม่กระทบหน้าอื่น)
     try{ const _all=loadBCItems(true)||[]; const _byNo={}; ITEMS.forEach(it=>{ _byNo[it.no]=it; }); window.ITEMS_ALL=_all.map(m=>_byNo[m.no]||m); }catch(e){ window.ITEMS_ALL=ITEMS.slice(); }
+    const ileMatched = mergeILE();       // รวม on-hand จริง + อัตราขายจริง จาก Item Ledger Entries
     generateDemoData();   // ข้อมูลจริงทั้งหมด: คงเหลือ/อัตราขาย/Lead Time/Vendor-Factory/PO
     setBadge(`<b style="color:var(--good)">ข้อมูลจริงจาก BC</b> · คงเหลือ+ขาย: ILE (${ileMatched}) · Lead Time+Vendor/Factory (${ltMatched}) · PO ค้างรับ (${poMatched}) · <b>Safety Stock ยังเป็น 0</b>`, 'live');
   } else {
