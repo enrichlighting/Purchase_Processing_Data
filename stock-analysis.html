@@ -10830,9 +10830,11 @@ function flowItemRow(it, basis, grp, salesCols){
   const poRemain = Math.max(0, (rc.incoming||0)-(rc.packed||0)-(rc.production||0));   // PO ค้างรับ หักส่วนที่จัดตู้/สั่งผลิตไปแล้ว
   const poDeduct = (rc.incoming||0) - poRemain;                                       // ส่วนที่ถูกจัดตู้/ผลิตแล้ว
   const lopts=it.ltOpts||[]; const lsi=it.leadSelIdx||0; const lo=lopts[lsi]||lopts[0]||null;
+  const poVendors=[...new Set(pos.map(p=>p&&p[3]).filter(Boolean))];   // ชื่อ Vendor จาก PO (BC_PO) — ใช้เป็น fallback ให้สินค้าแบรนด์อื่น (R-BKP) ที่ไม่มี Lead Time
   const vendorHtml = lopts.length>1
     ? `<select onclick="event.stopPropagation()" onchange="flowSetVendor('${it.no}',this.value)" style="max-width:74px;font-size:10.5px;padding:2px;border:1px solid var(--brand);border-radius:5px;background:var(--bg);color:var(--ink);cursor:pointer;">${lopts.map((o,i)=>`<option value="${i}" ${i===lsi?'selected':''}>${o.vendor}</option>`).join('')}</select>`
-    : (lopts.length===1 ? `<span style="font-size:11px;font-weight:600;">${lopts[0].vendor}</span>` : '<span class="muted" style="font-size:10px;">—</span>');
+    : (lopts.length===1 ? `<span style="font-size:11px;font-weight:600;">${lopts[0].vendor}</span>`
+      : ((flowIsOtherBrand(it) && poVendors.length) ? `<span style="font-size:10px;font-weight:600;line-height:1.25;display:inline-block;white-space:normal;word-break:break-word;" title="ชื่อ Vendor จาก PO">${poVendors.join(', ')}</span>` : '<span class="muted" style="font-size:10px;">—</span>'));
   const factoryHtml = lo ? `<span style="font-size:11px;">${lo.factory||'-'}</span>` : '<span class="muted" style="font-size:10px;">—</span>';
   const leadMoq = [ (lo&&lo.lead)?`LT ${lo.lead} วัน`:'', (it.moq)?`MOQ ${fmtNum(it.moq)}`:'' ].filter(Boolean).join(' · ');
   const tr=`<tr onclick="flowToggleItem('${it.no}')" style="cursor:pointer;border-top:1px solid var(--line);${iOpen?'background:var(--bg);':''}">
