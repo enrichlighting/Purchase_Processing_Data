@@ -6755,8 +6755,12 @@ function openPOs(itemNo, vendorNo){
   // ใช้ PO จริงถ้ามีไฟล์ BC_PO (คืน [] ถ้าสินค้านี้ไม่มี PO ค้าง)
   if(typeof window!=='undefined' && window.BC_PO){
     const it = getItem(itemNo);
-    if(!it || !it.poReal) return [];
-    return it.openPOs.map(p=>({ docNo:p.po, outstanding:p.qty, expectedReceipt:p.eta, vendorNo:p.vendor, status:p.status }))
+    let src = (it && it.poReal) ? it.openPOs : null;
+    if(!src && window.BC_PO[itemNo]){   // สินค้าที่ไม่ได้ผ่าน mergePO (เช่น R-BKP ที่บังคับแสดงผ่าน FLOW_INCLUDE) → อ่าน BC_PO ดิบ
+      src = (window.BC_PO[itemNo].pos||[]).map(p=>({ po:p[0], qty:p[1], eta:p[2]?new Date(p[2]):null, vendor:p[3], status:p[4] }));
+    }
+    if(!src) return [];
+    return src.map(p=>({ docNo:p.po, outstanding:p.qty, expectedReceipt:p.eta, vendorNo:p.vendor, status:p.status }))
       .sort((a,b)=>(a.expectedReceipt?+a.expectedReceipt:8e15)-(b.expectedReceipt?+b.expectedReceipt:8e15));
   }
   return POS.filter(p=>p.itemNo===itemNo && (!vendorNo||p.vendorNo===vendorNo) && p.outstanding>0)
@@ -7713,7 +7717,8 @@ function reorderCalc(it, basisDays, custGroup){
   const availRaw = onHand - poDiy - draftDiy;                           // ในคลังหัก DIY แล้ว (ติดลบได้ = ขาด)
   const avail  = Math.max(0, availRaw);                                 // สำหรับแสดง "อยู่ได้กี่วัน" (ไม่ติดลบ)
   const usage = avgDailyUsage(it.no);
-  const incoming = openPOs(it.no).filter(p=>poType(p.docNo).code==='POA').reduce((s,p)=>s+p.outstanding,0);  // PO ค้างรับทั้งหมด (POA)
+  const _rbkpPO = /^R-BKP/.test(it.no);   // R-BKP: นับ "PO เฉยๆ" (ไม่มี A/C) ด้วย เพราะเป็น PO จริงที่ Released & ค้างรับ
+  const incoming = openPOs(it.no).filter(p=>{ const c=poType(p.docNo).code; return c==='POA' || (_rbkpPO && /^PO\d/.test(String(p.docNo||''))); }).reduce((s,p)=>s+p.outstanding,0);  // PO ค้างรับ (POA · เฉพาะ R-BKP รวม PO เฉยๆ)
   const packed = (typeof itemPackedQty==='function') ? itemPackedQty(it.no) : 0;          // จัดตู้แล้ว
   const productionRaw = (typeof itemProductionQty==='function') ? itemProductionQty(it.no) : 0; // สั่งผลิต (กรอก/Lead Time)
   const production = Math.min(productionRaw, Math.max(0, incoming - packed));               // ไม่เกินค้างรับที่ยังไม่จัดตู้ (กันนับซ้ำกับ PO)
@@ -11923,7 +11928,7 @@ function init(){
     ITEMS.forEach(it=>{ if(!it.avgUse) it.avgUse = Math.max(1, Math.round((it.inventory||140)/120)); });
     // ITEMS_ALL = ทุกแบรนด์ (ใช้เฉพาะหน้า 🔎) — ENRICH ใช้ตัวที่ enrich แล้ว · แบรนด์อื่นใช้ข้อมูลดิบจาก BC_ITEMS (ไม่กระทบหน้าอื่น)
     try{ const _all=loadBCItems(true)||[]; const _byNo={}; ITEMS.forEach(it=>{ _byNo[it.no]=it; }); window.ITEMS_ALL=_all.map(m=>_byNo[m.no]||m); }catch(e){ window.ITEMS_ALL=ITEMS.slice(); }
-    const ileMatched = mergeILE();       // รวม on-hand จริง + อัตราขายจริง จาก Item Ledger Entries
+   const ileMatched = mergeILE();       // รวม on-hand จริง + อัตราขายจริง จาก Item Ledger Entries
     generateDemoData();   // ข้อมูลจริงทั้งหมด: คงเหลือ/อัตราขาย/Lead Time/Vendor-Factory/PO
     setBadge(`<b style="color:var(--good)">ข้อมูลจริงจาก BC</b> · คงเหลือ+ขาย: ILE (${ileMatched}) · Lead Time+Vendor/Factory (${ltMatched}) · PO ค้างรับ (${poMatched}) · <b>Safety Stock ยังเป็น 0</b>`, 'live');
   } else {
