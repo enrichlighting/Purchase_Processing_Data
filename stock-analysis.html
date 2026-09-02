@@ -10487,6 +10487,7 @@ function flowMrdiyStockNow(it){ const st=it.mrdiyStock; if(!st||!st.mon||!st.mon
 function flowExDiyAvg(it,n){ const map=flowMonMap(it); const diy=(window.BC_DIYMON&&window.BC_DIYMON[it.no])||{}; return flowMonthsBack(n).reduce((s,k)=>s+Math.max(0,(map[k]||0)-(diy[k]||0)),0)/n; }
 // สินค้านี้ขายให้ Mr.DIY หรือไม่ (มี PLU หรือมีข้อมูลการขาย Mr.DIY)
 function flowIsDiyItem(it){ return !!(it && (it.hasPLU || it.mrdiySell)); }
+function flowIsOtherBrand(it){ return !!(it && String(it.brand||'').toUpperCase()!=='ENRICH'); }   // สินค้าแบรนด์อื่น (ไม่ใช่ ENRICH) เช่น R-BKP
 // เซลล์ placeholder สำหรับคอลัมน์เฉพาะ Mr.DIY เมื่อสินค้าไม่ได้ขายให้ Mr.DIY
 function flowDiyNA(xtra, cellId){ return `<td ${cellId?('id="'+cellId+'" '):''}style="padding:6px 10px;text-align:center;vertical-align:middle;${xtra||''}"><span style="font-size:9px;color:#9ca3af;font-style:italic;white-space:normal;line-height:1.25;display:inline-block;max-width:120px;">สินค้านี้ไม่ได้ขาย Mr.DIY</span></td>`; }
 // เซลล์ค่าเฉลี่ยแบบซ้าย(3ด.)/ขวา(6ด.)
@@ -10913,8 +10914,10 @@ function renderFlowchart(){
   let items=ITEMS.filter(flowItemActive);   // ซ่อนสินค้าที่ไม่มียอดขาย 3 ปี + ไม่มี PO + ไม่เคยจัดตู้ (ตามที่ผู้ใช้สั่ง)
   if(FLOW_INCLUDE.size && window.ITEMS_ALL){ const have=new Set(items.map(i=>i.no)); window.ITEMS_ALL.forEach(i=>{ if(i&&FLOW_INCLUDE.has(i.no) && !have.has(i.no)){ items.push(i); have.add(i.no); } }); }   // บังคับเพิ่มสินค้าใน FLOW_INCLUDE (ต่างแบรนด์/ไม่มีความเคลื่อนไหวก็โชว์)
   items=items.filter(i=> !FLOW_EXCLUDE.has(i.no));               // เอาสินค้าที่เลิกใช้ออกจากตาราง
-  if(window.flowDiyMode==='diy') items=items.filter(i=> flowIsDiyItem(i));            // เฉพาะสินค้าที่ขายให้ Mr.DIY
-  else if(window.flowDiyMode==='nondiy') items=items.filter(i=> !flowIsDiyItem(i));   // เฉพาะสินค้าที่ไม่ได้ขายให้ Mr.DIY
+  if(window.flowDiyMode==='diy') items=items.filter(i=> flowIsDiyItem(i) && !flowIsOtherBrand(i));            // เฉพาะสินค้าที่ขายให้ Mr.DIY (ไม่รวมแบรนด์อื่น)
+  else if(window.flowDiyMode==='nondiy') items=items.filter(i=> !flowIsDiyItem(i) && !flowIsOtherBrand(i));   // เฉพาะสินค้าที่ไม่ได้ขายให้ Mr.DIY (ไม่รวมแบรนด์อื่น)
+  else if(window.flowDiyMode==='other') items=items.filter(i=> flowIsOtherBrand(i));   // เฉพาะสินค้าแบรนด์อื่น (ไม่ใช่ ENRICH)
+  // 'all' = ทุกสินค้า (รวมแบรนด์อื่นด้วย) — ไม่กรอง
   if(q) items=items.filter(i=> (i.no+' '+(i.desc||'')+' '+flowShort(i.no)).toLowerCase().indexOf(q)>=0);
   const vf=(window.flowVendorFilter||'').trim(), ff=(window.flowFactoryFilter||'').trim();
   if(vf) items=items.filter(i=> (i.sources||[]).some(x=>x.vendor===vf));       // กรองตาม Vendor
@@ -10994,6 +10997,7 @@ function renderFlowchart(){
         + b('all','📋 ทุกสินค้า','แสดงทุกสินค้า (คอลัมน์ Mr.DIY จะขึ้นครบ · สินค้าที่ไม่ได้ขาย DIY จะแจ้งในช่องนั้น)','')
         + b('diy','🛒 เฉพาะ Mr.DIY','แสดงเฉพาะสินค้าที่ขายให้ Mr.DIY','border-left:1px solid var(--brand);')
         + b('nondiy','🚫 เฉพาะที่ไม่ขาย Mr.DIY','แสดงเฉพาะสินค้าที่ไม่ได้ขายให้ Mr.DIY','border-left:1px solid var(--brand);')
+        + b('other','🏷️ แบรนด์อื่น','แสดงเฉพาะสินค้าแบรนด์อื่น (ไม่ใช่ ENRICH) เช่น R-BKP','border-left:1px solid var(--brand);')
         + `</div>`; })()}
   </div>
   <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -11011,8 +11015,11 @@ function renderFlowchart(){
     const gsales=gsalesOf(arr);
     const sOpen = q ? true : !!window.flowState.sub[sub];   // ค่าเริ่มต้น = ย่อ (collapsed)
     if(sOpen) anyOpen=true;
+    const grpOther = arr.length>0 && arr.every(i=>flowIsOtherBrand(i));   // หมวดที่เป็นแบรนด์อื่นทั้งหมด → แถบสีเขียวอ่อน
+    const barBg = grpOther ? '#dcfce7' : 'var(--brand-soft)';
+    const barTag = grpOther ? ' <span style="font-weight:700;font-size:10.5px;color:#15803d;background:#bbf7d0;border-radius:6px;padding:1px 7px;margin-left:4px;">แบรนด์อื่น</span>' : '';
     html+=`<div class="card" style="padding:0;margin-bottom:10px;overflow:hidden;">
-      <div onclick="flowToggleSub(this)" data-sub="${encodeURIComponent(sub)}" style="cursor:pointer;padding:11px 16px;background:var(--brand-soft);font-weight:800;font-size:13.5px;user-select:none;">${sOpen?'▼':'▶'} 🏷️ ${sub} <span class="muted" style="font-weight:400;font-size:11px;">(${arr.length} รายการ · ขาย 1 ปี ${fmtNum(gsales)})</span></div>`;
+      <div onclick="flowToggleSub(this)" data-sub="${encodeURIComponent(sub)}" style="cursor:pointer;padding:11px 16px;background:${barBg};font-weight:800;font-size:13.5px;user-select:none;">${sOpen?'▼':'▶'} 🏷️ ${sub}${barTag} <span class="muted" style="font-weight:400;font-size:11px;">(${arr.length} รายการ · ขาย 1 ปี ${fmtNum(gsales)})</span></div>`;
     if(sOpen){
       arr.sort((a,b)=>flowCmp(a,b,basis,grp) || (a.no<b.no?-1:1));   // เรียงในหมวดตาม flowSort (default = ควรสั่ง→ยอดขาย)
       html+=`<div class="flow-tscroll"><table style="table-layout:fixed;width:${tableW}px;min-width:${tableW}px;border-collapse:collapse;font-size:12px;">
