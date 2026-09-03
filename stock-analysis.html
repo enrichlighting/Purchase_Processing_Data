@@ -7717,8 +7717,8 @@ function reorderCalc(it, basisDays, custGroup){
   const availRaw = onHand - poDiy - draftDiy;                           // ในคลังหัก DIY แล้ว (ติดลบได้ = ขาด)
   const avail  = Math.max(0, availRaw);                                 // สำหรับแสดง "อยู่ได้กี่วัน" (ไม่ติดลบ)
   const usage = avgDailyUsage(it.no);
-  const _rbkpPO = /^R-BKP/.test(it.no);   // R-BKP: นับ "PO เฉยๆ" (ไม่มี A/C) ด้วย เพราะเป็น PO จริงที่ Released & ค้างรับ
-  const incoming = openPOs(it.no).filter(p=>{ const c=poType(p.docNo).code; return c==='POA' || (_rbkpPO && /^PO\d/.test(String(p.docNo||''))); }).reduce((s,p)=>s+p.outstanding,0);  // PO ค้างรับ (POA · เฉพาะ R-BKP รวม PO เฉยๆ)
+  const _forcedPO = (typeof FLOW_INCLUDE!=='undefined') && FLOW_INCLUDE.has(it.no);   // สินค้าที่บังคับแสดง (R-BKP/R-CVM/Street Pole): นับ "PO เฉยๆ" (ไม่มี A/C) ด้วย เพราะไม่มีการจัดตู้ · เป็น PO จริงที่ Released & ค้างรับ
+  const incoming = openPOs(it.no).filter(p=>{ const c=poType(p.docNo).code; return c==='POA' || (_forcedPO && /^PO\d/.test(String(p.docNo||''))); }).reduce((s,p)=>s+p.outstanding,0);  // PO ค้างรับ (POA · สินค้า FLOW_INCLUDE รวม PO เฉยๆ)
   const packed = (typeof itemPackedQty==='function') ? itemPackedQty(it.no) : 0;          // จัดตู้แล้ว
   const productionRaw = (typeof itemProductionQty==='function') ? itemProductionQty(it.no) : 0; // สั่งผลิต (กรอก/Lead Time)
   const production = Math.min(productionRaw, Math.max(0, incoming - packed));               // ไม่เกินค้างรับที่ยังไม่จัดตู้ (กันนับซ้ำกับ PO)
