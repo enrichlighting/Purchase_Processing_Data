@@ -253,6 +253,7 @@
     <div class="tab" data-tab="search" title="ค้นหาสต๊อก &amp; รายการสินค้า">🔎</div>
     <div class="tab" data-tab="packing" title="Packing List">📦 Packing List</div>
     <div class="tab" data-tab="payment" title="Payment — อัพเดทการโอนเงินรายเดือน">💰 Payment</div>
+    <div class="tab" data-tab="payment2" title="Payment for ACC — เหมือน Payment + คอลัมน์ POA และ Lot No. (เฉพาะ Account/Admin)">🧾 Payment for ACC</div>
   </div>
 
   <!-- ============ PAGE: FLOWCHART ============ -->
@@ -402,6 +403,29 @@
         <button onclick="payAddExtra()" title="เพิ่มบรรทัดค่าใช้จ่ายที่ไม่ใช่สินค้า (กรอกวันที่โอน · SUPPLIER · CT No. · จำนวนเงินเอง)" style="font-size:13px;font-weight:800;padding:6px 13px;border-radius:8px;border:0;background:#7f1d1d;color:#fff;cursor:pointer;">🧾 เพิ่มค่าใช้จ่ายอื่น (ไม่ใช่สินค้า)</button>
       </div>
       <div id="pay-body"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-payment2">
+    <div class="card">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-size:16px;font-weight:800;">
+        <span>🧾 Payment for ACC</span>
+        <span style="font-size:11px;font-weight:600;color:var(--muted);">(เหมือน Payment + คอลัมน์ POA และ Lot No. ต่อตู้)</span>
+        <span>ปี</span>
+        <select id="pay2-year" onchange="renderPayment2()" style="width:150px;max-width:150px;font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;"></select>
+        <span>เดือน</span>
+        <select id="pay2-month" onchange="renderPayment2()" style="width:170px;max-width:170px;font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;"></select>
+        <span>Vendor</span>
+        <select id="pay2-vendor" onchange="renderPayment2()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;max-width:220px;"></select>
+        <span>เลขตู้</span>
+        <select id="pay2-ct" onchange="renderPayment2()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;max-width:160px;"></select>
+        <span style="width:1px;height:22px;background:var(--line);margin:0 4px;"></span>
+        <label style="font-size:13px;font-weight:700;">Exchange Rate: <input type="number" id="pay2-fx" value="5" min="0" step="0.01" onchange="renderPayment2()" oninput="renderPayment2()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/หยวน</label>
+        <label style="font-size:13px;font-weight:700;">USD: <input type="number" id="pay2-usd" value="34" min="0" step="0.01" onchange="renderPayment2()" oninput="renderPayment2()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/ดอลลาร์</label>
+        <span style="width:1px;height:22px;background:var(--line);margin:0 4px;"></span>
+        <button onclick="payAddExtra()" title="เพิ่มบรรทัดค่าใช้จ่ายที่ไม่ใช่สินค้า (กรอกวันที่โอน · SUPPLIER · CT No. · จำนวนเงินเอง)" style="font-size:13px;font-weight:800;padding:6px 13px;border-radius:8px;border:0;background:#7f1d1d;color:#fff;cursor:pointer;">🧾 เพิ่มค่าใช้จ่ายอื่น (ไม่ใช่สินค้า)</button>
+      </div>
+      <div id="pay2-body"></div>
     </div>
   </div>
 
@@ -11478,7 +11502,7 @@ function payExportExcel(sfx){
   pkToast('Export Payment แล้ว — '+mTxt+' '+yTxt+'\n'+nRow+' บรรทัด (แตกย่อยราย Lot) · ระบุ Lot No. ได้ '+nLot+' บรรทัด','good');
 }
 const PAY_OPT1={sfx:'', body:'pay-body', mSel:'pay-month', ySel:'pay-year', vSel:'pay-vendor', ctSel:'pay-ct', fxEl:'pay-fx', usdEl:'pay-usd', splitLot:false, docs:false};
-const PAY_OPT2={sfx:'2', body:'pay2-body', mSel:'pay2-month', ySel:'pay2-year', vSel:'pay2-vendor', ctSel:'pay2-ct', fxEl:'pay2-fx', usdEl:'pay2-usd', splitLot:true, docs:true};
+const PAY_OPT2={sfx:'2', body:'pay2-body', mSel:'pay2-month', ySel:'pay2-year', vSel:'pay2-vendor', ctSel:'pay2-ct', fxEl:'pay2-fx', usdEl:'pay2-usd', splitLot:true, docs:false, poa:true};   // หน้า Payment for ACC — เพิ่มคอลัมน์ POA + Lot No. (ยังไม่เอา PI/INV/PL)
 function renderPayment2(){ renderPayment(PAY_OPT2); }
 function payRefresh(){   // รีเฟรชหน้า Payment ที่กำลังเปิดอยู่ (รองรับทั้ง 2 หน้า)
   const p1=document.getElementById('page-payment'), p2=document.getElementById('page-payment2');
@@ -11556,6 +11580,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
   const rBaht=r=>((r._cur==='USD')?((+r.amtUsd||0)*usd):((+r.amtRmb||0)*fx));   // มูลค่าบาทต่อแถว (USD ×เรทดอลลาร์ · อื่น ×เรทหยวน)
   const weeks=payWeeks(y,m);
   const LEFT=['WEEK','วันที่โอน','SUPPLIER (VENDOR+FACTORY)','TERM','Loading date','CT NO.']
+    .concat(opt.poa?['POA']:[])
     .concat(opt.splitLot?['Lot No.']:[])
     .concat(['AMOUNT','TOTAL AMOUNT (SUPPLIER - RMB)','TOTAL AMOUNT (SUPPLIER - BAHT)'])
     .concat(opt.docs?['PI','INV','PL No']:[]);
@@ -11598,6 +11623,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
        + `<td style="${bTd}background:${vbg};text-align:left;white-space:normal;font-size:11px;line-height:1.3;min-width:150px;color:#4b5563;">${r._extra ? (r._kind?('<b style="color:#7f1d1d;">'+payEsc(payExtraKindLabel(r._kind))+'</b>'):'<span style="color:#9ca3af;">-</span>') : (payEsc(r.term)||'<span style="color:#9ca3af;">-</span>')}</td>`
        + `<td style="${bTd}background:${vbg};text-align:center;white-space:nowrap;color:#374151;">${payThaiDate(r.load)}</td>`
        + `<td class="pay-ct-cell" style="${bTd}background:${vbg};text-align:center;white-space:nowrap;font-weight:700;color:#111;">${payEsc(r.cont)}</td>`
+       + (opt.poa?`<td style="${bTd}background:${vbg};text-align:center;white-space:normal;min-width:110px;font-size:11px;color:#111;">${r.poList?('<b>'+payEsc(r.poList)+'</b>'):(r.po?('<b>'+payEsc(r.po)+'</b>'):'<span style="color:#9ca3af;">-</span>')}</td>`:'')
        + (opt.splitLot?`<td style="${bTd}background:${vbg};text-align:center;white-space:nowrap;color:#111;">${r.lot?('<b>'+payEsc(r.lot)+'</b>'):'<span style="color:#9ca3af;">-</span>'}</td>`:'')
        + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:700;color:${((r._cur==='USD'?(+r.amtUsd||0):(+r.amtRmb||0))<0)?'#b91c1c':'#111'};">${(r._cur==='USD')?('$'+f2(r.amtUsd)):('¥'+f2(r.amtRmb))}${r.seg?`<div style="font-size:9px;font-weight:700;color:#7f1d1d;">${payEsc(r.seg)}</div>`:''}</td>`
        + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?((venShow.usd>0)?('$'+f2(venShow.usd)):('¥'+f2(venShow.rmb))):''}</td>`
@@ -11697,6 +11723,7 @@ function renderTab(tab){
   else if(tab==='leadtime'){ poLoadFollow(); const _pr=poPruneStaleFollow(); if(_pr && _pr.length && typeof pkToast==='function') pkToast('ล้างรายการติดตาม PO เก่าที่ไม่ตรงข้อมูล BC แล้ว '+_pr.length+' รายการ','good'); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderUrgent(); renderPoFollow(); renderArrivedMatrix(); }
   else if(tab==='packing'){ renderPacking(); pkLoadLog(); renderPkLog(); if(typeof renderArrivedMatrix==='function') renderArrivedMatrix(); }
   else if(tab==='payment'){ renderPayment(); }
+  else if(tab==='payment2'){ renderPayment2(); }
   window.tabRendered[tab]=true;
 }
 document.querySelectorAll('.tab').forEach(t=>{
@@ -11854,9 +11881,9 @@ function presTick(){ presHeartbeat(); presRender(); }
 // ต้องเข้าสู่ระบบด้วย username/password ที่สร้างไว้ใน SharePoint List "AppUsers" ก่อนถึงจะใช้แอปได้
 // ============================================================
 const ROLE_PAGES = {
-  Admin: ['flowchart','leadtime','search','packing','payment'],
-  Purchase: ['flowchart','leadtime','search','packing','payment'],
-  Account: ['payment'],
+  Admin: ['flowchart','leadtime','search','packing','payment','payment2'],   // เห็นทุกหน้า (รวม Payment for ACC)
+  Purchase: ['flowchart','leadtime','search','packing','payment'],            // เห็น Payment ปกติ · ไม่เห็น Payment for ACC
+  Account: ['payment2'],                                                       // เห็นเฉพาะ Payment for ACC
 };
 function appAuthInfo(){ try{ const s=sessionStorage.getItem('appAuthV1'); return s?JSON.parse(s):null; }catch(e){ return null; } }
 function appSetAuthInfo(info){ try{ sessionStorage.setItem('appAuthV1', JSON.stringify(info)); }catch(e){} }
