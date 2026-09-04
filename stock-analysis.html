@@ -11407,9 +11407,9 @@ function payRowsData(splitLot, splitPo){
       (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; const q=per?(+per.pcs||0):0; if(q<=0) return; if(!/^POA/i.test(r.po||'')) return;   // เฉพาะ PO ขึ้นต้น POA (ข้าม POC/POS)
         const f=(r.factory||'').trim(); if(!f) return;
         const ven=(payRowVendor(s, r, f)||'').trim();   // ตู้ import → ยึด CSV · ตู้ที่คีย์เอง → ยึด Vendor ของ PO จาก BC
-        const lot = splitLot ? (((per&&per.lot)||r.costLot||'').trim()) : '';   // แยกตาม Lot No. ที่ระบุในตู้ (เฉพาะหน้า Payment 2)
-        // Lot No. เดียวกับที่แสดงในหน้า Packing List (Lot ที่บันทึก → ที่เลือกเอง → ดึงจาก POA) — ใช้กับคอลัมน์ใน Excel
+        // Lot No. เดียวกับที่แสดงในหน้า Packing List (Lot ที่บันทึก → ที่เลือกเอง → ดึงจาก POA) — ใช้กับคอลัมน์ใน Excel และหน้า Payment for ACC
         const lotAll = (((per&&per.lot)||r.costLot||((typeof pkLotFromPO==='function')?pkLotFromPO(r.item, r.po||''):'')||'')).trim();
+        const lot = splitLot ? lotAll : '';   // แยก/แสดง Lot No. โดยใช้ค่าเต็ม (รวม fallback ดึงจาก POA) ไม่งั้นตู้ที่ไม่ได้คีย์ Lot จะว่าง
         const gk=f+'||'+ven+(splitLot?('||'+lot):'')+(splitPo?('||'+(r.po||'')):'');   // แยกกลุ่มตาม Vendor + Factory (+ Lot ถ้าเปิด splitLot · + POA ถ้าเปิด splitPo)
         const g=groups[gk]||(groups[gk]={factory:f, vendor:ven, lot:lot, rmb:0, item:r.item, po:r.po||'', pos:new Set(), lots:new Set(), brk:{}});
         g.rmb+=(+per.valRmb||0); if(!g.item) g.item=r.item; if(!g.po) g.po=r.po||'';
