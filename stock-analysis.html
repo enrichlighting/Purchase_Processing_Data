@@ -11501,7 +11501,7 @@ function payExportExcel(sfx){
   pkWriteFile(name, new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'}));
   pkToast('Export Payment แล้ว — '+mTxt+' '+yTxt+'\n'+nRow+' บรรทัด (แตกย่อยราย Lot) · ระบุ Lot No. ได้ '+nLot+' บรรทัด','good');
 }
-const PAY_OPT1={sfx:'', body:'pay-body', mSel:'pay-month', ySel:'pay-year', vSel:'pay-vendor', ctSel:'pay-ct', fxEl:'pay-fx', usdEl:'pay-usd', splitLot:false, docs:false};
+const PAY_OPT1={sfx:'', body:'pay-body', mSel:'pay-month', ySel:'pay-year', vSel:'pay-vendor', ctSel:'pay-ct', fxEl:'pay-fx', usdEl:'pay-usd', splitLot:false, docs:false, noExport:true};   // หน้า Payment ปกติ — ตัดปุ่มปริ้นท์/Export ออก
 const PAY_OPT2={sfx:'2', body:'pay2-body', mSel:'pay2-month', ySel:'pay2-year', vSel:'pay2-vendor', ctSel:'pay2-ct', fxEl:'pay2-fx', usdEl:'pay2-usd', splitLot:true, splitPo:true, docs:false, poa:true, hideCF:true};   // หน้า Payment for ACC — แยกบรรทัดต่อ POA (แสดงเงินต่อ POA) + คอลัมน์ POA/Lot No. · ตัด บัญชี CF/SUPPLIER CF/BANK SLIP
 function renderPayment2(){ renderPayment(PAY_OPT2); }
 function payRefresh(){   // รีเฟรชหน้า Payment ที่กำลังเปิดอยู่ (รองรับทั้ง 2 หน้า)
@@ -11557,9 +11557,9 @@ function renderPayment(opt){
     if(!combos.length) combos=[{y:(y0||APP_TODAY.getFullYear()), m:(allMonth?(APP_TODAY.getMonth()+1):(+mSel||APP_TODAY.getMonth()+1))}];
   }
   const multi=combos.length>1;
-  const tools=`<div class="pay-tools" style="display:flex;justify-content:flex-end;margin:0 0 4px;">`
+  const tools = opt.noExport ? '' : (`<div class="pay-tools" style="display:flex;justify-content:flex-end;margin:0 0 4px;">`
     +`<button onclick="payExportExcel('${opt.sfx||''}')" title="Export ตารางนี้เป็น Excel (ตามปี/เดือน/Vendor/ตู้ ที่เลือกอยู่) — มีคอลัมน์ POA และ Lot No. เพิ่มให้"`
-    +` style="border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:7px;padding:2px 8px;font-size:14px;line-height:1.3;cursor:pointer;">🖨️</button></div>`;
+    +` style="border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:7px;padding:2px 8px;font-size:14px;line-height:1.3;cursor:pointer;">🖨️</button></div>`);   // ปุ่มปริ้นท์/Export — ซ่อนได้ด้วย opt.noExport (หน้า Payment ปกติตัดออกแล้ว)
   el.innerHTML=tools+combos.map(c=>payMonthBlock(c.y, c.m, data, fx, !multi, opt)).join('<div style="height:26px;border-top:2px dashed #d8c893;margin-top:14px;"></div>');
 }
 // สีพื้นหลังพาสเทลต่อ Vendor — แจกสีไล่ลำดับ (Vendor คนละตัว = คนละสี) จัดใน payAssignVendorColors()
