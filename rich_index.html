@@ -11354,8 +11354,10 @@ function payPoVendor(po, item){
 //        ตู้ที่คีย์ในเว็บเอง (ตู้ 354 เป็นต้นไป) → ยึด Vendor ของ PO จาก Business Central
 function payRowVendor(s, r, factory){
   const manual=(r.vendor||'').trim();
-  if(s && s.imported) return manual || payVendorForFactory(r.item,factory) || payPoVendor(r.po||'', r.item) || '';
-  return payPoVendor(r.po||'', r.item) || manual || payVendorForFactory(r.item,factory) || '';
+  const byFac=payVendorForFactory(r.item, factory) || '';   // Vendor ตาม Factory ที่เลือก (Lead Time) = ตัวบอก Vendor ต่อตู้ที่แม่นสุด
+  if(byFac) return byFac;                                    // มี Factory ที่ map เป็น Vendor → ยึด Factory (Vendor ตรงกับคอลัมน์ Factory เสมอ · กัน payPoVendor เดา vendor เริ่มต้นของสินค้าผิด)
+  if(s && s.imported) return manual || payPoVendor(r.po||'', r.item) || '';
+  return payPoVendor(r.po||'', r.item) || manual || '';
 }
 function payVendorForFactory(item, factory){ const lt=(window.BC_LEADTIME&&window.BC_LEADTIME[item]); if(lt&&Array.isArray(lt.opts)){ const o=lt.opts.find(x=>((x&&x.f)||'')===factory); if(o&&o.v) return o.v; } return ''; }
 // เลือก Term ตาม Vendor/Factory ที่ระบุ · สินค้า 1 ตัวมีได้หลาย Vendor (Vendor1/2/3) ในไฟล์ Lead Time — จับคู่ให้ตรงตัวที่ระบุ
