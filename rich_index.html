@@ -8419,8 +8419,9 @@ function pkPickLot(i, v){
   if(v===''){ pkSetCostLot(i,''); return; }
   const list=pkLotList(r.item);
   let idx=list.findIndex(e=>pkLotLabelOf(e)===v);
+  if(idx<0) idx=list.findIndex(e=>String(e.po||'').toLowerCase()===v.toLowerCase() || (e.po && v.toLowerCase().indexOf(String(e.po).toLowerCase())>=0));   // พิมพ์เลข PO ตรงๆ ก็เลือกได้ (เช่น POA26050020)
   if(idx<0) idx=list.findIndex(e=>String(e.lot||'').toLowerCase()===v.toLowerCase() || (e.lot && v.toLowerCase().indexOf(String(e.lot).toLowerCase())>=0));
-  if(idx>=0) pkSetCostLot(i, String(idx)); else pkToast('ไม่พบ Lot — เลือกจากรายการที่ระบบแนะนำ','bad');
+  if(idx>=0) pkSetCostLot(i, String(idx)); else pkToast('ไม่พบ Lot/PO — เลือกจากรายการที่ระบบแนะนำ','bad');
 }
 function pkSetCell(i, c, v){
   const r=window.packingRows[i];
