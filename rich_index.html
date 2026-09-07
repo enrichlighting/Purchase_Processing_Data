@@ -11402,9 +11402,15 @@ function payPaymentSegments(term, load, eta, docDate){
 // ดึงจากประวัติ Packing (pkLog): เฉพาะสินค้าที่กรอก Factory · group ตาม (ตู้ × Vendor × Factory) = 1 แถว
 function payRowsData(splitLot, splitPo){
   pkLoadLog(); const out=[];
-  (window.pkLog||[]).forEach((s,si)=>{ if(s.pending) return;
+  const _log=(window.pkLog||[]);
+  // รวมรอบร่าง (pending "รอเปิด PO") เข้า Payment ด้วย — แต่กันซ้ำ: PO×สินค้า ที่ "จัดตู้จริงแล้ว" (รอบ committed = ไม่ pending)
+  // ถ้าร่างนั้นถูกจัดตู้จริงไปแล้ว (หรือ import จาก CSV มาเป็นรอบจริง) → ใช้รอบจริง ไม่นับซ้ำ
+  const _packedKeys=new Set();
+  _log.forEach(s=>{ if(s.pending) return; (s.containers||[]).forEach((ct,ci)=>{ (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; const q=per?(+per.pcs||0):0; if(q<=0) return; if(!/^POA/i.test(r.po||'')) return; _packedKeys.add((r.po||'')+'|'+(r.item||'')); }); }); });
+  _log.forEach((s,si)=>{
     (s.containers||[]).forEach((ct,ci)=>{ const groups={}; const load=(ct.dates&&ct.dates.load)||'', eta=(ct.dates&&ct.dates.arrWh)||'';
       (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; const q=per?(+per.pcs||0):0; if(q<=0) return; if(!/^POA/i.test(r.po||'')) return;   // เฉพาะ PO ขึ้นต้น POA (ข้าม POC/POS)
+        if(s.pending && _packedKeys.has((r.po||'')+'|'+(r.item||''))) return;   // ร่างที่ถูกจัดตู้จริงไปแล้ว → ใช้รอบจริง ไม่นับซ้ำ
         const f=(r.factory||'').trim(); if(!f) return;
         const ven=(payRowVendor(s, r, f)||'').trim();   // ตู้ import → ยึด CSV · ตู้ที่คีย์เอง → ยึด Vendor ของ PO จาก BC
         // Lot No. เดียวกับที่แสดงในหน้า Packing List (Lot ที่บันทึก → ที่เลือกเอง → ดึงจาก POA) — ใช้กับคอลัมน์ใน Excel และหน้า Payment for ACC
