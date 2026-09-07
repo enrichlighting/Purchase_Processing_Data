@@ -8299,11 +8299,13 @@ function pkMatchApply(){
 function pkConvertDraftToReleased(){ pkOpenMatchModal(); }
 function pkSetCostLot(i, v){
   const r=window.packingRows[i];
+  const oldPo=((pkRowCost(r)||{}).po)||'';   // PO เดิมก่อนเปลี่ยน
   r.costIdx = (v==='')? null : (+v);
   if(window.pkMode==='released'){
     const rc=pkRowCost(r);
     r.lotMax = (rc.out!=null)? rc.out : null;
     if(window.pkEditIdx==null) r.loads=[pkDefaultLoad(r)];   // สร้างรอบใหม่ = ดึงจำนวนสั่งผลิตมาใส่ตู้แรก · แก้ไขรอบเก่า (เปลี่ยน PO) = คงจำนวนที่จัดไว้เดิม ไม่ล้าง
+    if(rc.po && rc.po!==oldPo){ const nv=(typeof payVendorForFactory==='function'?payVendorForFactory(r.item,r.factory):'')||(typeof payPoVendor==='function'?payPoVendor(rc.po,r.item):'')||''; if(nv) r.vendor=nv; }   // เปลี่ยน PO → อัปเดต Vendor ตามโรงงาน/PO ใหม่ (ไม่ค้าง vendor เก่า)
   } else { r.lotMax=null; }
   renderPacking();
 }
@@ -8633,7 +8635,7 @@ function pkFactoryOptions(item){
   const lt=(window.BC_LEADTIME&&window.BC_LEADTIME[item]); if(!lt||!Array.isArray(lt.opts)) return [];
   const seen=new Set(), out=[]; lt.opts.forEach(o=>{ const f=((o&&o.f)||'').trim(); if(f && !seen.has(f)){ seen.add(f); out.push(f); } }); return out;
 }
-function pkSetFactory(i, v){ const r=window.packingRows[i]; if(r) r.factory=v; }
+function pkSetFactory(i, v){ const r=window.packingRows[i]; if(!r) return; r.factory=v; const nv=(typeof payVendorForFactory==='function'?payVendorForFactory(r.item,v):'')||''; if(nv) r.vendor=nv; }   // เลือกโรงงาน → อัปเดต Vendor ให้ตรงโรงงาน (Lead Time) · ไม่ค้าง vendor เก่า
 function pkSetVendor(i, v){ const r=window.packingRows[i]; if(r) r.vendor=v; }
 // ค่าเริ่มต้น Vendor/Factory/Term ตามรหัสสินค้า (โหมด Forecast) — เพิ่มกลุ่มใหม่ได้ที่นี่
 function pkDefaultVendorFactory(item){
