@@ -8151,7 +8151,10 @@ function pkReleasedSet(){ if(window._pkRelSet) return window._pkRelSet; var s={}
 function pkLotList(item){
   if(window.pkMode==='released'){
     var rel=(window.BC_POREL&&window.BC_POREL[item])?window.BC_POREL[item]:[], rs=pkReleasedSet();
-    return rel.filter(function(e){return rs[e[0]];}).map(function(e){return {po:e[0], lot:e[1], rmb:e[2], out:e[3]};});
+    var list=rel.filter(function(e){return rs[e[0]];}).map(function(e){return {po:e[0], lot:e[1], rmb:e[2], out:e[3]};});
+    var have={}; list.forEach(function(x){ have[x.po]=1; });
+    pkPoCost(item).forEach(function(e){ var po=e[2]; if(po && !have[po]){ have[po]=1; list.push({po:po, lot:e[0], rmb:e[1], out:null, closed:true}); } });   // รวม PO ที่ปิดแล้ว (Fully · BC_POCOST) เพื่อให้แก้ตู้เก่าไปจับ PO ที่ปิดแล้วได้
+    return list;
   }
   return pkPoCost(item).map(function(e){return {po:e[2], lot:e[0], rmb:e[1], out:null};});
 }
@@ -8300,7 +8303,7 @@ function pkSetCostLot(i, v){
   if(window.pkMode==='released'){
     const rc=pkRowCost(r);
     r.lotMax = (rc.out!=null)? rc.out : null;
-    r.loads=[pkDefaultLoad(r)];   // ดึงจำนวนสั่งผลิตมาใส่ตู้แรก (แก้ได้) · ถ้ายังไม่กรอกสั่งผลิต = เว้นว่าง
+    if(window.pkEditIdx==null) r.loads=[pkDefaultLoad(r)];   // สร้างรอบใหม่ = ดึงจำนวนสั่งผลิตมาใส่ตู้แรก · แก้ไขรอบเก่า (เปลี่ยน PO) = คงจำนวนที่จัดไว้เดิม ไม่ล้าง
   } else { r.lotMax=null; }
   renderPacking();
 }
@@ -8410,7 +8413,7 @@ function pkPickItemByNo(i, v){ v=String(v||'').trim().toUpperCase(); if(!v){ pkS
   if(itemHasReleasedPO(code)){ pkEnsureDims(code); pkSetItem(i, code); return; }
   pkToast('ไม่พบรหัสสินค้า','bad');
 }
-function pkLotLabelOf(e){ return (window.pkMode==='released') ? `${e.po} · ${e.lot} · ค้าง ${fmtNum(e.out)} · ¥${e.rmb}` : `${e.lot} · ¥${e.rmb}`; }
+function pkLotLabelOf(e){ return (window.pkMode==='released') ? `${e.po} · ${e.lot} · ${e.closed?'ปิดแล้ว (Fully)':('ค้าง '+fmtNum(e.out))} · ¥${e.rmb}` : `${e.lot} · ¥${e.rmb}`; }
 function pkPickLot(i, v){
   const r=window.packingRows[i]; if(!r) return; v=String(v||'').trim();
   if(v===''){ pkSetCostLot(i,''); return; }
