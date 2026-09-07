@@ -9054,22 +9054,32 @@ function pkRestoreRmbFromCsv(file){
     if(col.container===undefined||col.item===undefined){ pkToast('CSV ต้องมีคอลัมน์ เลขตู้, รหัสสินค้า','bad'); return; }
     const get=(c,k)=> col[k]===undefined?'':(c[col[k]]||'').trim();
     // เก็บ {rmb,factory,vendor} ต่อ key: cont|item|po → item|po → cont|item → item
-    const M1={},M2={},M3={},M4={};
+    const M1={},M2={},M3={},M4={}, POM={};   // POM: ตู้|รหัส → {po,rmb} สำหรับแก้ PO (จับคู่ระดับตู้ · ambig=ไฟล์มี PO ขัดกันในตู้/รหัสเดียวกัน → ไม่แก้)
     const put=(map,key,o)=>{ const e=map[key]||(map[key]={}); if(o.rmb>0&&e.rmb==null)e.rmb=o.rmb; if(o.factory&&!e.factory)e.factory=o.factory; if(o.vendor&&!e.vendor)e.vendor=o.vendor; };
     for(let i=1;i<lines.length;i++){ const c=pkParseCSVLine(lines[i]); const cont=get(c,'container'); let item=get(c,'item').toUpperCase(); const po=get(c,'po'); if(!cont||!item) continue;
       const o={rmb:parseFloat((get(c,'rmb')||'').replace(/,/g,''))||0, factory:(get(c,'factory')||'').trim(), vendor:(get(c,'vendor')||'').trim()};
-      put(M1,cont+'|'+item+'|'+po,o); put(M2,item+'|'+po,o); put(M3,cont+'|'+item,o); put(M4,item,o); }
+      put(M1,cont+'|'+item+'|'+po,o); put(M2,item+'|'+po,o); put(M3,cont+'|'+item,o); put(M4,item,o);
+      if(po){ const pk=cont+'|'+item; if(!POM[pk]) POM[pk]={po, rmb:o.rmb}; else if(POM[pk].po!==po) POM[pk].ambig=true; } }
     const findRec=(cont,item,po)=> M1[cont+'|'+item+'|'+po] || M2[item+'|'+po] || M3[cont+'|'+item] || M4[item] || null;
-    pkLoadLog(); let rounds=0, patchedRows=0, facAdded=0, venAdded=0, rmbAdded=0;
+    pkLoadLog(); let rounds=0, patchedRows=0, facAdded=0, venAdded=0, rmbAdded=0, poFixed=0;
     (window.pkLog||[]).forEach(s=>{ if(s.pending) return; const fx=s.fx||pkFxVal()||5; let rmbChanged=false, roundTouched=false;
       (s.containers||[]).forEach((ct,ci)=>{ const cont=ct.name||'';
         (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; if(!per||!(+per.pcs>0)) return; if(r.custom) return;
-          const rec=findRec(cont, r.item, r.po||''); if(!rec) return;
           let touched=false;
-          const cur=(r.rmb!=null&&r.rmb!==''?+r.rmb:0);
-          if(!(cur>0 && r.rmbFixed!=null) && rec.rmb>0){ r.rmb=rec.rmb; r.rmbFixed=rec.rmb; rmbChanged=true; touched=true; rmbAdded++; }   // เติมต้นทุนเฉพาะที่ยังไม่มี
-          if(rec.factory && (r.factory||'').trim()!==rec.factory){ r.factory=rec.factory; touched=true; facAdded++; }   // เติม/อัปเดต Factory
-          if(rec.vendor && (r.vendor||'').trim()!==rec.vendor){ r.vendor=rec.vendor; touched=true; venAdded++; }        // เติม/อัปเดต Vendor
+          const prec=POM[cont+'|'+r.item];   // ---- แก้ PO จาก CSV (จับคู่ ตู้|รหัสสินค้า) — PO ในตู้ผิด/ต่างจากไฟล์ → ยึดตามไฟล์ ----
+          if(prec && !prec.ambig && prec.po && (r.po||'')!==prec.po){
+            r.po=prec.po; r.costIdx=null;
+            r.costLot=((typeof pkLotFromPO==='function')?pkLotFromPO(r.item, prec.po):'')||'';   // Lot ตาม PO ใหม่
+            if(prec.rmb>0){ r.rmb=prec.rmb; r.rmbFixed=prec.rmb; rmbChanged=true; }               // ต้นทุนตามแถว CSV เดียวกัน
+            touched=true; poFixed++;
+          }
+          const rec=findRec(cont, r.item, r.po||'');   // ใช้ PO ล่าสุด (หลังแก้) จับคู่ต้นทุน/Factory/Vendor
+          if(rec){
+            const cur=(r.rmb!=null&&r.rmb!==''?+r.rmb:0);
+            if(!(cur>0 && r.rmbFixed!=null) && rec.rmb>0){ r.rmb=rec.rmb; r.rmbFixed=rec.rmb; rmbChanged=true; touched=true; rmbAdded++; }   // เติมต้นทุนเฉพาะที่ยังไม่มี
+            if(rec.factory && (r.factory||'').trim()!==rec.factory){ r.factory=rec.factory; touched=true; facAdded++; }   // เติม/อัปเดต Factory
+            if(rec.vendor && (r.vendor||'').trim()!==rec.vendor){ r.vendor=rec.vendor; touched=true; venAdded++; }        // เติม/อัปเดต Vendor
+          }
           if(touched){ patchedRows++; roundTouched=true; }
         });
       });
@@ -9082,7 +9092,7 @@ function pkRestoreRmbFromCsv(file){
       if(roundTouched) rounds++;
     });
     if(!patchedRows){ pkToast('ไม่พบตู้/สินค้าที่ตรงกับไฟล์ (หรือข้อมูลครบอยู่แล้ว)','muted'); return; }
-    pkConfirm(`เติมข้อมูลตู้ import จาก CSV:\n• ต้นทุน RMB ${rmbAdded} รายการ\n• Factory ${facAdded} รายการ\n• Vendor ${venAdded} รายการ\n(รวม ${patchedRows} รายการ ใน ${rounds} ตู้)\n\nกด "ตกลง" เพื่อบันทึก`, ()=>{
+    pkConfirm(`เติมข้อมูลตู้ import จาก CSV:\n• แก้ PO ${poFixed} รายการ\n• ต้นทุน RMB ${rmbAdded} รายการ\n• Factory ${facAdded} รายการ\n• Vendor ${venAdded} รายการ\n(รวม ${patchedRows} รายการ ใน ${rounds} ตู้)\n\nกด "ตกลง" เพื่อบันทึก (เก็บในเครื่องนี้ · กด "อัปโหลดขึ้นส่วนกลาง" เพื่อ sync ให้ทีม)`, ()=>{
       pkSaveLogStore(); renderPkLog(); pkRerenderLinked();
       pkToast(`เติมข้อมูลสำเร็จ — RMB ${rmbAdded} · Factory ${facAdded} · Vendor ${venAdded}`,'good');
     });
