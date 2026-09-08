@@ -11373,6 +11373,15 @@ function payRowVendor(s, r, factory){
   if(s && s.imported) return manual || payPoVendor(r.po||'', r.item) || '';
   return payPoVendor(r.po||'', r.item) || manual || '';
 }
+// รวมชื่อ Vendor ที่เป็นเจ้าเดียวกันในหน้า Payment/Payment for ACC (เช่น "QILI (TUBO)"→"QILI", "KTL(DINGDING)"→"KTL") — ตัดส่วนในวงเล็บทิ้งเฉพาะชื่อในลิสต์
+const PAY_VENDOR_MERGE = ['QILI','KTL'];
+function payNormVendor(v){
+  const s=String(v||'').trim(); if(!s) return s;
+  const base=s.split('(')[0].trim();                 // "QILI (TUBO)"→"QILI" · "KTL(DINGDING)"→"KTL"
+  const u=base.toUpperCase();
+  for(const b of PAY_VENDOR_MERGE){ if(u===b.toUpperCase()) return b; }
+  return s;                                          // เจ้าอื่นคงชื่อเดิม (รวมวงเล็บ)
+}
 function payVendorForFactory(item, factory){ const lt=(window.BC_LEADTIME&&window.BC_LEADTIME[item]); if(lt&&Array.isArray(lt.opts)){ const o=lt.opts.find(x=>((x&&x.f)||'')===factory); if(o&&o.v) return o.v; } return ''; }
 // เลือก Term ตาม Vendor/Factory ที่ระบุ · สินค้า 1 ตัวมีได้หลาย Vendor (Vendor1/2/3) ในไฟล์ Lead Time — จับคู่ให้ตรงตัวที่ระบุ
 function payCreditTerm(item, vendor, factory){ const C=window.BC_CREDITTERM||{};
@@ -11445,7 +11454,7 @@ function payRowsData(splitLot, splitPo){
         if(!/^POA/i.test(r.po||'')) return;   // เฉพาะ PO ขึ้นต้น POA (ข้าม POC/POS)
         if(s.pending && _packedKeys.has((r.po||'')+'|'+(r.item||''))) return;   // ร่างที่ถูกจัดตู้จริงไปแล้ว → ใช้รอบจริง ไม่นับซ้ำ
         const f=(r.factory||'').trim(); if(!f) return;
-        const ven=(payRowVendor(s, r, f)||'').trim();   // ตู้ import → ยึด CSV · ตู้ที่คีย์เอง → ยึด Vendor ของ PO จาก BC
+        const ven=payNormVendor((payRowVendor(s, r, f)||'').trim());   // ตู้ import → ยึด CSV · ตู้ที่คีย์เอง → ยึด Vendor ของ PO จาก BC · แล้วรวมชื่อเจ้าเดียวกัน (QILI/KTL)
         // Lot No. เดียวกับที่แสดงในหน้า Packing List (Lot ที่บันทึก → ที่เลือกเอง → ดึงจาก POA) — ใช้กับคอลัมน์ใน Excel และหน้า Payment for ACC
         const lotAll = (((per&&per.lot)||r.costLot||((typeof pkLotFromPO==='function')?pkLotFromPO(r.item, r.po||''):'')||'')).trim();
         const lot = splitLot ? lotAll : '';   // แยก/แสดง Lot No. โดยใช้ค่าเต็ม (รวม fallback ดึงจาก POA) ไม่งั้นตู้ที่ไม่ได้คีย์ Lot จะว่าง
