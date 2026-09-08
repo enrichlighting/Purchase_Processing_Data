@@ -8564,6 +8564,19 @@ function pkSaveDates(c){
   changes.forEach(ch=>{ const reason = ch.from ? document.getElementById('pk-r-'+c+'-'+ch.k).value.trim() : '(ระบุครั้งแรก)'; ct.dates[ch.k]=ch.to; ct.dateLog.push({ts, field:ch.label, from:ch.from, to:ch.to, reason}); });
   ct.editing=false;
   renderShipPanel();
+  // ---- บันทึกวันที่ลง "รอบที่บันทึกไว้" ทันที (ไม่งั้นรีเฟรชแล้วหาย เพราะเดิมแก้แค่ในฟอร์มชั่วคราว) ----
+  try{
+    if(window.pkEditIdx!=null && window.pkLog && window.pkLog[window.pkEditIdx] && (window.pkLog[window.pkEditIdx].containers||[])[c]){
+      const tgt=window.pkLog[window.pkEditIdx].containers[c];
+      tgt.dates=Object.assign({}, ct.dates); tgt.dateLog=(ct.dateLog||[]).slice();
+      pkSaveLogStore();
+      if(typeof renderPkLog==='function') renderPkLog();
+      if(typeof pkRerenderLinked==='function') pkRerenderLinked();   // Payment ใช้วันที่คำนวณวันโอน → อัปเดตตาม
+      pkToast('บันทึกวันที่ตู้ลงรอบแล้ว ✅ ถาวร · กด "อัปโหลดขึ้นส่วนกลาง" เพื่อ sync ให้ทีม','good');
+    } else {
+      pkToast('บันทึกวันที่ในฟอร์มแล้ว — กด "บันทึกรอบ" ด้านล่างเพื่อเก็บถาวร','info');
+    }
+  }catch(e){}
 }
 function pkShowLog(c){
   const ct=window.pkContainers[c]; const log=(ct.dateLog||[]).slice().reverse();
