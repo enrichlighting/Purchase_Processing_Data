@@ -10995,7 +10995,7 @@ function renderFlowchart(){
   if(!window.flowMoqT){ try{ window.flowMoqT=JSON.parse(localStorage.getItem('flowMoqTV1')||'{}'); }catch(e){ window.flowMoqT={}; } }
   if(window.flowMoqMode===undefined){ try{ window.flowMoqMode=localStorage.getItem('flowMoqModeV1')||'qty'; }catch(e){ window.flowMoqMode='qty'; } }
   if(window.flowMoqUnit===undefined){ try{ window.flowMoqUnit=localStorage.getItem('flowMoqUnitV1')||'month'; }catch(e){ window.flowMoqUnit='month'; } }
-  let items=ITEMS.filter(flowItemActive);   // ซ่อนสินค้าที่ไม่มียอดขาย 3 ปี + ไม่มี PO + ไม่เคยจัดตู้ (ตามที่ผู้ใช้สั่ง)
+  let items=ITEMS.filter(function(i){return String(i.brand||'').toUpperCase()==='ENRICH' && flowItemActive(i);});   // ซ่อนสินค้าที่ไม่มียอดขาย 3 ปี + ไม่มี PO + ไม่เคยจัดตู้ (ตามที่ผู้ใช้สั่ง)
   if(FLOW_INCLUDE.size && window.ITEMS_ALL){ const have=new Set(items.map(i=>i.no)); window.ITEMS_ALL.forEach(i=>{ if(i&&FLOW_INCLUDE.has(i.no) && !have.has(i.no)){ items.push(i); have.add(i.no); } }); }   // บังคับเพิ่มสินค้าใน FLOW_INCLUDE (ต่างแบรนด์/ไม่มีความเคลื่อนไหวก็โชว์)
   items=items.filter(i=> !FLOW_EXCLUDE.has(i.no));               // เอาสินค้าที่เลิกใช้ออกจากตาราง
   if(window.flowDiyMode==='diy') items=items.filter(i=> flowIsDiyItem(i) && !flowIsOtherBrand(i));            // เฉพาะสินค้าที่ขายให้ Mr.DIY (ไม่รวมแบรนด์อื่น)
