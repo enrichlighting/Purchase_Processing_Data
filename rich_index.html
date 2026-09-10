@@ -408,7 +408,7 @@
 
   <div class="page" id="page-payment2">
     <div class="card">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-size:16px;font-weight:800;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:16px;font-weight:800;">
         <span>🧾 Payment for ACC</span>
         <span style="font-size:11px;font-weight:600;color:var(--muted);">(เหมือน Payment + คอลัมน์ POA และ Lot No. ต่อตู้)</span>
         <span>ปี</span>
@@ -419,7 +419,12 @@
         <select id="pay2-vendor" onchange="renderPayment2()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;max-width:220px;"></select>
         <span>เลขตู้</span>
         <select id="pay2-ct" onchange="renderPayment2()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;max-width:160px;"></select>
-        <span style="width:1px;height:22px;background:var(--line);margin:0 4px;"></span>
+        <span>ค้นหา PO</span>
+        <input type="text" id="pay2-po" placeholder="🔍 เลข PO" oninput="renderPayment2()" autocomplete="off" style="width:150px;font-size:14px;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">
+        <span>ค้นหา Lot</span>
+        <input type="text" id="pay2-lot" placeholder="🔍 เลข Lot" oninput="renderPayment2()" autocomplete="off" style="width:150px;font-size:14px;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
         <label style="font-size:13px;font-weight:700;">Exchange Rate: <input type="number" id="pay2-fx" value="5" min="0" step="0.01" onchange="renderPayment2()" oninput="renderPayment2()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/หยวน</label>
         <label style="font-size:13px;font-weight:700;">USD: <input type="number" id="pay2-usd" value="34" min="0" step="0.01" onchange="renderPayment2()" oninput="renderPayment2()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/ดอลลาร์</label>
         <span style="width:1px;height:22px;background:var(--line);margin:0 4px;"></span>
@@ -11550,7 +11555,7 @@ function payExportExcel(sfx){
   pkToast('Export Payment แล้ว — '+mTxt+' '+yTxt+'\n'+nRow+' บรรทัด (แตกย่อยราย Lot) · ระบุ Lot No. ได้ '+nLot+' บรรทัด','good');
 }
 const PAY_OPT1={sfx:'', body:'pay-body', mSel:'pay-month', ySel:'pay-year', vSel:'pay-vendor', ctSel:'pay-ct', fxEl:'pay-fx', usdEl:'pay-usd', splitLot:false, docs:false, noExport:true};   // หน้า Payment ปกติ — ตัดปุ่มปริ้นท์/Export ออก
-const PAY_OPT2={sfx:'2', body:'pay2-body', mSel:'pay2-month', ySel:'pay2-year', vSel:'pay2-vendor', ctSel:'pay2-ct', fxEl:'pay2-fx', usdEl:'pay2-usd', splitLot:true, splitPo:true, docs:false, poa:true, hideCF:true};   // หน้า Payment for ACC — แยกบรรทัดต่อ POA (แสดงเงินต่อ POA) + คอลัมน์ POA/Lot No. · ตัด บัญชี CF/SUPPLIER CF/BANK SLIP
+const PAY_OPT2={sfx:'2', body:'pay2-body', mSel:'pay2-month', ySel:'pay2-year', vSel:'pay2-vendor', ctSel:'pay2-ct', fxEl:'pay2-fx', usdEl:'pay2-usd', poSel:'pay2-po', lotSel:'pay2-lot', splitLot:true, splitPo:true, docs:false, poa:true, hideCF:true};   // หน้า Payment for ACC — แยกบรรทัดต่อ POA (แสดงเงินต่อ POA) + คอลัมน์ POA/Lot No. · ตัด บัญชี CF/SUPPLIER CF/BANK SLIP
 function renderPayment2(){ renderPayment(PAY_OPT2); }
 function payRefresh(){   // รีเฟรชหน้า Payment ที่กำลังเปิดอยู่ (รองรับทั้ง 2 หน้า)
   const p1=document.getElementById('page-payment'), p2=document.getElementById('page-payment2');
@@ -11584,6 +11589,8 @@ function renderPayment(opt){
     csel.value=(cur!=='__all__'&&cs.indexOf(cur)<0)?'__all__':cur; window[cKey]=csel.value;
   }
   if(window[cKey] && window[cKey]!=='__all__') data=data.filter(r=>r.cont===window[cKey]);
+  if(opt.poSel){ const _pe=document.getElementById(opt.poSel); const _q=((_pe&&_pe.value)||'').trim().toUpperCase(); if(_q) data=data.filter(r=> (((r.poList||'')+' '+(r.po||'')).toUpperCase().indexOf(_q)>=0)); }   // ค้นหาเลข PO
+  if(opt.lotSel){ const _le=document.getElementById(opt.lotSel); const _q=((_le&&_le.value)||'').trim().toUpperCase(); if(_q) data=data.filter(r=> (((r.lot||'')+' '+(r.lotList||'')).toUpperCase().indexOf(_q)>=0)); }   // ค้นหาเลข Lot
   // ใช้วันที่โอนที่แก้เอง (ถ้ามี) + เก็บ meta ไว้ให้ modal
   payLoadOv(); window._payRowMeta=window._payRowMeta||{};
   data.forEach(r=>{
