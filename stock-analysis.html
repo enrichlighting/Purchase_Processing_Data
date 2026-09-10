@@ -11385,6 +11385,7 @@ function payPoVendor(po, item){
 //        ตู้ที่คีย์ในเว็บเอง (ตู้ 354 เป็นต้นไป) → ยึด Vendor ของ PO จาก Business Central
 function payRowVendor(s, r, factory){
   const manual=(r.vendor||'').trim();
+  if(manual) return manual;   // Vendor ที่พิมพ์ทับเองในหน้า Packing List = ชนะทุกกรณี (ลิงก์ตรงมาหน้า Payment) · ไม่ได้พิมพ์ = ไหลตามตรรกะเดิมทุกอย่าง
   const byFac=payVendorForFactory(r.item, factory) || '';   // Vendor ตาม Factory ที่เลือก (Lead Time) = ตัวบอก Vendor ต่อตู้ที่แม่นสุด
   if(byFac) return byFac;                                    // มี Factory ที่ map เป็น Vendor → ยึด Factory (Vendor ตรงกับคอลัมน์ Factory เสมอ · เคสตู้ 355)
   const strict=payPoVendorStrict(r.po||'');                 // Vendor จริงของ PO (ไม่เดา item default)
