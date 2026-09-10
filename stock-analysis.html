@@ -8311,6 +8311,7 @@ function pkSetCostLot(i, v){
     r.lotMax = (rc.out!=null)? rc.out : null;
     if(window.pkEditIdx==null) r.loads=[pkDefaultLoad(r)];   // สร้างรอบใหม่ = ดึงจำนวนสั่งผลิตมาใส่ตู้แรก · แก้ไขรอบเก่า (เปลี่ยน PO) = คงจำนวนที่จัดไว้เดิม ไม่ล้าง
     if(rc.po && rc.po!==oldPo){ const nv=(typeof payVendorForFactory==='function'?payVendorForFactory(r.item,r.factory):'')||(typeof payPoVendor==='function'?payPoVendor(rc.po,r.item):'')||''; if(nv) r.vendor=nv; }   // เปลี่ยน PO → อัปเดต Vendor ตามโรงงาน/PO ใหม่ (ไม่ค้าง vendor เก่า)
+    if(pkEditingArrived() && rc.po && rc.po!==oldPo){ if(typeof pkToast==='function') pkToast('✅ ตู้นี้ถึงคลังแล้ว · เปลี่ยน PO ได้โดยไม่จำกัดจำนวนคงค้าง (คงจำนวนเดิมที่จัดไว้)','info'); }
   } else { r.lotMax=null; }
   renderPacking();
 }
@@ -8430,12 +8431,14 @@ function pkPickLot(i, v){
   if(idx<0) idx=list.findIndex(e=>String(e.lot||'').toLowerCase()===v.toLowerCase() || (e.lot && v.toLowerCase().indexOf(String(e.lot).toLowerCase())>=0));
   if(idx>=0) pkSetCostLot(i, String(idx)); else pkToast('ไม่พบ Lot/PO — เลือกจากรายการที่ระบบแนะนำ','bad');
 }
+// ตู้ที่กำลังแก้ไขเป็นรอบที่ "ถึงคลังแล้ว" หรือไม่ — ใช้ปลดล็อกการจำกัดจำนวนตอนแก้ PO ย้อนหลัง (ของเข้าคลังแล้ว จำนวนในตู้เป็นข้อมูลจริง ไม่ควรถูกตัดตามค้างรับที่เหลือ)
+function pkEditingArrived(){ if(window.pkEditIdx==null) return false; const s=(window.pkLog||[])[window.pkEditIdx]; return !!(s && typeof pkRoundArrived==='function' && pkRoundArrived(s)); }
 function pkSetCell(i, c, v){
   const r=window.packingRows[i];
   if(!r.loads) r.loads=[];
   v = (v==='') ? '' : Math.max(0, +v||0);
-  // released: จำนวนรวมทุกตู้ต้องไม่เกินจำนวนใน Lot ที่เลือก
-  if(window.pkMode==='released' && r.lotMax!=null && v!==''){
+  // released: จำนวนรวมทุกตู้ต้องไม่เกินจำนวนใน Lot ที่เลือก — ยกเว้นตู้ที่ "ถึงคลังแล้ว" (อนุญาตให้แก้ PO ย้อนหลังได้โดยไม่จำกัดจำนวนคงค้าง)
+  if(window.pkMode==='released' && r.lotMax!=null && v!=='' && !pkEditingArrived()){
     let other=0; window.pkContainers.forEach((ct,cc)=>{ if(cc!==c) other+=(+((r.loads||[])[cc])||0); });
     if(other+v > r.lotMax) v = Math.max(0, r.lotMax-other);
   }
@@ -8682,7 +8685,7 @@ function renderPacking(){
     const _cov=pkCoverInfo(r.item);   // {stock, mo} สำหรับ "อยู่ได้กี่เดือน" ต่อสินค้า
     let qtyCells='', lotNoParts=[];
     conts.forEach((ct,c)=>{
-      const maxAttr=(window.pkMode==='released'&&r.lotMax!=null)?` max="${r.lotMax}"`:'';
+      const maxAttr=(window.pkMode==='released'&&r.lotMax!=null&&!pkEditingArrived())?` max="${r.lotMax}"`:'';
       const pieceInput=`<input id="pk-in-${i}-${c}" type="number" value="${(r.loads||[])[c]===''||(r.loads||[])[c]==null?'':(r.loads||[])[c]}" min="0" step="1"${maxAttr} oninput="pkSetCell(${i},${c},this.value)" style="width:90px;text-align:right" title="จำนวนชิ้น">`;
       qtyCells+=`<td class="num" style="vertical-align:top">${pieceInput}${c===0?('<br><span id="pk-cover-'+i+'">'+(r.item?pkCoverCellHtml(r.item):'')+'</span>'):''}</td>`;   // จำนวน + "อยู่ได้ X ด." (ใต้ช่องตู้แรก)
       let lotPart;
