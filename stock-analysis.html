@@ -8713,13 +8713,15 @@ function renderPacking(){
     }
     let facTd='';
     if(REL){
-      if(!r.item){ facTd='<td><span class="muted">—</span></td>'; }
+      const vvR=(r.vendor||'').replace(/"/g,'&quot;');   // โหมด Released: เพิ่มช่อง Vendor กรอกทับได้ (กรณีระบบดึงมาผิด เช่น PO ปิดแล้วหา Vendor ไม่เจอ → เดาเป็น item default)
+      const venTdR=`<td style="min-width:150px;"><input type="text" value="${vvR}" onchange="pkSetVendor(${i},this.value)" placeholder="Vendor (กรอกทับได้)" title="Vendor — ปกติดึงตาม Factory/PO ให้อัตโนมัติ · ถ้าดึงมาผิดพิมพ์ทับได้เลย" style="width:100%;box-sizing:border-box;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"></td>`;
+      if(!r.item){ facTd=venTdR+'<td><span class="muted">—</span></td>'; }
       else { const fops=pkFactoryOptions(r.item);
         if(r.factory===undefined && fops.length===1) r.factory=fops[0];   // มีโรงงานเดียว → เลือกให้อัตโนมัติ
         const cur=r.factory||'';
         let o='<option value="">— เลือกโรงงาน —</option>'+fops.map(f=>`<option value="${f.replace(/"/g,'&quot;')}" ${f===cur?'selected':''}>${f}</option>`).join('');
         if(cur && fops.indexOf(cur)<0) o+=`<option value="${cur.replace(/"/g,'&quot;')}" selected>${cur}</option>`;
-        facTd=`<td><select onchange="pkSetFactory(${i},this.value)" title="เลือกโรงงาน (ตัวเลือกจาก Lead Time)" style="max-width:150px;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">${o}</select>${fops.length?'':'<div class="muted" style="font-size:10px;margin-top:2px;">ไม่มีใน Lead Time</div>'}</td>`;
+        facTd=venTdR+`<td><select onchange="pkSetFactory(${i},this.value)" title="เลือกโรงงาน (ตัวเลือกจาก Lead Time)" style="max-width:150px;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">${o}</select>${fops.length?'':'<div class="muted" style="font-size:10px;margin-top:2px;">ไม่มีใน Lead Time</div>'}</td>`;
       }
     } else {   // โหมด Forecast: คอลัมน์ Vendor + Factory (กรอกเอง · เติมอัตโนมัติตามรหัส เช่น R-OSR)
       if(r.item){ const def=pkDefaultVendorFactory(r.item);
@@ -8759,9 +8761,9 @@ function renderPacking(){
   });
   let gp=0,gb=0,gc=0,gvr=0,gvt=0; window.packingRows.forEach(r=>{ const s=pkRowSum(r); gp+=s.pcs;gb+=s.box;gc+=s.cbm;gvr+=s.valRmb;gvt+=s.valThb; });
   const html = pkItemDatalist() + pkItemNoDatalist() + `<table>
-    <tr><th>#</th><th>Item (เลือก)</th><th class="num">L</th><th class="num">W</th><th class="num">H</th>${contTh}<th class="num">pcs./ctn.</th><th class="num">ctns</th><th class="num">cbm</th><th class="num">Price (RMB)</th><th class="num">Total Price (RMB)</th><th class="num">Total Price (BAHT)</th><th class="num">Lot No.</th><th>Lot (ต้นทุน)</th>${REL?'<th>Factory</th>':'<th>Vendor</th><th>Factory</th>'}<th></th></tr>
+    <tr><th>#</th><th>Item (เลือก)</th><th class="num">L</th><th class="num">W</th><th class="num">H</th>${contTh}<th class="num">pcs./ctn.</th><th class="num">ctns</th><th class="num">cbm</th><th class="num">Price (RMB)</th><th class="num">Total Price (RMB)</th><th class="num">Total Price (BAHT)</th><th class="num">Lot No.</th><th>Lot (ต้นทุน)</th><th>Vendor</th><th>Factory</th><th></th></tr>
     ${rows}
-    <tr style="border-top:2px solid var(--line)"><td colspan="5" class="num"><b>รวม CBM ต่อตู้ →</b></td>${footCbm}<td></td><td class="num" id="pk-gbox"><b>${fmt1(gb)}</b></td><td class="num" id="pk-gcbm"><b>${gc.toFixed(3)}</b></td><td></td><td class="num" id="pk-gvr"><b>¥${pkYuan(gvr)}</b></td><td class="num" id="pk-gvt"><b>฿${pkMoney(gvt)}</b></td><td colspan="${REL?4:5}"></td></tr>
+    <tr style="border-top:2px solid var(--line)"><td colspan="5" class="num"><b>รวม CBM ต่อตู้ →</b></td>${footCbm}<td></td><td class="num" id="pk-gbox"><b>${fmt1(gb)}</b></td><td class="num" id="pk-gcbm"><b>${gc.toFixed(3)}</b></td><td></td><td class="num" id="pk-gvr"><b>¥${pkYuan(gvr)}</b></td><td class="num" id="pk-gvt"><b>฿${pkMoney(gvt)}</b></td><td colspan="5"></td></tr>
     <tr><td colspan="5" class="num"><b>มูลค่าต่อตู้ (¥) →</b></td>${footVr}<td colspan="${REL?10:11}"></td></tr>
     <tr><td colspan="5" class="num"><b>มูลค่าต่อตู้ (฿) →</b></td>${footVt}<td colspan="${REL?10:11}"></td></tr>
   </table>`;
