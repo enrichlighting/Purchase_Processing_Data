@@ -8310,7 +8310,7 @@ function pkSetCostLot(i, v){
     const rc=pkRowCost(r);
     r.lotMax = (rc.out!=null)? rc.out : null;
     if(window.pkEditIdx==null) r.loads=[pkDefaultLoad(r)];   // สร้างรอบใหม่ = ดึงจำนวนสั่งผลิตมาใส่ตู้แรก · แก้ไขรอบเก่า (เปลี่ยน PO) = คงจำนวนที่จัดไว้เดิม ไม่ล้าง
-    if(rc.po && rc.po!==oldPo){ const nv=(typeof payVendorForFactory==='function'?payVendorForFactory(r.item,r.factory):'')||(typeof payPoVendor==='function'?payPoVendor(rc.po,r.item):'')||''; if(nv) r.vendor=nv; }   // เปลี่ยน PO → อัปเดต Vendor ตามโรงงาน/PO ใหม่ (ไม่ค้าง vendor เก่า)
+    if(rc.po && rc.po!==oldPo){ const nv=(typeof payVendorForFactory==='function'?payVendorForFactory(r.item,r.factory):'')||(typeof payPoVendorStrict==='function'?payPoVendorStrict(rc.po):'')||''; if(nv) r.vendor=nv; }   // เปลี่ยน PO → อัปเดต Vendor จาก Factory/PO จริงเท่านั้น (ไม่เดา vendor เริ่มต้นของสินค้า มาทับ Vendor ที่นำเข้า/คีย์ไว้ เช่น ZHONGQIAN)
     if(pkEditingArrived() && rc.po && rc.po!==oldPo){ if(typeof pkToast==='function') pkToast('✅ ตู้นี้ถึงคลังแล้ว · เปลี่ยน PO ได้โดยไม่จำกัดจำนวนคงค้าง (คงจำนวนเดิมที่จัดไว้)','info'); }
   } else { r.lotMax=null; }
   renderPacking();
@@ -11361,7 +11361,8 @@ function payVendorShort(name, code){
   return name;
 }
 // Vendor ของ PO: bc-povendor.js (ครอบคลุม PO ปิดแล้ว) → bc-po.js (เฉพาะ PO ค้างรับ) → Vendor_No ของสินค้า
-function payPoVendor(po, item){
+// Vendor จริงของ PO เท่านั้น (จาก BC_POVENDOR / invoice) — ไม่มีข้อมูลจริง = คืนค่าว่าง (ไม่เดา vendor เริ่มต้นของสินค้า)
+function payPoVendorStrict(po){
   if(!po) return '';
   const V=window.BC_POVENDOR||{}; let code='', name='';
   const e=V[po];
@@ -11369,17 +11370,24 @@ function payPoVendor(po, item){
          else if(e && typeof e==='object'){ code=e.code||e.no||e.Vendor_No||''; name=e.name||e.Vendor_Name||''; }
          else name=String(e||''); }
   if(!code && !name && typeof invPoVendor==='function') name=invPoVendor(po)||'';
-  if(!code && !name && item) code=payItemVendorNo(item);
+  if(!code && !name) return '';   // ไม่รู้ Vendor จริงของ PO นี้ → ไม่เดาเป็น vendor เริ่มต้นของสินค้า (กัน STAR ผิดมาทับ)
   return payVendorShort(name, code);
+}
+function payPoVendor(po, item){
+  if(!po) return '';
+  const strict=payPoVendorStrict(po); if(strict) return strict;
+  if(item){ const code=payItemVendorNo(item); if(code) return payVendorShort('', code); }   // fallback สุดท้าย = vendor เริ่มต้นของสินค้า (อาจไม่ตรง — ใช้เฉพาะตอนไม่มีข้อมูลอื่นเลย)
+  return '';
 }
 // กติกา: ตู้ที่ import จาก CSV → ยึดข้อมูลในไฟล์ CSV เป็นหลัก
 //        ตู้ที่คีย์ในเว็บเอง (ตู้ 354 เป็นต้นไป) → ยึด Vendor ของ PO จาก Business Central
 function payRowVendor(s, r, factory){
   const manual=(r.vendor||'').trim();
   const byFac=payVendorForFactory(r.item, factory) || '';   // Vendor ตาม Factory ที่เลือก (Lead Time) = ตัวบอก Vendor ต่อตู้ที่แม่นสุด
-  if(byFac) return byFac;                                    // มี Factory ที่ map เป็น Vendor → ยึด Factory (Vendor ตรงกับคอลัมน์ Factory เสมอ · กัน payPoVendor เดา vendor เริ่มต้นของสินค้าผิด)
-  if(s && s.imported) return manual || payPoVendor(r.po||'', r.item) || '';
-  return payPoVendor(r.po||'', r.item) || manual || '';
+  if(byFac) return byFac;                                    // มี Factory ที่ map เป็น Vendor → ยึด Factory (Vendor ตรงกับคอลัมน์ Factory เสมอ · เคสตู้ 355)
+  const strict=payPoVendorStrict(r.po||'');                 // Vendor จริงของ PO (ไม่เดา item default)
+  if(s && s.imported) return manual || strict || payPoVendor(r.po||'', r.item) || '';   // ตู้ import: ยึด Vendor ที่นำเข้า/คีย์เอง ก่อน (เคสตู้ 352 = ZHONGQIAN) แล้วค่อย PO จริง
+  return strict || manual || payPoVendor(r.po||'', r.item) || '';   // ตู้คีย์เอง: Vendor จริงของ PO ก่อน แล้วค่อยที่คีย์ไว้ สุดท้ายค่อยเดา item default
 }
 // รวมชื่อ Vendor ที่เป็นเจ้าเดียวกันในหน้า Payment/Payment for ACC (เช่น "QILI (TUBO)"→"QILI", "KTL(DINGDING)"→"KTL") — ตัดส่วนในวงเล็บทิ้งเฉพาะชื่อในลิสต์
 const PAY_VENDOR_MERGE = ['QILI','KTL'];
