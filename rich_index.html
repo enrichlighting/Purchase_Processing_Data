@@ -11233,17 +11233,22 @@ function payFmtPct(ratio){ let n=Math.round(ratio*10000)/100; return Number.isIn
 window._payPiRowTotal=window._payPiRowTotal||{};
 function payLoadPi(){ if(window.payPi) return; try{ window.payPi=JSON.parse(localStorage.getItem('payPiV1')||'{}'); }catch(e){ window.payPi={}; } }
 function paySavePi(){ try{ localStorage.setItem('payPiV1', JSON.stringify(window.payPi||{})); }catch(e){} if(typeof payPushToCloud==='function'){ try{ payPushToCloud(); }catch(e){} } }
-function payEmitRow(out, row, splitPo){
-  if(!splitPo || row._extra){ out.push(row); return; }
+function payEmitRow(out, row, splitPo){   // ACC: แตกบรรทัดตามเลข PI ที่คีย์ (พร้อมจำนวนเงินต่อ PI) · เหลือที่ยังไม่ระบุ = บรรทัด "ยังไม่ระบุ PI" (ยอดรวมคงเดิม) · รองรับแถวค่าใช้จ่ายอื่น (_extra) ด้วย
+  if(!splitPo){ out.push(row); return; }
   payLoadPi();
-  const pk=(row.cont||'')+'|'+(row.vendor||'')+'|'+(row.factory||'')+'|'+(row.po||'')+'|'+(row.lot||'')+'|'+(row.seg||'');
-  row._piKey=pk; window._payPiRowTotal[pk]=+row.amtRmb||0;
+  const isEx=!!row._extra;
+  const pk= isEx ? ('EX|'+(row._extraId||'')) : ((row.cont||'')+'|'+(row.vendor||'')+'|'+(row.factory||'')+'|'+(row.po||'')+'|'+(row.lot||'')+'|'+(row.seg||''));
+  row._piKey=pk;
+  const usd=(isEx && row._cur==='USD');   // แถวค่าใช้จ่ายอื่นอาจเป็น USD → แบ่ง PI ตามสกุลของแถว
+  const total= usd ? (+row.amtUsd||0) : (+row.amtRmb||0);
+  window._payPiRowTotal[pk]=total;
   const entries=(window.payPi[pk]||[]).filter(x=>x&&(x.pi||(+x.amt>0)));
   if(!entries.length){ row.pi=''; out.push(row); return; }
-  let used=0; entries.forEach(e=>{ const a=+e.amt||0; used+=a; out.push(Object.assign({}, row, {pi:e.pi||'', amtRmb:a, lotRows:[{po:row.po||'', lot:row.lot||'', rmb:a}]})); });
-  const rem=Math.round(((+row.amtRmb||0)-used)*100)/100;
-  if(rem>0.009) out.push(Object.assign({}, row, {pi:'', _piRemainder:true, amtRmb:rem, lotRows:[{po:row.po||'', lot:row.lot||'', rmb:rem}]}));
-  else if(rem<-0.009) out.push(Object.assign({}, row, {pi:'⚠️ เกินยอด', _piOver:true, amtRmb:rem, lotRows:[{po:row.po||'', lot:row.lot||'', rmb:rem}]}));
+  const mk=(extra,a)=>{ const o=Object.assign({}, row, extra, {lotRows:[{po:row.po||'', lot:row.lot||'', rmb:a}]}); if(usd){ o.amtUsd=a; o.amtRmb=0; } else { o.amtRmb=a; if(isEx) o.amtUsd=0; } return o; };
+  let used=0; entries.forEach(e=>{ const a=+e.amt||0; used+=a; out.push(mk({pi:e.pi||''}, a)); });
+  const rem=Math.round((total-used)*100)/100;
+  if(rem>0.009) out.push(mk({pi:'', _piRemainder:true}, rem));
+  else if(rem<-0.009) out.push(mk({pi:'⚠️ เกินยอด', _piOver:true}, rem));
 }
 function payEditPi(enc){ const key=decodeURIComponent(enc); if(!key) return; payLoadPi();
   window._payPiEdit=(window.payPi[key]||[]).map(e=>({pi:e.pi||'', amt:(e.amt!=null?e.amt:'')})); if(!window._payPiEdit.length) window._payPiEdit=[{pi:'',amt:''}];
@@ -11256,7 +11261,7 @@ function payRenderPiModal(){ const key=window._payPiEditKey; const parts=key.spl
   const rows=window._payPiEdit.map((e,i)=>`<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;"><input type="text" value="${payEsc(e.pi)}" onchange="window._payPiEdit[${i}].pi=this.value" placeholder="เลข PI" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;"><input type="number" value="${e.amt}" oninput="window._payPiEdit[${i}].amt=this.value; payPiSum()" placeholder="จำนวนเงิน ¥" step="0.01" style="width:130px;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;text-align:right;"><button onclick="payPiRowDel(${i})" title="ลบ" style="border:0;background:#fee2e2;color:#b91c1c;border-radius:6px;padding:5px 9px;cursor:pointer;font-weight:800;">✕</button></div>`).join('');
   ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:18px 20px;max-width:470px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);max-height:90vh;overflow:auto;">
     <div style="font-weight:800;font-size:15px;margin-bottom:4px;">🧾 คีย์เลข PI (เอกสาร)</div>
-    <div class="muted" style="font-size:12px;margin-bottom:10px;line-height:1.5;">${payEsc(parts[0]||'')} · ${payEsc(parts[1]||'')}${parts[3]?(' · PO '+payEsc(parts[3])):''}${parts[4]?(' · Lot '+payEsc(parts[4])):''}<br>คีย์ได้หลายเอกสาร (แต่ละ PI ระบุจำนวนเงิน ¥) · ระบบจะแยกบรรทัดให้${total!=null?('<br>ยอดบรรทัดนี้: <b>¥'+f(total)+'</b>'):''}</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px;line-height:1.5;">${parts[0]==='EX'?'🧾 ค่าใช้จ่ายอื่น (นอกสินค้า)':(payEsc(parts[0]||'')+' · '+payEsc(parts[1]||'')+(parts[3]?(' · PO '+payEsc(parts[3])):'')+(parts[4]?(' · Lot '+payEsc(parts[4])):''))}<br>คีย์ได้หลายเอกสาร (แต่ละ PI ระบุจำนวนเงิน) · ระบบจะแยกบรรทัดให้${total!=null?('<br>ยอดบรรทัดนี้: <b>¥'+f(total)+'</b>'):''}</div>
     <div id="pay-pi-rows">${rows}</div>
     <div style="margin:6px 0 2px;"><a href="#" onclick="payPiRowAdd();return false;" style="font-size:13px;color:var(--brand);font-weight:700;">+ เพิ่มเอกสาร PI</a></div>
     <div id="pay-pi-sum" class="muted" style="font-size:12px;margin-top:6px;"></div>
@@ -11701,7 +11706,7 @@ function renderPayment(opt){
   let data=payRowsData(opt.splitLot, opt.splitPo);
   // ---- ค่าใช้จ่ายอื่น (ไม่ใช่สินค้า) ที่เพิ่มเอง — รวมเข้าตารางเดียวกัน ให้ไหลตามสูตรเดิม ----
   payLoadExtra();
-  (window.payExtra||[]).forEach(e=>{ const load=e.cont?payLoadDateOfCont(e.cont):''; const cur=(e.cur==='USD')?'USD':'RMB'; const amt=(e.amt!=null?+e.amt:(+e.amtRmb||0)); data.push({cont:e.cont||'', load, eta:'', factory:e.factory||'', vendor:(e.vendor||'').trim()||'(ค่าใช้จ่ายอื่น)', term:'', lot:'', amtRmb:(cur==='USD'?0:amt), amtUsd:(cur==='USD'?amt:0), _cur:cur, _amtOrig:amt, xfer:e.xfer||'', seg:'', _extra:true, _extraId:e.id, _kind:e.kind||''}); });
+  (window.payExtra||[]).forEach(e=>{ const load=e.cont?payLoadDateOfCont(e.cont):''; const cur=(e.cur==='USD')?'USD':'RMB'; const amt=(e.amt!=null?+e.amt:(+e.amtRmb||0)); const exRow={cont:e.cont||'', load, eta:'', factory:e.factory||'', vendor:(e.vendor||'').trim()||'(ค่าใช้จ่ายอื่น)', term:'', lot:'', po:'', amtRmb:(cur==='USD'?0:amt), amtUsd:(cur==='USD'?amt:0), _cur:cur, _amtOrig:amt, xfer:e.xfer||'', seg:'', _extra:true, _extraId:e.id, _kind:e.kind||''}; if(opt.piCol) payEmitRow(data, exRow, opt.splitPo); else data.push(exRow); });   // ค่าใช้จ่ายอื่น: หน้า ACC ให้คีย์ PI แยกบรรทัดได้เหมือนแถวสินค้า
   const vKey='paySelVendor'+opt.sfx, cKey='paySelCt'+opt.sfx;
   // ---- ตัวเลือก Vendor ----
   const vsel=document.getElementById(opt.vSel);
