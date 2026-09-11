@@ -395,7 +395,9 @@
         <span>Vendor</span>
         <select id="pay-vendor" onchange="renderPayment()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;max-width:220px;"></select>
         <span>เลขตู้</span>
-        <select id="pay-ct" onchange="renderPayment()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;max-width:160px;"></select>
+        <span style="position:relative;display:inline-block;"><button type="button" id="pay-ctf-btn" onclick="payFilterPop('pay-ctf-pop')" style="font-size:14px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;min-width:120px;">ทุกตู้ ▾</button><div id="pay-ctf-pop" class="pay-filter-pop" style="display:none;position:absolute;top:calc(100% + 3px);left:0;z-index:60;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;max-height:320px;overflow:auto;min-width:220px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.3);"></div></span>
+        <span>สัปดาห์</span>
+        <span style="position:relative;display:inline-block;"><button type="button" id="pay-wkf-btn" onclick="payFilterPop('pay-wkf-pop')" style="font-size:14px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;min-width:110px;">ทุกสัปดาห์ ▾</button><div id="pay-wkf-pop" class="pay-filter-pop" style="display:none;position:absolute;top:calc(100% + 3px);left:0;z-index:60;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;min-width:150px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.3);"></div></span>
         <span style="width:1px;height:22px;background:var(--line);margin:0 4px;"></span>
         <label style="font-size:13px;font-weight:700;">Exchange Rate: <input type="number" id="pay-fx" value="5" min="0" step="0.01" onchange="renderPayment()" oninput="renderPayment()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/หยวน</label>
         <label style="font-size:13px;font-weight:700;">USD: <input type="number" id="pay-usd" value="34" min="0" step="0.01" onchange="renderPayment()" oninput="renderPayment()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/ดอลลาร์</label>
@@ -418,7 +420,9 @@
         <span>Vendor</span>
         <select id="pay2-vendor" onchange="renderPayment2()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;max-width:220px;"></select>
         <span>เลขตู้</span>
-        <select id="pay2-ct" onchange="renderPayment2()" style="font-size:15px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;max-width:160px;"></select>
+        <span style="position:relative;display:inline-block;"><button type="button" id="pay2-ctf-btn" onclick="payFilterPop('pay2-ctf-pop')" style="font-size:14px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;min-width:120px;">ทุกตู้ ▾</button><div id="pay2-ctf-pop" class="pay-filter-pop" style="display:none;position:absolute;top:calc(100% + 3px);left:0;z-index:60;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;max-height:320px;overflow:auto;min-width:220px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.3);"></div></span>
+        <span>สัปดาห์</span>
+        <span style="position:relative;display:inline-block;"><button type="button" id="pay2-wkf-btn" onclick="payFilterPop('pay2-wkf-pop')" style="font-size:14px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;min-width:110px;">ทุกสัปดาห์ ▾</button><div id="pay2-wkf-pop" class="pay-filter-pop" style="display:none;position:absolute;top:calc(100% + 3px);left:0;z-index:60;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;min-width:150px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.3);"></div></span>
         <span>ค้นหา PO</span>
         <input type="text" id="pay2-po" placeholder="🔍 เลข PO" oninput="renderPayment2()" autocomplete="off" style="width:150px;font-size:14px;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">
         <span>ค้นหา Lot</span>
@@ -11152,34 +11156,53 @@ function payFillSelectors(msId, ysId){
   if(ms && !ms.options.length){ ms.innerHTML='<option value="__all__">ทุกเดือน</option>'+PAY_MONTHS_TH.map((n,i)=>`<option value="${i+1}">${n}</option>`).join(''); ms.value=(APP_TODAY.getMonth()+1); }
   if(ys && !ys.options.length){ const beNow=APP_TODAY.getFullYear()+543; let o='<option value="__all__">ทุกปี</option>'; for(let yy=beNow-2;yy<=beNow+3;yy++) o+=`<option value="${yy}">${yy}</option>`; ys.innerHTML=o; ys.value=beNow; }
 }
-function payClearDates(){ window.payHiliteDate=''; payRefresh(); }
-function paySelectDate(key, ev){   // คลิกวันในปฏิทิน → ไฮไลต์รายการที่ "วันที่โอน" ตรงวันนั้น (คลิกซ้ำ = ยกเลิก)
-  window.payHiliteDate = (window.payHiliteDate===key) ? '' : key;
-  payRefresh();
-  if(window.payHiliteDate){ setTimeout(function(){ const el=document.querySelector('[data-xfer="'+window.payHiliteDate+'"]'); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); }, 60); }
+// ===== ตัวกรองเลือกหลายค่า (ตู้ / สัปดาห์ / วันที่โอน) — แยกต่อหน้าด้วย sfx =====
+function payCurSfx(){ const p2=document.getElementById('page-payment2'); return (p2&&p2.classList.contains('active'))?'2':''; }
+function paySetOf(k){ if(!(window[k] instanceof Set)) window[k]=new Set(); return window[k]; }
+function payToggleSet(k,v){ const s=paySetOf(k); const sv=String(v); if(s.has(sv)) s.delete(sv); else s.add(sv); payRefresh(); }
+function payClearSet(k){ paySetOf(k).clear(); payRefresh(); }
+function payFilterPop(id){ const p=document.getElementById(id); if(!p) return; const show=(p.style.display==='none'||!p.style.display); document.querySelectorAll('.pay-filter-pop').forEach(x=>{ if(x!==p) x.style.display='none'; }); p.style.display=show?'block':'none'; }
+function payWeekNo(dstr){ const mm=String(dstr||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!mm) return 0; const wks=payWeeks(+mm[1],+mm[2]); const d=+mm[3]; for(let i=0;i<wks.length;i++){ if(d>=wks[i].start&&d<=wks[i].end) return i+1; if(d>wks[i].end && (i+1>=wks.length||d<wks[i+1].start)) return i+1; } return wks.length||0; }
+function payClearDates(sfx){ paySetOf('paySelDt'+(sfx!=null?sfx:payCurSfx())).clear(); payRefresh(); }
+function paySelectDate(key, sfx){ payToggleSet('paySelDt'+(sfx!=null?sfx:payCurSfx()), key); }   // คลิกวัน = เลือก/ยกเลิก (เลือกได้หลายวัน) → กรองเฉพาะวันโอนที่เลือก
+function payFillCtControl(opt, conts, set){
+  if(!window._payFilterDocBound){ window._payFilterDocBound=1; document.addEventListener('click', function(e){ const t=e.target; if(t.closest && (t.closest('.pay-filter-pop')||(t.id&&/-ctf-btn|-wkf-btn/.test(t.id)))) return; document.querySelectorAll('.pay-filter-pop').forEach(p=>p.style.display='none'); }); }
+  const btn=document.getElementById('pay'+opt.sfx+'-ctf-btn'), pop=document.getElementById('pay'+opt.sfx+'-ctf-pop'); if(!pop) return;
+  [...set].forEach(v=>{ if(conts.indexOf(v)<0) set.delete(v); });
+  if(btn) btn.textContent=(set.size? (set.size+' ตู้ ▾'):'ทุกตู้ ▾');
+  let h='<div style="margin-bottom:5px;"><a href="#" onclick="payClearSet(\'paySelCt'+opt.sfx+'\');return false;" style="font-size:12px;color:#7f1d1d;font-weight:700;">ล้างทั้งหมด</a></div>';
+  h+=conts.map(c=>{ const jc=c.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); return '<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:3px 4px;cursor:pointer;white-space:nowrap;"><input type="checkbox" '+(set.has(c)?'checked':'')+' onchange="payToggleSet(\'paySelCt'+opt.sfx+'\',\''+jc+'\')" style="width:15px;height:15px;">'+payEsc(c)+'</label>'; }).join('') || '<div class="muted" style="font-size:12px;">— ไม่มีตู้ —</div>';
+  pop.innerHTML=h;
 }
-function payCalendarHtml(y,m,xferSet){
-  xferSet=xferSet||new Set();
+function payFillWkControl(opt, set){
+  const btn=document.getElementById('pay'+opt.sfx+'-wkf-btn'), pop=document.getElementById('pay'+opt.sfx+'-wkf-pop'); if(!pop) return;
+  if(btn) btn.textContent=(set.size? (set.size+' สัปดาห์ ▾'):'ทุกสัปดาห์ ▾');
+  let h='<div style="margin-bottom:5px;"><a href="#" onclick="payClearSet(\'paySelWk'+opt.sfx+'\');return false;" style="font-size:12px;color:#7f1d1d;font-weight:700;">ล้าง</a></div>';
+  h+=[1,2,3,4,5].map(w=>'<label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:3px 4px;cursor:pointer;"><input type="checkbox" '+(set.has(String(w))?'checked':'')+' onchange="payToggleSet(\'paySelWk'+opt.sfx+'\',\''+w+'\')" style="width:15px;height:15px;">WEEK '+w+'</label>').join('');
+  pop.innerHTML=h;
+}
+function payCalendarHtml(y,m,xferSet,sfx){
+  xferSet=xferSet||new Set(); sfx=sfx||''; const dset=paySetOf('paySelDt'+sfx);
   const dim=new Date(y,m,0).getDate(); const lead=(new Date(y,m-1,1).getDay()+6)%7;   // Mon=0
-  const dn=['M','T','W','T','F','S','S']; const T=APP_TODAY; const active=window.payHiliteDate||''; const p2=n=>String(n).padStart(2,'0');
+  const dn=['M','T','W','T','F','S','S']; const T=APP_TODAY; const p2=n=>String(n).padStart(2,'0');
   const LY='#fde68a', DY='#eab308';   // เหลืองอ่อน (จ–ศ) · เหลืองเข้ม (ส–อา)
   let cells=dn.map((d,i)=>`<div style="text-align:center;font-weight:800;font-size:9px;color:${i>=5?DY:LY};">${d}</div>`).join('');
   for(let i=0;i<lead;i++) cells+='<div></div>';
   for(let d=1;d<=dim;d++){ const wd=new Date(y,m-1,d).getDay(); const wknd=(wd===0||wd===6);
     const key=y+'-'+p2(m)+'-'+p2(d);
-    const isToday=(y===T.getFullYear() && m===T.getMonth()+1 && d===T.getDate()); const isActive=(active===key); const hasXfer=xferSet.has(key);
+    const isToday=(y===T.getFullYear() && m===T.getMonth()+1 && d===T.getDate()); const isActive=dset.has(key); const hasXfer=xferSet.has(key);
     let st='position:relative;display:flex;align-items:center;justify-content:center;font-size:11px;border-radius:5px;cursor:pointer;user-select:none;';
     if(isActive) st+='background:#22d3ee;color:#083344;font-weight:800;';                              // วันที่กำลังไฮไลต์
     else if(hasXfer) st+='background:rgba(34,211,238,.16);color:#67e8f9;font-weight:800;';             // วันที่มีการโอน
     else st+='color:'+(wknd?DY:LY)+';font-weight:'+(wknd?'800':'600')+';';
     if(isToday && !isActive) st+='box-shadow:0 0 0 2px #38bdf8 inset;';
     const dot=(hasXfer&&!isActive)?'<span style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:#22d3ee;"></span>':'';
-    cells+=`<div onclick="paySelectDate('${key}',event)" title="${d} ${PAY_MONTHS_TH[m-1]} ${y+543}${isToday?' (วันนี้)':''}${hasXfer?' · มีวันโอน (คลิกเพื่อไฮไลต์)':''}" style="${st}">${d}${dot}</div>`;
+    cells+=`<div onclick="paySelectDate('${key}','${sfx}')" title="${d} ${PAY_MONTHS_TH[m-1]} ${y+543}${isToday?' (วันนี้)':''}${hasXfer?' · มีวันโอน (คลิกเพื่อเลือกกรอง)':''}" style="${st}">${d}${dot}</div>`;
   }
-  let selTxt = active ? ('โอนวันที่ '+payThaiDate(active)) : 'คลิกวันที่มีจุด = ไฮไลต์รายการที่โอนวันนั้น';
+  let selTxt = dset.size ? ('เลือก '+dset.size+' วัน (กรองเฉพาะวันโอนที่เลือก)') : 'คลิกวัน = เลือกกรอง (เลือกได้หลายวัน)';
   return `<div style="flex:0 0 auto;width:8cm;height:8cm;box-sizing:border-box;border:1px solid #333;border-radius:10px;padding:7px 8px;background:#0b0b0b;display:flex;flex-direction:column;">
     <div style="text-align:center;font-weight:800;font-size:13px;letter-spacing:.3px;text-transform:uppercase;color:${LY};">${PAY_MONTHS_TH[m-1]} ${y+543}</div>
-    <div style="text-align:center;font-size:8.5px;color:#d4d4d4;margin-bottom:3px;line-height:1.3;"><b style="color:${active?'#67e8f9':LY};">${selTxt}</b>${active?` <a href="#" onclick="payClearDates();return false;" style="font-size:8.5px;color:#fca5a5;">✕ ล้าง</a>`:''}</div>
+    <div style="text-align:center;font-size:8.5px;color:#d4d4d4;margin-bottom:3px;line-height:1.3;"><b style="color:${dset.size?'#67e8f9':LY};">${selTxt}</b>${dset.size?` <a href="#" onclick="payClearDates('${sfx}');return false;" style="font-size:8.5px;color:#fca5a5;">✕ ล้าง</a>`:''}</div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;gap:1px;flex:1;">${cells}</div>
   </div>`;
 }
@@ -11447,6 +11470,7 @@ function payPaymentSegments(term, load, eta, docDate){
     pushStr(docDate||load, 0.2, '20% มัดจำ');
     const ms=/after\s*shipment\s*(\d+)\s*days?/i.exec(t);
     if(ms){ push(payCalFrom(load, +ms[1]), 0.8, '80%'); }
+    else if(/before\s*(sending|loading|shipment)/i.test(t)){ push(payCalFrom(load,0), 0.8, '80% ก่อนส่งออก'); }   // balance ก่อนของออกจากโรงงาน = จ่ายวัน Loading
     else { const md=/(\d+)\s*days?/i.exec(t); const dd=md?(+md[1]):45; push(payCalFrom(eta,dd), 0.8, '80%'); }
     return segs;
   }
@@ -11597,13 +11621,13 @@ function renderPayment(opt){
     vsel.value=(cur!=='__all__'&&vs.indexOf(cur)<0)?'__all__':cur; window[vKey]=vsel.value;
   }
   if(window[vKey] && window[vKey]!=='__all__') data=data.filter(r=>r.vendor===window[vKey]);
-  // ---- ตัวเลือก เลขตู้ (CT No.) ----
-  const csel=document.getElementById(opt.ctSel);
-  if(csel){ const cs=[...new Set(data.map(r=>r.cont).filter(Boolean))].sort(); const cur=csel.value||window[cKey]||'__all__';
-    csel.innerHTML='<option value="__all__">ทุกตู้</option>'+cs.map(v=>`<option value="${payEsc(v)}">${payEsc(v)}</option>`).join('');
-    csel.value=(cur!=='__all__'&&cs.indexOf(cur)<0)?'__all__':cur; window[cKey]=csel.value;
-  }
-  if(window[cKey] && window[cKey]!=='__all__') data=data.filter(r=>r.cont===window[cKey]);
+  // ---- ตัวกรอง: เลขตู้ (หลายตู้) + สัปดาห์ (หลายสัปดาห์) + วันที่โอน (หลายวันจากปฏิทิน) ----
+  const ctSet=paySetOf('paySelCt'+opt.sfx), wkSet=paySetOf('paySelWk'+opt.sfx), dtSet=paySetOf('paySelDt'+opt.sfx);
+  payFillCtControl(opt, [...new Set(data.map(r=>r.cont).filter(Boolean))].sort(), ctSet);
+  payFillWkControl(opt, wkSet);
+  if(ctSet.size) data=data.filter(r=>ctSet.has(String(r.cont)));
+  if(dtSet.size) data=data.filter(r=>dtSet.has(String(r.xfer)));
+  if(wkSet.size) data=data.filter(r=>wkSet.has(String(payWeekNo(r.xfer))));
   if(opt.poSel){ const _pe=document.getElementById(opt.poSel); const _q=((_pe&&_pe.value)||'').trim().toUpperCase(); if(_q) data=data.filter(r=> (((r.poList||'')+' '+(r.po||'')).toUpperCase().indexOf(_q)>=0)); }   // ค้นหาเลข PO
   if(opt.lotSel){ const _le=document.getElementById(opt.lotSel); const _q=((_le&&_le.value)||'').trim().toUpperCase(); if(_q) data=data.filter(r=> (((r.lot||'')+' '+(r.lotList||'')).toUpperCase().indexOf(_q)>=0)); }   // ค้นหาเลข Lot
   // ใช้วันที่โอนที่แก้เอง (ถ้ามี) + เก็บ meta ไว้ให้ modal
@@ -11753,7 +11777,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
     </table></div>`;
   const title = showSide?'':`<div style="font-weight:800;font-size:15px;color:#7f1d1d;margin:2px 0 6px;">📅 ${PAY_MONTHS_TH[m-1]} ${y+543}</div>`;
   const side = showSide?`<div class="pay-side" style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;">
-      ${payCalendarHtml(y,m,xferSet)}
+      ${payCalendarHtml(y,m,xferSet,opt.sfx)}
       <div title="ปลามังกรพ่นน้ำ รับทรัพย์ (มงคล ปีมังกร)" style="width:8cm;display:flex;justify-content:flex-end;padding-right:8px;user-select:none;">
         <div style="position:relative;display:inline-block;line-height:1;filter:drop-shadow(0 4px 7px rgba(0,0,0,.22));">
           <svg width="172" height="120" viewBox="0 0 320 220" style="display:block;overflow:visible;" xmlns="http://www.w3.org/2000/svg">
