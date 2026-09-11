@@ -11216,9 +11216,10 @@ function paySaveOv(){ try{ localStorage.setItem('payXferOvV1', JSON.stringify(wi
 // ---- แก้ % มัดจำเอง ต่อตู้ (คีย์ = ตู้|Vendor|Factory · ค่า = สัดส่วนมัดจำ 0-1) ----
 function payLoadDepOv(){ if(window.payDepOv) return; try{ window.payDepOv=JSON.parse(localStorage.getItem('payDepOvV1')||'{}'); }catch(e){ window.payDepOv={}; } }
 function paySaveDepOv(){ try{ localStorage.setItem('payDepOvV1', JSON.stringify(window.payDepOv||{})); }catch(e){} if(typeof payPushToCloud==='function'){ try{ payPushToCloud(); }catch(e){} } }
+function payFmtPct(ratio){ let n=Math.round(ratio*10000)/100; return Number.isInteger(n)?String(n):String(parseFloat(n.toFixed(2))); }   // สัดส่วน 0-1 → "%" (ทศนิยมได้สูงสุด 2 ตำแหน่ง ตัด 0 ท้าย)
 function payEditDeposit(enc){
   const key=decodeURIComponent(enc); payLoadDepOv();
-  const cur=(window.payDepOv[key]!=null&&window.payDepOv[key]!=='')?Math.round(+window.payDepOv[key]*100):20;
+  const cur=(window.payDepOv[key]!=null&&window.payDepOv[key]!=='')?(Math.round(+window.payDepOv[key]*10000)/100):20;
   const parts=key.split('|');
   let ov=document.getElementById('pay-dep-ov'); if(ov) ov.remove();
   ov=document.createElement('div'); ov.id='pay-dep-ov';
@@ -11226,7 +11227,7 @@ function payEditDeposit(enc){
   ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:18px 20px;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);">
     <div style="font-weight:800;font-size:15px;margin-bottom:4px;">✎ แก้ % มัดจำ (Deposit)</div>
     <div class="muted" style="font-size:12px;margin-bottom:12px;line-height:1.5;">${payEsc(parts[0]||'')} · ${payEsc(parts[1]||'')}${parts[2]?(' · '+payEsc(parts[2])):''}<br>ใช้กรณีเหมาจ่ายมัดจำ แล้วปรับ % ให้ตรงจริง · ส่วนที่เหลือ = 100 − มัดจำ</div>
-    <label style="font-size:13px;font-weight:700;">% มัดจำ (1-99)<br><input type="number" id="pay-dep-pct" value="${cur}" min="1" max="99" step="1" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:14px;"></label>
+    <label style="font-size:13px;font-weight:700;">% มัดจำ (1-99 · ทศนิยมได้ 2 ตำแหน่ง)<br><input type="number" id="pay-dep-pct" value="${cur}" min="1" max="99" step="0.01" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:14px;"></label>
     <div id="pay-dep-preview" class="muted" style="font-size:12px;margin-top:8px;"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;">
       <button onclick="document.getElementById('pay-dep-ov').remove()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:700;">ยกเลิก</button>
@@ -11236,10 +11237,10 @@ function payEditDeposit(enc){
   </div>`;
   document.body.appendChild(ov);
   const inp=document.getElementById('pay-dep-pct'), pv=document.getElementById('pay-dep-preview');
-  const upd=()=>{ const v=Math.max(0,Math.min(100,+inp.value||0)); pv.textContent='มัดจำ '+v+'% · ที่เหลือ '+(100-v)+'%'; };
+  const upd=()=>{ const v=Math.max(0,Math.min(100,+inp.value||0)); const bal=Math.round((100-v)*100)/100; pv.textContent='มัดจำ '+v+'% · ที่เหลือ '+bal+'%'; };
   inp.oninput=upd; upd();
 }
-function paySaveDeposit(enc){ const key=decodeURIComponent(enc); const v=+((document.getElementById('pay-dep-pct')||{}).value); if(!(v>0&&v<100)){ pkToast('กรุณาระบุ % มัดจำ 1-99','bad'); return; } payLoadDepOv(); window.payDepOv[key]=v/100; paySaveDepOv(); const ov=document.getElementById('pay-dep-ov'); if(ov) ov.remove(); payRefresh(); pkToast('ปรับ % มัดจำเป็น '+v+'% แล้ว','good'); }
+function paySaveDeposit(enc){ const key=decodeURIComponent(enc); let v=+((document.getElementById('pay-dep-pct')||{}).value); if(!(v>0&&v<100)){ pkToast('กรุณาระบุ % มัดจำ 1-99 (ทศนิยมได้ 2 ตำแหน่ง)','bad'); return; } v=Math.round(v*100)/100; payLoadDepOv(); window.payDepOv[key]=v/100; paySaveDepOv(); const ov=document.getElementById('pay-dep-ov'); if(ov) ov.remove(); payRefresh(); pkToast('ปรับ % มัดจำเป็น '+v+'% แล้ว','good'); }
 function payResetDeposit(enc){ const key=decodeURIComponent(enc); payLoadDepOv(); delete window.payDepOv[key]; paySaveDepOv(); const ov=document.getElementById('pay-dep-ov'); if(ov) ov.remove(); payRefresh(); pkToast('คืนค่ามัดจำเดิมแล้ว','good'); }
 function payEditXfer(enc){
   const key=decodeURIComponent(enc); const meta=(window._payRowMeta||{})[key]||{}; payLoadOv();
@@ -11543,7 +11544,7 @@ function payRowsData(splitLot, splitPo){
         // ---- แก้ % มัดจำเองต่อตู้ (บางตู้เหมาจ่ายมัดจำ → ปรับ %) · balance = 100 − มัดจำ ----
         payLoadDepOv(); const _dk=(ct.name||('ตู้'+(ci+1)))+'|'+(g.vendor||'(ไม่ทราบ vendor)')+'|'+g.factory; let _isDep=false;
         if(segs.length===2 && /มัดจำ/.test(segs[0].label||'')){ _isDep=true; const dov=window.payDepOv[_dk];
-          if(dov!=null && dov!=='' && +dov>0 && +dov<1){ const dep=+dov; const suf=(segs[1].label||'').replace(/^\d+%\s*/,''); segs=[Object.assign({},segs[0],{r:dep,label:Math.round(dep*100)+'% มัดจำ'}), Object.assign({},segs[1],{r:1-dep,label:Math.round((1-dep)*100)+'%'+(suf?(' '+suf):'')})]; }
+          if(dov!=null && dov!=='' && +dov>0 && +dov<1){ const dep=+dov; const suf=(segs[1].label||'').replace(/^[\d.]+%\s*/,''); segs=[Object.assign({},segs[0],{r:dep,label:payFmtPct(dep)+'% มัดจำ'}), Object.assign({},segs[1],{r:1-dep,label:payFmtPct(1-dep)+'%'+(suf?(' '+suf):'')})]; }
         }
         const base={cont:ct.name||('ตู้'+(ci+1)), load, eta, factory:g.factory, vendor:g.vendor||'(ไม่ทราบ vendor)', term, lot:g.lot||'',
                     poList:[...g.pos].sort().join(', '), lotList:[...g.lots].sort().join(', '),
