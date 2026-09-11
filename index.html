@@ -12166,7 +12166,7 @@ async function paySyncFromCloud(){ if(!window.GraphStorage) return;
   const dp=await window.GraphStorage.loadData('payDepOvV1'); if(dp){ window.payDepOv= typeof dp==='string'?JSON.parse(dp):dp; if(!window.payDepOv||typeof window.payDepOv!=='object') window.payDepOv={}; try{ localStorage.setItem('payDepOvV1', JSON.stringify(window.payDepOv)); }catch(e){} }
 }
 async function payPushToCloud(){ if(!window.GraphStorage) return; payLoadOv(); payLoadCheck(); payLoadExtra(); payLoadDocs(); payLoadDepOv(); await window.GraphStorage.saveData('payXferOvV1', window.payXferOv||{}); await window.GraphStorage.saveData('payCheckV1', window.payCheck||{}); await window.GraphStorage.saveData('payExtraV1', window.payExtra||[]); await window.GraphStorage.saveData('payDocsV1', window.payDocs||{}); await window.GraphStorage.saveData('payDepOvV1', window.payDepOv||{}); }
-function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent','renderPayment'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
+function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent','renderPayment','renderPayment2'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
 async function cloudPullNow(){ const b=document.getElementById('bc-pull'); if(b) b.disabled=true;
   try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); cloudRerenderAll(); bcSetTs('bcCloudSyncAt'); pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
   catch(e){ console.error(e); pkToast('ดึงข้อมูลไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
