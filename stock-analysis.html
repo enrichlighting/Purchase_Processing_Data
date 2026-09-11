@@ -11493,12 +11493,13 @@ function payRowsData(splitLot, splitPo){
   const _packedKeys=new Set();
   _log.forEach(s=>{ if(s.pending) return; (s.containers||[]).forEach((ct,ci)=>{ (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; const q=per?(+per.pcs||0):0; if(q<=0) return; if(!/^POA/i.test(r.po||'')) return; _packedKeys.add((r.po||'')+'|'+(r.item||'')); }); }); });
   _log.forEach((s,si)=>{
-    (s.containers||[]).forEach((ct,ci)=>{ const groups={}; const load=(ct.dates&&ct.dates.load)||'', eta=(ct.dates&&ct.dates.arrWh)||'';
+    (s.containers||[]).forEach((ct,ci)=>{ const groups={}, cvfRep={}; const load=(ct.dates&&ct.dates.load)||'', eta=(ct.dates&&ct.dates.arrWh)||'';
       (s.rows||[]).forEach(r=>{ const per=(r.per||[])[ci]; const q=per?(+per.pcs||0):0; if(q<=0) return; if(r.sc) return;   // ติ๊ก Sample/Claim → ไม่นำเข้าคำนวณเงิน
         if(!/^POA/i.test(r.po||'')) return;   // เฉพาะ PO ขึ้นต้น POA (ข้าม POC/POS)
         if(s.pending && _packedKeys.has((r.po||'')+'|'+(r.item||''))) return;   // ร่างที่ถูกจัดตู้จริงไปแล้ว → ใช้รอบจริง ไม่นับซ้ำ
         const f=(r.factory||'').trim(); if(!f) return;
         const ven=payNormVendor((payRowVendor(s, r, f)||'').trim());   // ตู้ import → ยึด CSV · ตู้ที่คีย์เอง → ยึด Vendor ของ PO จาก BC · แล้วรวมชื่อเจ้าเดียวกัน (QILI/KTL)
+        const _cvfk=f+'||'+ven; if(!cvfRep[_cvfk]) cvfRep[_cvfk]={item:r.item, po:(r.po||'')};   // ตัวแทนระดับตู้+Vendor+Factory (สินค้า/PO ตัวแรก) → ใช้คำนวณ TERM/วันโอนให้เท่ากันทั้ง Payment และ Payment for ACC (วันโอนยึดจากตู้ ไม่ยึดจาก PO)
         // Lot No. เดียวกับที่แสดงในหน้า Packing List (Lot ที่บันทึก → ที่เลือกเอง → ดึงจาก POA) — ใช้กับคอลัมน์ใน Excel และหน้า Payment for ACC
         const lotAll = (((per&&per.lot)||r.costLot||((typeof pkLotFromPO==='function')?pkLotFromPO(r.item, r.po||''):'')||'')).trim();
         const lot = splitLot ? lotAll : '';   // แยก/แสดง Lot No. โดยใช้ค่าเต็ม (รวม fallback ดึงจาก POA) ไม่งั้นตู้ที่ไม่ได้คีย์ Lot จะว่าง
@@ -11508,8 +11509,8 @@ function payRowsData(splitLot, splitPo){
         if(r.po) g.pos.add(r.po); if(lotAll) g.lots.add(lotAll);
         const bk=(r.po||'')+'\u0001'+lotAll; g.brk[bk]=(g.brk[bk]||0)+(+per.valRmb||0);   // มูลค่าแยกราย PO × Lot No.   // 1 กลุ่ม (ตู้×Vendor×Factory) อาจมีหลาย POA / หลาย Lot
       });
-      Object.keys(groups).forEach(gk=>{ const g=groups[gk]; const term=payCreditTerm(g.item,g.vendor,g.factory);
-        const docDate=(window.BC_PODATE&&window.BC_PODATE[g.po])||'';
+      Object.keys(groups).forEach(gk=>{ const g=groups[gk]; const _rep=cvfRep[g.factory+'||'+g.vendor]||{item:g.item,po:g.po}; const term=payCreditTerm(_rep.item,g.vendor,g.factory);
+        const docDate=(window.BC_PODATE&&window.BC_PODATE[_rep.po])||'';   // วันเอกสาร + TERM ยึดจากตัวแทนระดับตู้ → วันโอน ACC = วันโอน Payment
         const segs=payPaymentSegments(term, load, eta, docDate);
         const base={cont:ct.name||('ตู้'+(ci+1)), load, eta, factory:g.factory, vendor:g.vendor||'(ไม่ทราบ vendor)', term, lot:g.lot||'',
                     poList:[...g.pos].sort().join(', '), lotList:[...g.lots].sort().join(', '),
@@ -11634,7 +11635,7 @@ function renderPayment(opt){
   payLoadOv(); window._payRowMeta=window._payRowMeta||{};
   data.forEach(r=>{
     if(r._extra){ r._key='EX|'+r._extraId; return; }   // ค่าใช้จ่ายอื่น: ใช้วันที่โอนที่กรอกเอง ไม่ผ่านระบบ override
-    const key=r.cont+'|'+r.vendor+'|'+r.factory+'|'+(opt.splitLot?((r.lot||'')+'|'):'')+(opt.splitPo?((r.po||'')+'|'):'')+(r.seg||''); r._key=key; const auto=r.xfer; const ov=window.payXferOv[key];
+    const key=r.cont+'|'+r.vendor+'|'+r.factory+'|'+(r.seg||''); r._key=key; const auto=r.xfer; const ov=window.payXferOv[key];   // key ระดับตู้+Vendor+Factory+งวด (ไม่รวม Lot/PO) → แก้วันโอนที่ Payment มีผลกับ Payment for ACC ด้วย (ยึดวันโอนจากตู้)
     if(ov&&ov.date){ r.xfer=ov.date; r.xferReason=ov.reason||''; r.xferManual=true; }
     window._payRowMeta[key]={cont:r.cont,vendor:r.vendor,factory:r.factory,seg:r.seg,auto:auto,cur:r.xfer,reason:(ov&&ov.reason)||''};
   });
