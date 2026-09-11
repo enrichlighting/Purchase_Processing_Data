@@ -11732,7 +11732,9 @@ function renderPayment(opt){
   const beNow=APP_TODAY.getFullYear()+543;
   // เดือน/ปี: หน้า Payment for ACC (multiMY) เลือกได้หลายเดือน/หลายปี · หน้า Payment ปกติใช้ตัวเลือกเดี่ยว (แปลงเป็น Set: ว่าง = ทั้งหมด)
   let monSet, yrSet;
-  if(opt.multiMY){ monSet=paySetOf('paySelMon'+opt.sfx); yrSet=paySetOf('paySelYr'+opt.sfx); payFillMonControl(opt, monSet); payFillYrControl(opt, beNow, yrSet); }
+  if(opt.multiMY){ monSet=paySetOf('paySelMon'+opt.sfx); yrSet=paySetOf('paySelYr'+opt.sfx);
+    if(!window['_payMYInit'+opt.sfx]){ window['_payMYInit'+opt.sfx]=1; monSet.add(String(APP_TODAY.getMonth()+1)); yrSet.add(String(APP_TODAY.getFullYear()+543)); }   // เข้ามาใหม่ (sign in/โหลดหน้า) → ตั้งเดือน/ปีปัจจุบันเป็นค่าเริ่มต้น (ผู้ใช้ปรับ/ล้างเองได้)
+    payFillMonControl(opt, monSet); payFillYrControl(opt, beNow, yrSet); }
   else { monSet=new Set(); yrSet=new Set(); if(mSel && mSel!=='__all__') monSet.add(String(+mSel)); if(ySel && ySel!=='__all__') yrSet.add(String(+ySel)); }
   const _cset=new Set();
   data.forEach(r=>{ const ds=r.xfer||r.load; const mm=String(ds||'').match(/^(\d{4})-(\d{1,2})/); if(!mm) return; const yy=+mm[1], mo=+mm[2]; if(yrSet.size && !yrSet.has(String(yy+543))) return; if(monSet.size && !monSet.has(String(mo))) return; _cset.add(yy+'-'+String(mo).padStart(2,'0')); });
