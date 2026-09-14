@@ -11720,9 +11720,10 @@ function renderPayment(opt){
   const ctSet=paySetOf('paySelCt'+opt.sfx), wkSet=paySetOf('paySelWk'+opt.sfx), dtSet=paySetOf('paySelDt'+opt.sfx);
   payFillCtControl(opt, [...new Set(data.map(r=>r.cont).filter(Boolean))].sort(), ctSet);
   payFillWkControl(opt, wkSet);
+  payLoadOv(); const _effXfer=r=>{ if(r._extra) return r.xfer; const _k=r.cont+'|'+r.vendor+'|'+r.factory+'|'+(r.seg||''); const _o=(window.payXferOv||{})[_k]; return (_o&&_o.date)?_o.date:r.xfer; };   // วันที่โอนที่มีผลจริง (แก้เอง override ก่อน · ไม่งั้น auto) → กรอง สัปดาห์/วันที่ ให้ตรงกับที่ตารางแสดง
   if(ctSet.size) data=data.filter(r=>ctSet.has(String(r.cont)));
-  if(dtSet.size) data=data.filter(r=>dtSet.has(String(r.xfer)));
-  if(wkSet.size) data=data.filter(r=>wkSet.has(String(payWeekNo(r.xfer))));
+  if(dtSet.size) data=data.filter(r=>dtSet.has(String(_effXfer(r))));
+  if(wkSet.size) data=data.filter(r=>wkSet.has(String(payWeekNo(_effXfer(r)))));
   if(opt.poSel){ const _pe=document.getElementById(opt.poSel); const _q=((_pe&&_pe.value)||'').trim().toUpperCase(); if(_q) data=data.filter(r=> (((r.poList||'')+' '+(r.po||'')).toUpperCase().indexOf(_q)>=0)); }   // ค้นหาเลข PO
   if(opt.lotSel){ const _le=document.getElementById(opt.lotSel); const _q=((_le&&_le.value)||'').trim().toUpperCase(); if(_q) data=data.filter(r=> (((r.lot||'')+' '+(r.lotList||'')).toUpperCase().indexOf(_q)>=0)); }   // ค้นหาเลข Lot
   // ใช้วันที่โอนที่แก้เอง (ถ้ามี) + เก็บ meta ไว้ให้ modal
