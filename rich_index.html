@@ -12027,7 +12027,7 @@ function presSavePick(){ const v=(document.getElementById('pres-sel')||{}).value
   presSetName(v); const ov=document.getElementById('pres-ov'); if(ov) ov.remove(); presTick(); }
 const PRES_PAGE_LABEL={flowchart:'Flowchart',leadtime:'🚨 ต้องรีบสั่ง',search:'ค้นหาสต๊อก',packing:'Packing List',payment:'Payment'};
 // บันทึก "การกระทำล่าสุด" แบบหยาบ + ส่ง heartbeat ทันที (ให้เพื่อนเห็นเร็ว)
-function presAct(text){ window._presAct={t:text, ts:Date.now()}; try{ presHeartbeat(); }catch(e){} }
+function presAct(text){ window._presAct={t:text, ts:Date.now()}; try{ presHeartbeat(); }catch(e){} try{ auditLog(text); }catch(e){} }
 async function presHeartbeat(){ const nm=presName(); if(!nm) return; if(!(window.GraphStorage && window.GraphStorage.presenceSet)) return;
   const act=(window._presAct && (Date.now()-window._presAct.ts<600000)) ? window._presAct.t : '';   // การกระทำล่าสุดภายใน 10 นาที
   const actTs=(window._presAct)?window._presAct.ts:0;
@@ -12168,6 +12168,7 @@ window.appAuthGateStart=function(){
 window.appPresenceStart=function(){
   if(window._presStarted) return; window._presStarted=true;
   try{ if(!presName()) presPickModal(); }catch(e){}
+  try{ bcUpdateLogBtnVis(); }catch(e){}   // แสดงปุ่ม Log เมื่อผู้ใช้เป็น Admin (หลังล็อกอิน)
   presTick();
   setInterval(presTick, 60000);
   window.addEventListener('beforeunload', function(){ try{ if(window.GraphStorage&&window.GraphStorage.presenceDelete) window.GraphStorage.presenceDelete('presence-'+presClientId()); }catch(e){} });
@@ -12237,12 +12238,12 @@ async function paySyncFromCloud(){ if(!window.GraphStorage) return;
 async function payPushToCloud(){ if(!window.GraphStorage) return; payLoadOv(); payLoadCheck(); payLoadExtra(); payLoadDocs(); payLoadDepOv(); await window.GraphStorage.saveData('payXferOvV1', window.payXferOv||{}); await window.GraphStorage.saveData('payCheckV1', window.payCheck||{}); await window.GraphStorage.saveData('payExtraV1', window.payExtra||[]); await window.GraphStorage.saveData('payDocsV1', window.payDocs||{}); await window.GraphStorage.saveData('payDepOvV1', window.payDepOv||{}); payLoadPi(); await window.GraphStorage.saveData('payPiV1', window.payPi||{}); }
 function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent','renderPayment','renderPayment2'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
 async function cloudPullNow(){ const b=document.getElementById('bc-pull'); if(b) b.disabled=true;
-  try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); cloudRerenderAll(); bcSetTs('bcCloudSyncAt'); pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
+  try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); cloudRerenderAll(); bcSetTs('bcCloudSyncAt'); try{ auditLog('⬇️ ดึงข้อมูลล่าสุด'); }catch(e){} pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
   catch(e){ console.error(e); pkToast('ดึงข้อมูลไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
   if(b) b.disabled=false;
 }
 async function cloudPushNow(){ const b=document.getElementById('bc-push'); if(b) b.disabled=true;
-  try{ pkToast('กำลังอัปโหลดขึ้นส่วนกลาง...','info'); await window.GraphAuth.signIn(); await pkPushToCloud(); await poPushToCloud(); await payPushToCloud(); bcSetTs('bcCloudSyncAt'); pkToast('อัปโหลดขึ้นส่วนกลางสำเร็จ ✅','good'); }
+  try{ pkToast('กำลังอัปโหลดขึ้นส่วนกลาง...','info'); await window.GraphAuth.signIn(); await pkPushToCloud(); await poPushToCloud(); await payPushToCloud(); bcSetTs('bcCloudSyncAt'); try{ auditLog('⬆️ อัปโหลดขึ้นส่วนกลาง'); }catch(e){} pkToast('อัปโหลดขึ้นส่วนกลางสำเร็จ ✅','good'); }
   catch(e){ console.error(e); pkToast('อัปโหลดไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
   if(b) b.disabled=false;
 }
@@ -12260,6 +12261,53 @@ async function refreshAllBcData(){ const b=document.getElementById('bc-refresh-a
   }
   catch(e){ console.error(e); pkToast('รีเฟรชไม่สำเร็จ: '+((e&&e.message)||e),'bad'); if(b) b.disabled=false; }
 }
+// ===== Audit Log — ใครบันทึก/แก้ไข/อัปโหลดอะไรล่าสุด (เก็บบน SharePoint · ดูได้เฉพาะ Role: Admin) =====
+function auditRole(){ try{ const a=(typeof appAuthInfo==='function')&&appAuthInfo(); return (a&&a.role)||''; }catch(e){ return ''; } }
+function auditLog(action){
+  if(!(window.GraphStorage && window.GraphStorage.presenceSet && window.GraphAuth && window.GraphAuth.getGraphTokenSilent)) return;   // เฉพาะเมื่อเชื่อม SharePoint + ล็อกอิน (เงียบ)
+  try{ const id='alog-'+Date.now().toString(36)+Math.floor(Math.random()*1e5).toString(36);
+    window.GraphStorage.presenceSet(id, {ts:Date.now(), by:(typeof payWho==='function'?payWho():(presName()||'ไม่ทราบชื่อ')), role:auditRole(), act:String(action||'')}); }catch(e){}
+}
+function bcUpdateLogBtnVis(){ const b=document.getElementById('bc-log'); if(b) b.style.display=(auditRole()==='Admin')?'':'none'; }
+function auditOpenLog(){
+  if(auditRole()!=='Admin'){ pkToast('เมนูนี้สำหรับ Admin เท่านั้น','bad'); return; }
+  let ov=document.getElementById('audit-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='audit-ov'; ov.style.cssText='position:fixed;inset:0;z-index:100020;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:18px 20px;max-width:760px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.35);">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <div style="font-weight:800;font-size:15px;">📋 Log การบันทึก/แก้ไข/อัปโหลด <span class="muted" style="font-size:11px;font-weight:600;">(เฉพาะ Admin)</span></div>
+      <div style="display:flex;gap:6px;">
+        <button onclick="auditRenderLog()" style="padding:5px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:700;">🔄 รีเฟรช</button>
+        <button onclick="auditPruneOld()" title="ลบ log เก่ากว่า 60 วัน" style="padding:5px 12px;border-radius:8px;border:1px solid #b45309;background:var(--bg);color:#b45309;cursor:pointer;font-weight:700;">🧹 ล้างเก่า</button>
+        <button onclick="document.getElementById('audit-ov').remove()" style="padding:5px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:700;">ปิด</button>
+      </div>
+    </div>
+    <div id="audit-body" class="muted" style="font-size:13px;">กำลังโหลด...</div>
+  </div>`;
+  document.body.appendChild(ov); auditRenderLog();
+}
+async function auditFetch(){ try{ return await window.GraphStorage.presenceList('alog-'); }catch(e){ return null; } }
+async function auditRenderLog(){
+  const el=document.getElementById('audit-body'); if(!el) return; el.textContent='กำลังโหลด...';
+  const rows=await auditFetch();
+  if(!rows){ el.textContent='โหลด log ไม่ได้ (ต้องเข้าสู่ระบบ/เชื่อม SharePoint ก่อน)'; return; }
+  const list=rows.map(r=>{ let v={}; try{ v=JSON.parse(r.value||'{}'); }catch(e){} return v; }).filter(v=>v&&v.ts).sort((a,b)=>b.ts-a.ts).slice(0,300);
+  const d=ts=>{ const x=new Date(+ts); const p=n=>String(n).padStart(2,'0'); return p(x.getDate())+'/'+p(x.getMonth()+1)+'/'+(x.getFullYear()+543)+' '+p(x.getHours())+':'+p(x.getMinutes()); };
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  if(!list.length){ el.innerHTML='<div class="muted">ยังไม่มี log</div>'; return; }
+  el.innerHTML='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="background:var(--brand-soft);">'
+    +'<th style="padding:6px 8px;text-align:left;white-space:nowrap;">เวลา</th><th style="padding:6px 8px;text-align:left;">ผู้ใช้</th><th style="padding:6px 8px;text-align:left;">Role</th><th style="padding:6px 8px;text-align:left;">การกระทำ</th></tr></thead><tbody>'
+    + list.map(v=>`<tr><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;">${d(v.ts)}</td><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;"><b>${esc(v.by||'-')}</b></td><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;">${esc(v.role||'-')}</td><td style="padding:5px 8px;border-bottom:1px solid var(--line);">${esc(v.act||'-')}</td></tr>`).join('')
+    + '</tbody></table></div><div class="muted" style="font-size:10.5px;margin-top:8px;">แสดง '+list.length+' รายการล่าสุด (เรียงใหม่→เก่า)</div>';
+}
+function auditPruneOld(){
+  if(auditRole()!=='Admin') return;
+  pkConfirm('ลบ log ที่เก่ากว่า 60 วันทั้งหมด?', async function(){
+    const rows=await auditFetch(); if(!rows) return; const cut=Date.now()-60*86400000; let n=0;
+    for(const r of rows){ let v={}; try{ v=JSON.parse(r.value||'{}'); }catch(e){} if(v&&v.ts && (+v.ts)<cut){ try{ await window.GraphStorage.presenceDelete(r.key); n++; }catch(e){} } }
+    pkToast('ลบ log เก่าแล้ว '+n+' รายการ','good'); auditRenderLog();
+  });
+}
 function bcInjectSyncButtons(){
   if(document.getElementById('bc-sync-wrap') || !(window.GraphStorage && window.GraphAuth)) return;   // ขึ้นเฉพาะเมื่อมี SharePoint (GitHub Pages)
   const wrap=document.createElement('div'); wrap.id='bc-sync-wrap';
@@ -12273,7 +12321,10 @@ function bcInjectSyncButtons(){
   const br=document.createElement('button'); br.id='bc-refresh-all'; br.textContent='🔄 รีเฟรชข้อมูลทั้งหมด';
   br.style.cssText='padding:10px 16px;border-radius:8px;background:#ff9f43;color:#fff;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:14px;font-family:inherit;';
   br.onclick=refreshAllBcData;
-  wrap.appendChild(bp); wrap.appendChild(bu); wrap.appendChild(br); document.body.appendChild(wrap);
+  const bl=document.createElement('button'); bl.id='bc-log'; bl.textContent='📋 Log (Admin)';
+  bl.style.cssText='padding:10px 16px;border-radius:8px;background:#7f1d1d;color:#fff;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);font-size:14px;font-family:inherit;display:none;';
+  bl.onclick=auditOpenLog;
+  wrap.appendChild(bp); wrap.appendChild(bu); wrap.appendChild(br); wrap.appendChild(bl); document.body.appendChild(wrap); try{ bcUpdateLogBtnVis(); }catch(e){}
 }
 window.addEventListener('load', function(){ let n=0; const t=setInterval(function(){ if(window.GraphStorage && window.GraphAuth){ clearInterval(t); bcInjectSyncButtons(); } else if(++n>24){ clearInterval(t); } }, 250); });
 </script>
