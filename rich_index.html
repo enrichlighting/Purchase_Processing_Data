@@ -12072,7 +12072,7 @@ function presPanel(){
   </div>`;
   document.body.appendChild(ov);
 }
-function presTick(){ presHeartbeat(); presRender(); }
+function presTick(){ presHeartbeat(); presRender(); try{ if(typeof bcUpdateLogBtnVis==='function') bcUpdateLogBtnVis(); }catch(e){} }
 // ============================================================
 // Login ตาม Role (Admin/Purchase/Account) — ทำงานหลังผ่านด่านรหัสรวมแล้ว
 // ต้องเข้าสู่ระบบด้วย username/password ที่สร้างไว้ใน SharePoint List "AppUsers" ก่อนถึงจะใช้แอปได้
@@ -12263,14 +12263,15 @@ async function refreshAllBcData(){ const b=document.getElementById('bc-refresh-a
 }
 // ===== Audit Log — ใครบันทึก/แก้ไข/อัปโหลดอะไรล่าสุด (เก็บบน SharePoint · ดูได้เฉพาะ Role: Admin) =====
 function auditRole(){ try{ const a=(typeof appAuthInfo==='function')&&appAuthInfo(); return (a&&a.role)||''; }catch(e){ return ''; } }
+function auditIsAdmin(){ return String(auditRole()).trim().toLowerCase()==='admin'; }   // ทนต่อ "admin"/" Admin "/ตัวพิมพ์ต่างกัน
 function auditLog(action){
   if(!(window.GraphStorage && window.GraphStorage.presenceSet && window.GraphAuth && window.GraphAuth.getGraphTokenSilent)) return;   // เฉพาะเมื่อเชื่อม SharePoint + ล็อกอิน (เงียบ)
   try{ const id='alog-'+Date.now().toString(36)+Math.floor(Math.random()*1e5).toString(36);
     window.GraphStorage.presenceSet(id, {ts:Date.now(), by:(typeof payWho==='function'?payWho():(presName()||'ไม่ทราบชื่อ')), role:auditRole(), act:String(action||'')}); }catch(e){}
 }
-function bcUpdateLogBtnVis(){ const b=document.getElementById('bc-log'); if(b) b.style.display=(auditRole()==='Admin')?'':'none'; }
+function bcUpdateLogBtnVis(){ const b=document.getElementById('bc-log'); if(b) b.style.display=auditIsAdmin()?'':'none'; }
 function auditOpenLog(){
-  if(auditRole()!=='Admin'){ pkToast('เมนูนี้สำหรับ Admin เท่านั้น','bad'); return; }
+  if(!auditIsAdmin()){ pkToast('เมนูนี้สำหรับ Admin เท่านั้น','bad'); return; }
   let ov=document.getElementById('audit-ov'); if(ov) ov.remove();
   ov=document.createElement('div'); ov.id='audit-ov'; ov.style.cssText='position:fixed;inset:0;z-index:100020;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px;';
   ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:18px 20px;max-width:760px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.35);">
@@ -12301,7 +12302,7 @@ async function auditRenderLog(){
     + '</tbody></table></div><div class="muted" style="font-size:10.5px;margin-top:8px;">แสดง '+list.length+' รายการล่าสุด (เรียงใหม่→เก่า)</div>';
 }
 function auditPruneOld(){
-  if(auditRole()!=='Admin') return;
+  if(!auditIsAdmin()) return;
   pkConfirm('ลบ log ที่เก่ากว่า 60 วันทั้งหมด?', async function(){
     const rows=await auditFetch(); if(!rows) return; const cut=Date.now()-60*86400000; let n=0;
     for(const r of rows){ let v={}; try{ v=JSON.parse(r.value||'{}'); }catch(e){} if(v&&v.ts && (+v.ts)<cut){ try{ await window.GraphStorage.presenceDelete(r.key); n++; }catch(e){} } }
