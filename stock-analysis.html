@@ -12263,7 +12263,7 @@ async function refreshAllBcData(){ const b=document.getElementById('bc-refresh-a
 }
 // ===== Audit Log — ใครบันทึก/แก้ไข/อัปโหลดอะไรล่าสุด (เก็บบน SharePoint · ดูได้เฉพาะ Role: Admin) =====
 function auditRole(){ try{ const a=(typeof appAuthInfo==='function')&&appAuthInfo(); return (a&&a.role)||''; }catch(e){ return ''; } }
-function auditIsAdmin(){ return String(auditRole()).trim().toLowerCase()==='admin'; }   // ทนต่อ "admin"/" Admin "/ตัวพิมพ์ต่างกัน
+function auditIsAdmin(){ return String(auditRole()).trim().toLowerCase().includes('admin'); }   // ทนต่อ "admin"/" Admin "/"IT Admin"/ตัวพิมพ์ต่างกัน (role ที่มีคำว่า admin)
 function auditLog(action){
   if(!(window.GraphStorage && window.GraphStorage.presenceSet && window.GraphAuth && window.GraphAuth.getGraphTokenSilent)) return;   // เฉพาะเมื่อเชื่อม SharePoint + ล็อกอิน (เงียบ)
   try{ const id='alog-'+Date.now().toString(36)+Math.floor(Math.random()*1e5).toString(36);
