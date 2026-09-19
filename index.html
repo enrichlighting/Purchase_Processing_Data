@@ -7033,9 +7033,9 @@ async function diyUploadPO(inp){
     if(window.GraphStorage&&window.GraphStorage.uploadFile&&window.GraphAuth&&window.GraphAuth.getGraphTokenSilent && (await window.GraphAuth.getGraphTokenSilent())){
       try{
         const safe=file.name.replace(/[\\/:*?"<>|]+/g,'_'); const fname='PODIY_'+Date.now().toString(36)+'_'+safe;
-        const item=await window.GraphStorage.uploadFile(fname, file); const url=(item&&(item.webUrl||item['@microsoft.graph.downloadUrl']))||'';
+        const item=await window.GraphStorage.uploadFile(fname, file); const url=(item&&(item.webUrl||item['@microsoft.graph.downloadUrl']))||''; const did=(item&&item.id)||'';
         const id='podiy-'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
-        await window.GraphStorage.presenceSet(id, {name:file.name, url, size:file.size, ts:Date.now(), by:diyWho(), ref:(parsed&&parsed.ref)||'', ym:(parsed&&parsed.ym)||'', mapped});
+        await window.GraphStorage.presenceSet(id, {name:file.name, url, did, size:file.size, ts:Date.now(), by:diyWho(), ref:(parsed&&parsed.ref)||'', ym:(parsed&&parsed.ym)||'', mapped});
         msgs.push('เก็บไฟล์ขึ้นส่วนกลางแล้ว'); diyRenderPOList();
       }catch(e){ msgs.push('เก็บไฟล์ส่วนกลางไม่สำเร็จ: '+(e&&e.message||e)); }
     } else { msgs.push('(ยังไม่ล็อกอิน — ไม่ได้เก็บไฟล์ส่วนกลาง)'); }
@@ -7050,14 +7050,37 @@ async function diyRenderPOList(){
   let rows=null; try{ rows=await window.GraphStorage.presenceList('podiy-'); }catch(e){}
   if(rows==null){ el.innerHTML='<div class="muted" style="font-size:12px;">เข้าสู่ระบบเพื่อดูรายการ PO DIY ที่อัปโหลดไว้</div>'; return; }
   const list=rows.map(r=>{ let v={}; try{ v=JSON.parse(r.value||'{}'); }catch(e){} v._key=r.key; return v; }).filter(v=>v&&v.name).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  window._diyPoRows={}; list.forEach(v=>{ window._diyPoRows[v._key]=v; });   // เก็บไว้ให้ปุ่มลบอ้างอิง (เลี่ยงปัญหา escape)
   if(!list.length){ el.innerHTML='<div class="muted" style="font-size:12px;">ยังไม่มีไฟล์ PO DIY — อัปโหลดไฟล์ PDF ด้านบนได้เลย</div>'; return; }
   const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const d=ts=>{ if(!ts) return '-'; const x=new Date(+ts); const p=n=>String(n).padStart(2,'0'); return p(x.getDate())+'/'+p(x.getMonth()+1)+'/'+(x.getFullYear()+543)+' '+p(x.getHours())+':'+p(x.getMinutes()); };
   const sz=n=>{ n=+n||0; return n>1048576?(Math.round(n/104857.6)/10+' MB'):(n>1024?(Math.round(n/102.4)/10+' KB'):(n+' B')); };
-  el.innerHTML='<div class="section-title">📄 ไฟล์ PO DIY ในส่วนกลาง ('+list.length+')</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="background:var(--brand-soft);"><th style="padding:6px 8px;text-align:left;">ชื่อไฟล์</th><th style="padding:6px 8px;text-align:left;white-space:nowrap;">อัปโหลดเมื่อ</th><th style="padding:6px 8px;text-align:left;">โดย</th><th style="padding:6px 8px;text-align:right;">ขนาด</th><th style="padding:6px 8px;"></th></tr></thead><tbody>'
-    + list.map(v=>`<tr><td style="padding:5px 8px;border-bottom:1px solid var(--line);"><b>${esc(v.name)}</b></td><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;">${d(v.ts)}</td><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;">${esc(v.by||'-')}</td><td style="padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;">${sz(v.size)}</td><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;">${v.url?`<a href="${esc(v.url)}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:700;text-decoration:none;">เปิด/ดาวน์โหลด ↗</a>`:'<span class="muted">-</span>'}</td></tr>`).join('')
+  el.innerHTML='<div class="section-title">📄 ไฟล์ PO DIY ในส่วนกลาง ('+list.length+')</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="background:var(--brand-soft);"><th style="padding:6px 8px;text-align:left;">ชื่อไฟล์</th><th style="padding:6px 8px;text-align:left;white-space:nowrap;">PO / เดือนส่ง</th><th style="padding:6px 8px;text-align:left;white-space:nowrap;">อัปโหลดเมื่อ</th><th style="padding:6px 8px;text-align:left;">โดย</th><th style="padding:6px 8px;text-align:right;">ขนาด</th><th style="padding:6px 8px;"></th><th style="padding:6px 8px;"></th></tr></thead><tbody>'
+    + list.map(v=>`<tr><td style="padding:5px 8px;border-bottom:1px solid var(--line);"><b>${esc(v.name)}</b></td><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:11.5px;">${v.ref?('<b>'+esc(v.ref)+'</b>'+(v.ym?(' · '+esc(v.ym)):'')):'<span class="muted">—</span>'}</td><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;">${d(v.ts)}</td><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;">${esc(v.by||'-')}</td><td style="padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;">${sz(v.size)}</td><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;">${v.url?`<a href="${esc(v.url)}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:700;text-decoration:none;">เปิด/ดาวน์โหลด ↗</a>`:'<span class="muted">-</span>'}</td><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;"><button type="button" onclick="diyDeletePO('${v._key}')" title="ลบไฟล์นี้ออกจากส่วนกลาง${v.ref?(' + ลบข้อมูล PO '+esc(v.ref)+' จาก Flowchart'):''}" style="padding:3px 10px;border-radius:7px;border:1px solid #dc2626;background:var(--bg);color:#dc2626;cursor:pointer;font-weight:700;font-size:11.5px;">🗑️ ลบ</button></td></tr>`).join('')
     + '</tbody></table></div>';
 }
+// ลบไฟล์ PO DIY: ลบไฟล์จริงใน SharePoint (ถ้ามี id) + ลบออกจากรายการ + ถ้าไฟล์นี้มีข้อมูล PO (ref) ที่ import ไว้ ก็ลบข้อมูลนั้นออกจาก Flowchart ด้วย
+async function diyDeletePO(key){
+  const v=(window._diyPoRows||{})[key]||{}; const ref=v.ref||''; const name=v.name||'ไฟล์นี้';
+  const doDel=async ()=>{
+    try{
+      diyStatus('กำลังลบ '+name+' ...','');
+      if(v.did && window.GraphStorage && window.GraphStorage.deleteFile){ try{ await window.GraphStorage.deleteFile(v.did); }catch(e){} }   // ลบไฟล์จริง (best-effort)
+      try{ await window.GraphStorage.presenceDelete(key); }catch(e){}                                                                    // ลบออกจากรายการส่วนกลาง
+      if(ref){
+        diyPoImpLoad(); if(window.PODIY_IMPORT && window.PODIY_IMPORT[ref]){ delete window.PODIY_IMPORT[ref]; diyPoImpSave(); diyPoImpPushCloud(); }
+        if(window.BC_PODIY){ for(const e in window.BC_PODIY){ window.BC_PODIY[e]=(window.BC_PODIY[e]||[]).filter(o=>o.ref!==ref); if(!window.BC_PODIY[e].length) delete window.BC_PODIY[e]; } }   // เอา PO นี้ออกจากคอลัมน์/กราฟ
+        try{ mergeCust(); }catch(e){} try{ if(typeof renderFlowchart==='function') renderFlowchart(); }catch(e){} try{ renderSearch(); }catch(e){}
+      }
+      try{ if(typeof presAct==='function') presAct('ลบ PO DIY: '+name+(ref?(' ('+ref+')'):'')); }catch(e){}
+      diyStatus('✅ ลบแล้ว: '+name+(ref?(' · เอา PO '+ref+' ออกจาก Flowchart แล้ว'):''),'good');
+      diyRenderPOList();
+    }catch(err){ diyStatus('❌ ลบไม่สำเร็จ: '+(err&&err.message||err),'bad'); }
+  };
+  const msg='ลบไฟล์ "'+name+'"'+(ref?(' และข้อมูล PO '+ref+' ออกจาก Flowchart'):'')+' ?\n(ลบออกจากส่วนกลางถาวร — คนอื่นจะไม่เห็นไฟล์นี้อีก)';
+  if(typeof pkConfirm==='function') pkConfirm(msg, doDel); else if(confirm(msg)) doDel();
+}
+
 
 function renderSearch(){
   const itemNo = comboValue('s-item');

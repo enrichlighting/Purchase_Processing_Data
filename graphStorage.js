@@ -143,6 +143,15 @@ async function uploadFile(filename, blob) {
   }
   return response.json();
 }
+// ลบไฟล์ใน SharePoint (Document Library) ตาม DriveItem id · 404 = หายไปแล้ว ถือว่าสำเร็จ
+async function deleteFile(itemId) {
+  if (!itemId) return false;
+  const token = await window.GraphAuth.getGraphToken();
+  const url = `https://graph.microsoft.com/v1.0/sites/${SITE_ID}/drive/items/${encodeURIComponent(itemId)}`;
+  const response = await fetch(url, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok && response.status !== 404) { const t = await response.text(); throw new Error(`Graph delete error (${response.status}): ${t}`); }
+  return true;
+}
 // ============================================================
 // Login ระบบ username/password ของแอป (แยกจาก Microsoft sign-in ที่มีอยู่แล้ว)
 // เก็บใน SharePoint List: AppUsers (site: PackingPO) — คอลัมน์ Title(=username) / PasswordHash / Role / DisplayName
@@ -200,6 +209,7 @@ window.GraphStorage = {
   presenceList,
   presenceDelete,
   uploadFile,
+  deleteFile,
   verifyLogin,
   createUser,
 };
