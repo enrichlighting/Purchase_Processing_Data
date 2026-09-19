@@ -470,7 +470,7 @@
     <!-- นำเข้าข้อมูลภายนอก DIY (ยอดขาย/สต๊อก Excel + PO DIY PDF เก็บส่วนกลาง) -->
     <div class="card" id="sec-diy-import">
       <h2>📥 นำเข้าข้อมูลภายนอก (DIY)</h2>
-      <p class="hint">อัปเดต <b>ยอดขาย/สต๊อกหน้าร้าน Mr.DIY</b> จากไฟล์ Excel (อ่านในแอป → อัปเดตกราฟ DIY ทันที) และเก็บไฟล์ <b>PO DIY (PDF)</b> ไว้ส่วนกลางเพื่อให้ทีมดู/ดาวน์โหลด</p>
+      <p class="hint">อัปเดต <b>ยอดขาย/สต๊อกหน้าร้าน Mr.DIY</b> จากไฟล์ Excel (อ่านในแอป → อัปเดตกราฟ DIY ทันที) · นำเข้า <b>PO DIY (PDF)</b> → อ่านตารางในไฟล์ → อัปเดตคอลัมน์ <b style="color:#e2231a;">PO DIY</b> + เส้นในกราฟ Flowchart ทันที และเก็บไฟล์ต้นฉบับไว้ส่วนกลางให้ทีมดู/ดาวน์โหลด</p>
       <div class="controls" style="align-items:flex-end;gap:14px;flex-wrap:wrap;">
         <div class="field">
           <label>📈 ยอดขาย DIY (Excel)</label>
@@ -483,9 +483,9 @@
           <button class="go" type="button" onclick="document.getElementById('diy-stock-file').click()">เลือกไฟล์สต๊อก .xlsx</button>
         </div>
         <div class="field">
-          <label>📄 PO DIY (PDF) → เก็บส่วนกลาง</label>
+          <label>📄 PO DIY (PDF) → อัปเดต Flowchart + เก็บส่วนกลาง</label>
           <input type="file" id="diy-po-file" accept="application/pdf,.pdf" style="display:none;" onchange="diyUploadPO(this)">
-          <button class="go" type="button" onclick="document.getElementById('diy-po-file').click()">อัปโหลด PO DIY .pdf</button>
+          <button class="go" type="button" onclick="document.getElementById('diy-po-file').click()">นำเข้า PO DIY .pdf</button>
         </div>
       </div>
       <div id="diy-import-status" class="muted" style="font-size:12.5px;margin-top:8px;min-height:18px;"></div>
@@ -6728,6 +6728,10 @@ function mergeCust(){
     it.mrdiySell = (typeof window!=='undefined' && window.BC_MRDIY) ? (window.BC_MRDIY[it.no]||null) : null;  // ยอดขายหน้าร้าน Mr.DIY {plu,np,cost,mon}
     it.mrdiyStock = (typeof window!=='undefined' && window.BC_MRDIYSTOCK) ? (window.BC_MRDIYSTOCK[it.no]||null) : null;  // สต๊อกหน้าร้าน Mr.DIY {mon}
     it.hasPLU = !!(it.mrdiySell && it.mrdiySell.plu);   // มี PLU = ขายผ่าน Mr.DIY
+    // ยอด PO DIY (Mr.DIY สั่งซื้อล่วงหน้าจากเรา) รายเดือนตาม "เดือนกำหนดส่ง" (deliv) — สำหรับเส้นในกราฟ Flowchart
+    { const arr=(typeof window!=='undefined' && window.BC_PODIY) ? (window.BC_PODIY[it.no]||null) : null; let dp=null;
+      if(arr && arr.length){ dp={}; arr.forEach(o=>{ const ym=String(o.deliv||'').slice(0,7); if(ym) dp[ym]=(dp[ym]||0)+(+o.qty||0); }); }
+      it.diyPo = dp; }   // {ym:qty} หรือ null
     it.itemMon = (typeof window!=='undefined' && window.BC_ITEMMON) ? (window.BC_ITEMMON[it.no]||[]) : [];  // ยอดขายรวมรายเดือน (ทุกลูกค้า)
     matched++;
   });
@@ -6932,21 +6936,110 @@ function diyApplyStartup(){ try{ const raw=localStorage.getItem(DIY_STORE_KEY); 
 async function diyPushCloud(){ try{ if(!(window.GraphStorage&&window.GraphStorage.saveData&&window.GraphAuth&&window.GraphAuth.getGraphTokenSilent)) return; if(!(await window.GraphAuth.getGraphTokenSilent())) return; await window.GraphStorage.saveData(DIY_STORE_KEY, {sales:window.BC_MRDIY||{}, stock:window.BC_MRDIYSTOCK||{}, ts:Date.now(), by:diyWho()}); }catch(e){} }
 async function diyPullCloud(){ try{ if(!(window.GraphStorage&&window.GraphStorage.loadData)) return false; const raw=await window.GraphStorage.loadData(DIY_STORE_KEY); if(!raw) return false; const o=(typeof raw==='string')?JSON.parse(raw):raw; let ch=false; if(o&&o.sales&&Object.keys(o.sales).length){ window.BC_MRDIY=o.sales; ch=true; } if(o&&o.stock&&Object.keys(o.stock).length){ window.BC_MRDIYSTOCK=o.stock; ch=true; } if(ch){ diySaveLocal(); try{ mergeCust(); }catch(e){} } return ch; }catch(e){ return false; } }
 
-/* ---- PO DIY (PDF) เก็บส่วนกลาง + รายการให้ดู/ดาวน์โหลด (metadata เก็บใน presence key 'podiy-') ---- */
+/* =====================================================================
+   PO DIY (PDF) — อ่านในแอปด้วย pdf.js → เขียนเข้า BC_PODIY เดิม (คอลัมน์ "PO DIY" + จองสต๊อก) + เก็บไฟล์ส่วนกลาง
+   โครงสร้างเดิม: BC_PODIY[รหัสเรา] = [{ref, qty, deliv:'YYYY-MM-DD', plu}] · poDiyCommitted() รวมทุกออเดอร์
+   ===================================================================== */
+const PODIY_IMP_KEY='podiyImpV1';   // override ที่ import ในแอป (แยกจากไฟล์ auto-sync bc-podiy.js) · เก็บตามเลข PO (ref)
+// map PLU -> รหัสเรา แบบครบ: ใช้ it.diyCode (จาก Lead Time) เป็นหลัก + เสริมจาก BC_MRDIY/BC_PODIY
+function diyPluMapFull(){
+  const m={};
+  (window.ITEMS||[]).forEach(it=>{ const c=String(it.diyCode||'').trim(); if(c) m[c]=it.no; });
+  if(window.ITEMS_ALL && window.ITEMS_ALL!==window.ITEMS){ window.ITEMS_ALL.forEach(it=>{ const c=String(it.diyCode||'').trim(); if(c&&!m[c]) m[c]=it.no; }); }
+  for(const enr in (window.BC_MRDIY||{})){ const p=String(window.BC_MRDIY[enr].plu||'').trim(); if(p&&!m[p]) m[p]=enr; }
+  for(const enr in (window.BC_PODIY||{})){ (window.BC_PODIY[enr]||[]).forEach(o=>{ const p=String(o.plu||'').trim(); if(p&&!m[p]) m[p]=enr; }); }
+  return m;
+}
+// โหลด pdf.js แบบ lazy จาก CDN
+function diyEnsurePDF(){
+  return new Promise((resolve,reject)=>{
+    const got=()=>window.pdfjsLib||window['pdfjs-dist/build/pdf'];
+    if(got()) return resolve(got());
+    if(window._pdfjsLoading){ window._pdfjsLoading.then(resolve,reject); return; }
+    window._pdfjsLoading=new Promise((res,rej)=>{
+      const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      s.onload=()=>{ const L=got(); try{ if(L) L.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }catch(e){} L?res(L):rej(new Error('โหลด pdf.js ไม่สำเร็จ')); };
+      s.onerror=()=>rej(new Error('โหลด pdf.js ไม่ได้ (ตรวจอินเทอร์เน็ต)')); document.head.appendChild(s);
+    });
+    window._pdfjsLoading.then(resolve,reject);
+  });
+}
+// อ่าน PO DIY 1 ไฟล์ → {ref, date, deliv, ym, lines:[{plu,qty}]}
+async function diyParsePOPDF(file){
+  const pdfjsLib=await diyEnsurePDF();
+  const doc=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+  let all=[], firstItems=null;
+  for(let p=1;p<=doc.numPages;p++){
+    const page=await doc.getPage(p); const tc=await page.getTextContent();
+    const items=tc.items.map(it=>({s:it.str, x:it.transform[4], y:it.transform[5], w:it.width}));
+    if(p===1) firstItems=items.map(it=>({s:(it.s||'').trim(), x:it.x, y:it.y, w:it.w})).filter(it=>it.s);
+    let rows=[], cY=null, cur=null;
+    items.slice().sort((a,b)=>(Math.abs(a.y-b.y)>2?b.y-a.y:a.x-b.x)).forEach(it=>{ if(cY===null||Math.abs(it.y-cY)>2){ cur=[]; rows.push(cur); cY=it.y; } cur.push(it); });
+    rows.forEach(r=>{ r.sort((a,b)=>a.x-b.x); let l='',pe=null; r.forEach(it=>{ if(pe!==null && it.x-pe>1.2) l+=' '; l+=it.s; pe=it.x+it.w; }); all.push(l.replace(/\s+/g,' ').trim()); });
+  }
+  const joined=all.join('\n');
+  const ref=(joined.match(/OUR REF NO\s*:?\s*([A-Z]{2,4}-\d{5,})/i)||[])[1]||('PO-'+Date.now().toString(36));
+  const date=(joined.match(/(?:^|[^A-Z])DATE\s*:\s*(\d{2}\/\d{2}\/\d{4})/i)||[])[1]||null;
+  // DELIVERY DATE: จับด้วยตำแหน่ง x ให้ตรงกับหัวคอลัมน์ (แม่นสุด) → fallback = วันที่ที่ 2 บนแถว "N DAYS"
+  let deliv=null;
+  if(firstItems){
+    const lab=firstItems.find(it=>/DELIVERY/i.test(it.s));
+    const dts=firstItems.filter(it=>/^\d{2}\/\d{2}\/\d{4}$/.test(it.s));
+    if(lab){ const cx=lab.x+lab.w/2; const below=dts.filter(d=>d.y<lab.y); const pool=below.length?below:dts; pool.sort((a,b)=>Math.abs((a.x+a.w/2)-cx)-Math.abs((b.x+b.w/2)-cx)); if(pool[0]) deliv=pool[0].s; }
+  }
+  if(!deliv){ const m=joined.match(/\d+\s*DAYS\s+\d{2}\/\d{2}\/\d{4}\s+(\d{2}\/\d{2}\/\d{4})/i)||joined.match(/DELIVERY DATE\s*(\d{2}\/\d{2}\/\d{4})/i)||joined.match(/\d+\s*DAYS\s+(\d{2}\/\d{2}\/\d{4})/i); if(m) deliv=m[m.length-1]; }
+  const dmy=d=>{ if(!d) return null; const p=d.split('/'); return p[2]+'-'+p[1]+'-'+p[0]; };  // dd/mm/yyyy → yyyy-mm-dd
+  const re=/^\s*\d+\)\s+(\d{6,8})\s+\d{8,14}\s+.*?\s+([\d,]+)\s+[\d,]+\.\d{2}\s+[\d,]+\.\d{2}\s+[\d.]+\s+[\d.]+\s*$/;
+  const agg={}; all.forEach(L=>{ const m=L.match(re); if(m){ const plu=m[1], qty=+m[2].replace(/,/g,''); agg[plu]=(agg[plu]||0)+qty; } });
+  const lines=Object.keys(agg).map(plu=>({plu, qty:agg[plu]}));
+  return {ref, date, deliv:dmy(deliv), ym:(deliv?deliv.split('/').slice(1).reverse().join('-'):null), lines};
+}
+// override store (import ในแอป) — เก็บตาม ref: { ref: { deliv, ym, ts, by, name, byItem:{enr:[{ref,qty,deliv,plu}]} } }
+function diyPoImpEnsure(){ if(!window.PODIY_IMPORT) window.PODIY_IMPORT={}; return window.PODIY_IMPORT; }
+function diyPoImpLoad(){ try{ const raw=localStorage.getItem(PODIY_IMP_KEY); window.PODIY_IMPORT=raw?JSON.parse(raw):{}; }catch(e){ window.PODIY_IMPORT={}; } return window.PODIY_IMPORT; }
+function diyPoImpSave(){ try{ localStorage.setItem(PODIY_IMP_KEY, JSON.stringify(diyPoImpEnsure())); }catch(e){} }
+// เขียน override ทั้งหมดเข้า window.BC_PODIY (dedup ตาม ref: ลบ ref เดิมทุกที่ก่อน แล้วเติมของ import) — ไม่แตะ ref อื่นจากไฟล์ auto-sync
+function diyPoApplyImports(){
+  const imp=diyPoImpEnsure(); if(!window.BC_PODIY) window.BC_PODIY={};
+  const refs=new Set(Object.keys(imp));
+  if(refs.size){ for(const enr in window.BC_PODIY){ window.BC_PODIY[enr]=(window.BC_PODIY[enr]||[]).filter(o=>!refs.has(o.ref)); if(!window.BC_PODIY[enr].length) delete window.BC_PODIY[enr]; } }
+  Object.values(imp).forEach(po=>{ const bi=po.byItem||{}; for(const enr in bi){ (window.BC_PODIY[enr]=window.BC_PODIY[enr]||[]).push(...bi[enr]); } });
+}
+async function diyPoImpPushCloud(){ try{ if(!(window.GraphStorage&&window.GraphStorage.saveData&&window.GraphAuth&&window.GraphAuth.getGraphTokenSilent)) return; if(!(await window.GraphAuth.getGraphTokenSilent())) return; await window.GraphStorage.saveData(PODIY_IMP_KEY, diyPoImpEnsure()); }catch(e){} }
+async function diyPoImpPullCloud(){ try{ if(!(window.GraphStorage&&window.GraphStorage.loadData)) return false; const raw=await window.GraphStorage.loadData(PODIY_IMP_KEY); if(!raw) return false; const o=(typeof raw==='string')?JSON.parse(raw):raw; if(o&&typeof o==='object'){ window.PODIY_IMPORT=o; diyPoImpSave(); diyPoApplyImports(); try{ mergeCust(); }catch(e){} return true; } return false; }catch(e){ return false; } }
+
+/* ---- ปุ่ม PO DIY (PDF): อ่านข้อมูลเข้า BC_PODIY (คอลัมน์+กราฟ) + เก็บไฟล์ส่วนกลาง ---- */
 async function diyUploadPO(inp){
   const file=inp && inp.files && inp.files[0]; if(!file){ return; }
+  let parsed=null, mapped=0, msgs=[];
   try{
-    if(!(window.GraphStorage&&window.GraphStorage.uploadFile&&window.GraphAuth)) throw new Error('ต้องเข้าสู่ระบบ (SharePoint) ก่อนจึงจะอัปโหลดได้');
-    diyStatus('กำลังอัปโหลด '+file.name+' ขึ้นส่วนกลาง ...','');
-    const safe=file.name.replace(/[\\/:*?"<>|]+/g,'_');
-    const fname='PODIY_'+Date.now().toString(36)+'_'+safe;
-    const item=await window.GraphStorage.uploadFile(fname, file);
-    const url=(item&&(item.webUrl||item['@microsoft.graph.downloadUrl']))||'';
-    const id='podiy-'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
-    await window.GraphStorage.presenceSet(id, {name:file.name, url, size:file.size, ts:Date.now(), by:diyWho()});
-    diyStatus('✅ อัปโหลด PO DIY สำเร็จ: '+file.name,'good');
-    try{ if(typeof presAct==='function') presAct('อัปโหลด PO DIY: '+file.name); }catch(e){}
-    diyRenderPOList();
+    // 1) อ่านข้อมูลในไฟล์ → เข้า BC_PODIY เดิม (อัปเดตคอลัมน์ PO DIY + กราฟ ทันที · ทำงานแม้ยังไม่ล็อกอิน)
+    diyStatus('กำลังอ่าน PO DIY: '+file.name+' ...','');
+    try{ parsed=await diyParsePOPDF(file); }catch(e){ parsed=null; msgs.push('อ่านตารางไม่ได้ ('+(e&&e.message||e)+')'); }
+    if(parsed && parsed.lines.length){
+      const pluMap=diyPluMapFull(); const byItem={};
+      parsed.lines.forEach(l=>{ const enr=pluMap[l.plu]; if(!enr) return; mapped++; (byItem[enr]=byItem[enr]||[]).push({ref:parsed.ref, qty:l.qty, deliv:parsed.deliv, plu:l.plu}); });
+      diyPoImpEnsure()[parsed.ref]={deliv:parsed.deliv, ym:parsed.ym, ts:Date.now(), by:diyWho(), name:file.name, lineCount:parsed.lines.length, mapped, byItem};
+      diyPoApplyImports(); diyPoImpSave();
+      try{ mergeCust(); }catch(e){}
+      try{ if(typeof renderFlowchart==='function') renderFlowchart(); }catch(e){}
+      try{ if(typeof renderLead==='function') renderLead(); }catch(e){}
+      try{ renderSearch(); }catch(e){}
+      msgs.push('อ่าน PO '+parsed.ref+' · เดือนส่ง '+(parsed.ym||'-')+' · จับคู่สินค้าเรา '+mapped+'/'+parsed.lines.length+' รายการ → อัปเดตคอลัมน์ PO DIY + กราฟแล้ว');
+      try{ if(typeof presAct==='function') presAct('นำเข้า PO DIY '+parsed.ref+' ('+mapped+' รายการ)'); }catch(e){}
+      diyPoImpPushCloud();
+    } else if(!parsed || !parsed.lines.length){ msgs.push('⚠️ ไม่พบตารางสินค้าในไฟล์ (อาจเป็น PDF สแกน) — เก็บไฟล์อย่างเดียว'); }
+    // 2) เก็บไฟล์ต้นฉบับขึ้นส่วนกลาง (ถ้าล็อกอิน) — best-effort
+    if(window.GraphStorage&&window.GraphStorage.uploadFile&&window.GraphAuth&&window.GraphAuth.getGraphTokenSilent && (await window.GraphAuth.getGraphTokenSilent())){
+      try{
+        const safe=file.name.replace(/[\\/:*?"<>|]+/g,'_'); const fname='PODIY_'+Date.now().toString(36)+'_'+safe;
+        const item=await window.GraphStorage.uploadFile(fname, file); const url=(item&&(item.webUrl||item['@microsoft.graph.downloadUrl']))||'';
+        const id='podiy-'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
+        await window.GraphStorage.presenceSet(id, {name:file.name, url, size:file.size, ts:Date.now(), by:diyWho(), ref:(parsed&&parsed.ref)||'', ym:(parsed&&parsed.ym)||'', mapped});
+        msgs.push('เก็บไฟล์ขึ้นส่วนกลางแล้ว'); diyRenderPOList();
+      }catch(e){ msgs.push('เก็บไฟล์ส่วนกลางไม่สำเร็จ: '+(e&&e.message||e)); }
+    } else { msgs.push('(ยังไม่ล็อกอิน — ไม่ได้เก็บไฟล์ส่วนกลาง)'); }
+    diyStatus((mapped>0?'✅ ':'⚠️ ')+msgs.join(' · '), mapped>0?'good':'');
   }catch(err){ diyStatus('❌ '+(err&&err.message||err),'bad'); }
   finally{ if(inp) inp.value=''; }
 }
@@ -10495,30 +10588,32 @@ function flowSalesDIY(it){
   const sMon=Object.fromEntries((sale.mon||[]).map(m=>[m[0],m[1]]));
   const kMon=Object.fromEntries(((it.mrdiyStock||{}).mon||[]).map(m=>[m[0],m[1]]));
   const ship=(window.BC_DIYMON&&window.BC_DIYMON[it.no])||{};
+  const poM=it.diyPo||{};   // ยอด PO DIY (Mr.DIY สั่งล่วงหน้า) รายเดือนตามเดือนกำหนดส่ง
   const yset=new Set();
   (sale.mon||[]).forEach(m=>yset.add(m[0].slice(0,4)));
   Object.keys(kMon).forEach(k=>yset.add(k.slice(0,4)));
   Object.keys(ship).forEach(k=>yset.add(k.slice(0,4)));
+  Object.keys(poM).forEach(k=>yset.add(k.slice(0,4)));
   const years=[...yset].sort(); if(!years.length) return '<div class="muted" style="font-size:11px;">— ไม่มีข้อมูล Mr.DIY</div>';
   const selY=window.flowState.year[it.no]||years[years.length-1];
   const p=m=>String(m).padStart(2,'0');
   const MN=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   const yBtns=years.map(y=>`<span onclick="event.stopPropagation();flowSetYear('${it.no}','${y}')" style="cursor:pointer;padding:2px 9px;border-radius:6px;font-size:11px;font-weight:700;margin-right:5px;${y===selY?'background:var(--brand);color:#fff;':'background:var(--bg);color:var(--muted);border:1px solid var(--line);'}">${y}</span>`).join('');
   const rows=[];
-  for(let m=1;m<=12;m++){ const ym=selY+'-'+p(m); const si=ship[ym]||0, st=kMon[ym]||0, so=sMon[ym]||0; if(si||st||so) rows.push({m,si,st,so,to:st>0?so/st*100:0}); }
+  for(let m=1;m<=12;m++){ const ym=selY+'-'+p(m); const si=ship[ym]||0, st=kMon[ym]||0, so=sMon[ym]||0, po=poM[ym]||0; if(si||st||so||po) rows.push({m,si,st,so,po,to:st>0?so/st*100:0}); }
   if(!rows.length) return `<div style="margin:6px 0;"><span style="font-size:11.5px;font-weight:700;">🛒 Mr.DIY (PLU ${sale.plu||'-'})</span> ${yBtns}<div class="muted" style="font-size:11px;margin-top:5px;">— ปี ${selY} ไม่มีข้อมูล</div></div>`;
   const n=rows.length;
-  const maxV=Math.max(1,...rows.flatMap(r=>[r.si,r.st,r.so]));
+  const maxV=Math.max(1,...rows.flatMap(r=>[r.si,r.st,r.so,r.po]));
   const maxT=Math.max(1,...rows.map(r=>r.to));
   const fmtK=v=> v>=1000?(v/1000).toFixed(1)+'K':String(Math.round(v));
   const gw=Math.max(112,Math.min(150,780/n));
-  const L=14,R=14,TOP=30,PH=148,XL=20, W=Math.round(L+R+n*gw), H=TOP+PH+XL, y0=TOP+PH, bw=gw*0.17;
-  const COL={si:'#e991c4',st:'#3f4b5b',so:'#8ed29c'}, LBG={si:'#fbe4f1',st:'#e4e8ee',so:'#dcf5e2'}, LTX={si:'#a12e75',st:'#334155',so:'#1a7a3f'};
+  const L=14,R=14,TOP=30,PH=148,XL=20, W=Math.round(L+R+n*gw), H=TOP+PH+XL, y0=TOP+PH, bw=gw*0.14;
+  const COL={po:'#e2231a',si:'#e991c4',st:'#3f4b5b',so:'#8ed29c'}, LBG={po:'#fde0dd',si:'#fbe4f1',st:'#e4e8ee',so:'#dcf5e2'}, LTX={po:'#a1160d',si:'#a12e75',st:'#334155',so:'#1a7a3f'};
   const chip=(cx,cy,txt,bg,tx)=>{ const w=txt.length*5.7+8; return `<g transform="translate(${(cx-w/2).toFixed(1)},${(cy-13).toFixed(1)})"><rect width="${w.toFixed(1)}" height="13" rx="4" fill="${bg}"/><text x="${(w/2).toFixed(1)}" y="9.4" font-size="9" font-weight="700" fill="${tx}" text-anchor="middle">${txt}</text></g>`; };
   let bars='',labels='',xlab='',tolab='',pts=[];
-  const offs=[0.27,0.47,0.67];
+  const offs=[0.2,0.4,0.6,0.8];
   rows.forEach((r,i)=>{ const gx=L+i*gw, cx=gx+gw/2;
-    [['si',r.si],['st',r.st],['so',r.so]].forEach(([k,v],j)=>{ const bx=gx+gw*offs[j]-bw/2, h=v/maxV*PH, by=y0-h;
+    [['po',r.po],['si',r.si],['st',r.st],['so',r.so]].forEach(([k,v],j)=>{ const bx=gx+gw*offs[j]-bw/2, h=v/maxV*PH, by=y0-h;
       bars+=`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,h).toFixed(1)}" rx="2.5" fill="${COL[k]}"/>`;
       if(v>0) labels+=chip(bx+bw/2,by-1,fmtK(v),LBG[k],LTX[k]); });
     const ty=TOP+PH*(1-r.to/(maxT*1.45)); pts.push([cx,ty]);
@@ -10530,12 +10625,12 @@ function flowSalesDIY(it){
   const lg=(c,t)=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;"><span style="width:11px;height:11px;border-radius:2px;background:${c};"></span>${t}</span>`;
   return `<div style="margin:6px 0 10px;">
     <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:6px;"><span style="font-size:11.5px;font-weight:700;">🛒 Mr.DIY รายเดือน (PLU ${sale.plu||'-'})</span> ${yBtns}</div>
-    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px;">${lg(COL.si,'ยอดส่ง DIY (Sales In)')}${lg(COL.st,'สต๊อกหน้าร้าน (Stock)')}${lg(COL.so,'ยอดขายหน้าร้าน (Sales Out)')}<span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;"><span style="width:15px;height:3px;border-radius:2px;background:#f39a5f;"></span>% Turnover (ขายออก÷สต๊อก)</span></div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px;">${lg(COL.po,'PO DIY (Mr.DIY สั่ง · เดือนกำหนดส่ง)')}${lg(COL.si,'ยอดส่ง DIY (Sales In)')}${lg(COL.st,'สต๊อกหน้าร้าน (Stock)')}${lg(COL.so,'ยอดขายหน้าร้าน (Sales Out)')}<span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;"><span style="width:15px;height:3px;border-radius:2px;background:#f39a5f;"></span>% Turnover (ขายออก÷สต๊อก)</span></div>
     <div style="overflow-x:auto;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 4px 2px;">${svg}</div>
   </div>`;
 }
 function flowSales(it){
-  if(it.mrdiySell) return flowSalesDIY(it);   // กราฟ Mr.DIY เมื่อสินค้ามีการขาย Mr.DIY
+  if(it.mrdiySell || it.diyPo) return flowSalesDIY(it);   // กราฟ Mr.DIY เมื่อมีข้อมูลขายหน้าร้าน หรือมี PO DIY
   const mon=it.monthly||[]; if(!mon.length) return '<div class="muted" style="font-size:11px;">— ไม่มีข้อมูลยอดขาย</div>';
   const years=[...new Set(mon.map(m=>m[0].slice(0,4)))].sort();
   const selY=window.flowState.year[it.no]||years[years.length-1];
@@ -11983,7 +12078,7 @@ function renderTab(tab){
   try{ if(typeof packCentralLoad==='function') packCentralLoad(); }catch(e){}   // โหลดมิติกลาง (SharePoint) มาใช้กับ pkItem/Packing
 
   if(tab==='flowchart'){ if(typeof poLoadFollow==='function') poLoadFollow(); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderFlowchart(); }
-  else if(tab==='search'){ renderSearch(); renderItemList(); try{ diyRenderPOList(); }catch(e){} try{ diyPullCloud().then(ch=>{ if(ch){ try{ renderSearch(); }catch(e){} try{ if(typeof renderFlowchart==='function') renderFlowchart(); }catch(e){} } }); }catch(e){} }   // หน้าค้นหารวมรายการสินค้าแล้ว + นำเข้าข้อมูล DIY
+  else if(tab==='search'){ renderSearch(); renderItemList(); try{ diyRenderPOList(); }catch(e){} try{ Promise.all([diyPullCloud(), diyPoImpPullCloud()]).then(rs=>{ if(rs.some(Boolean)){ try{ renderSearch(); }catch(e){} try{ if(typeof renderFlowchart==='function') renderFlowchart(); }catch(e){} } }); }catch(e){} }   // หน้าค้นหารวมรายการสินค้าแล้ว + นำเข้าข้อมูล DIY (ยอดขาย/สต๊อก + PO DIY)
   else if(tab==='leadtime'){ poLoadFollow(); const _pr=poPruneStaleFollow(); if(_pr && _pr.length && typeof pkToast==='function') pkToast('ล้างรายการติดตาม PO เก่าที่ไม่ตรงข้อมูล BC แล้ว '+_pr.length+' รายการ','good'); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderUrgent(); renderPoFollow(); renderArrivedMatrix(); }
   else if(tab==='packing'){ renderPacking(); pkLoadLog(); renderPkLog(); if(typeof renderArrivedMatrix==='function') renderArrivedMatrix(); }
   else if(tab==='payment'){ renderPayment(); }
@@ -12253,6 +12348,7 @@ function init(){
     const freshOH = applyFreshOnHand();  // ทับยอดคงเหลือ+รายคลังด้วยค่าสดจาก Power Automate (ถ้ามี bc-onhand.js)
     const poMatched = mergePO();         // รวม PO ค้างรับจริง
     try{ diyApplyStartup(); }catch(e){}   // ทับข้อมูล DIY (ยอดขาย/สต๊อก) ที่เคยนำเข้าไว้ ก่อนผูกเข้า ITEMS
+    try{ diyPoImpLoad(); diyPoApplyImports(); }catch(e){}   // ผสาน PO DIY ที่ import ในแอป (ตาม ref) เข้า BC_PODIY ก่อน mergeCust/คำนวณ
     mergeCust();                          // รวม Top ลูกค้าต่อสินค้า
     // สินค้าที่ยังไม่มี ILE -> ประมาณอัตราใช้/วันจากยอดคงเหลือ เพื่อให้หน้า Lead Time แสดงผลได้
     ITEMS.forEach(it=>{ if(!it.avgUse) it.avgUse = Math.max(1, Math.round((it.inventory||140)/120)); });
@@ -12306,7 +12402,7 @@ async function paySyncFromCloud(){ if(!window.GraphStorage) return;
 async function payPushToCloud(){ if(!window.GraphStorage) return; payLoadOv(); payLoadCheck(); payLoadExtra(); payLoadDocs(); payLoadDepOv(); await window.GraphStorage.saveData('payXferOvV1', window.payXferOv||{}); await window.GraphStorage.saveData('payCheckV1', window.payCheck||{}); await window.GraphStorage.saveData('payExtraV1', window.payExtra||[]); await window.GraphStorage.saveData('payDocsV1', window.payDocs||{}); await window.GraphStorage.saveData('payDepOvV1', window.payDepOv||{}); payLoadPi(); await window.GraphStorage.saveData('payPiV1', window.payPi||{}); }
 function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent','renderPayment','renderPayment2'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
 async function cloudPullNow(){ const b=document.getElementById('bc-pull'); if(b) b.disabled=true;
-  try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); try{ await diyPullCloud(); }catch(e){} cloudRerenderAll(); try{ if(typeof renderSearch==='function') renderSearch(); }catch(e){} bcSetTs('bcCloudSyncAt'); try{ auditLog('⬇️ ดึงข้อมูลล่าสุด'); }catch(e){} pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
+  try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); try{ await diyPullCloud(); }catch(e){} try{ await diyPoImpPullCloud(); }catch(e){} cloudRerenderAll(); try{ if(typeof renderSearch==='function') renderSearch(); }catch(e){} bcSetTs('bcCloudSyncAt'); try{ auditLog('⬇️ ดึงข้อมูลล่าสุด'); }catch(e){} pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
   catch(e){ console.error(e); pkToast('ดึงข้อมูลไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
   if(b) b.disabled=false;
 }
