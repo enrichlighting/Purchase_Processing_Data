@@ -467,6 +467,31 @@
     </div>
     <div id="s-result"></div>
 
+    <!-- นำเข้าข้อมูลภายนอก DIY (ยอดขาย/สต๊อก Excel + PO DIY PDF เก็บส่วนกลาง) -->
+    <div class="card" id="sec-diy-import">
+      <h2>📥 นำเข้าข้อมูลภายนอก (DIY)</h2>
+      <p class="hint">อัปเดต <b>ยอดขาย/สต๊อกหน้าร้าน Mr.DIY</b> จากไฟล์ Excel (อ่านในแอป → อัปเดตกราฟ DIY ทันที) และเก็บไฟล์ <b>PO DIY (PDF)</b> ไว้ส่วนกลางเพื่อให้ทีมดู/ดาวน์โหลด</p>
+      <div class="controls" style="align-items:flex-end;gap:14px;flex-wrap:wrap;">
+        <div class="field">
+          <label>📈 ยอดขาย DIY (Excel)</label>
+          <input type="file" id="diy-sales-file" accept=".xlsx,.xls" style="display:none;" onchange="diyImportExcel('sales', this)">
+          <button class="go" type="button" onclick="document.getElementById('diy-sales-file').click()">เลือกไฟล์ยอดขาย .xlsx</button>
+        </div>
+        <div class="field">
+          <label>📦 สต๊อก DIY (Excel)</label>
+          <input type="file" id="diy-stock-file" accept=".xlsx,.xls" style="display:none;" onchange="diyImportExcel('stock', this)">
+          <button class="go" type="button" onclick="document.getElementById('diy-stock-file').click()">เลือกไฟล์สต๊อก .xlsx</button>
+        </div>
+        <div class="field">
+          <label>📄 PO DIY (PDF) → เก็บส่วนกลาง</label>
+          <input type="file" id="diy-po-file" accept="application/pdf,.pdf" style="display:none;" onchange="diyUploadPO(this)">
+          <button class="go" type="button" onclick="document.getElementById('diy-po-file').click()">อัปโหลด PO DIY .pdf</button>
+        </div>
+      </div>
+      <div id="diy-import-status" class="muted" style="font-size:12.5px;margin-top:8px;min-height:18px;"></div>
+      <div id="diy-po-list" style="margin-top:12px;"></div>
+    </div>
+
     <!-- รายการสินค้าทั้งหมด (ยุบรวมมาจากแท็บเดิม) -->
     <div class="card" id="sec-itemlist">
       <h2>📋 รายการสินค้าทั้งหมด (Brand ENRICH)</h2>
@@ -6827,6 +6852,120 @@ function poRow(p, uom){
 /* =====================================================================
    PAGE 1 — STOCK SEARCH
    ===================================================================== */
+/* =====================================================================
+   นำเข้าข้อมูลภายนอก DIY — ยอดขาย/สต๊อก (Excel, อ่านในแอป) + PO DIY (PDF, เก็บส่วนกลาง)
+   ===================================================================== */
+const DIY_STORE_KEY='mrdiyDataV1';   // key เดียวใช้ทั้ง localStorage + cloud (GraphStorage.saveData)
+function diyWho(){ try{ return (typeof payWho==='function')?payWho():(typeof presName==='function'?(presName()||'ไม่ทราบชื่อ'):'ไม่ทราบชื่อ'); }catch(e){ return 'ไม่ทราบชื่อ'; } }
+function diyStatus(msg, kind){ const el=document.getElementById('diy-import-status'); if(el) el.innerHTML=(kind==='bad'?'<span style="color:#dc2626;">':(kind==='good'?'<span style="color:#059669;">':'<span>'))+String(msg||'')+'</span>'; }
+// โหลด SheetJS (xlsx) แบบ lazy จาก CDN — ใช้เฉพาะตอนนำเข้า Excel
+function diyEnsureXLSX(){
+  return new Promise((resolve,reject)=>{
+    if(window.XLSX) return resolve(window.XLSX);
+    if(window._xlsxLoading){ window._xlsxLoading.then(resolve,reject); return; }
+    window._xlsxLoading=new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=()=>res(window.XLSX); s.onerror=()=>rej(new Error('โหลด SheetJS ไม่ได้ (ตรวจอินเทอร์เน็ต)'));
+      document.head.appendChild(s);
+    });
+    window._xlsxLoading.then(resolve,reject);
+  });
+}
+// map PLU -> รหัสเรา (R-ENR) จาก window.BC_MRDIY ที่ฝังไว้
+function diyPluMap(){ const m={}; const src=window.BC_MRDIY||{}; for(const enr in src){ const p=String((src[enr]||{}).plu||'').trim(); if(p) m[p]=enr; } return m; }
+function diyNum(v){ if(v==null) return 0; if(typeof v==='number') return v; let t=String(v).replace(/,/g,'').replace(/฿/g,'').trim(); if(t===''||/^[-–—\s]+$/.test(t)) return 0; const n=parseFloat(t); return isNaN(n)?0:n; }
+function diyYm(h){ if(h instanceof Date && !isNaN(h)) return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0'); return null; }
+function diyPickSheet(wb, name){ if(wb.Sheets[name]) return wb.Sheets[name]; const n=(wb.SheetNames||[]).find(s=>s.toLowerCase()===name.toLowerCase()); return n?wb.Sheets[n]:wb.Sheets[wb.SheetNames[0]]; }
+async function diyImportExcel(kind, inp){
+  const file=inp && inp.files && inp.files[0]; if(!file){ return; }
+  try{
+    diyStatus('กำลังอ่านไฟล์ '+file.name+' ...','');
+    const XLSX=await diyEnsureXLSX();
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array',cellDates:true});
+    const pluMap=diyPluMap();
+    const sheet=diyPickSheet(wb, kind==='sales'?'Sales':'Stock');
+    const aoa=XLSX.utils.sheet_to_json(sheet,{header:1,raw:true,defval:null});
+    if(!aoa.length) throw new Error('ไฟล์ว่างหรืออ่านชีตไม่ได้');
+    const hdr=aoa[0];
+    const findCol=nm=>{ for(let j=0;j<hdr.length;j++){ const c=hdr[j]; if(typeof c==='string' && c.trim().toLowerCase()===nm) return j; } return -1; };
+    const cPLU=findCol('item code'); if(cPLU<0) throw new Error('ไม่พบคอลัมน์ "Item Code" ในไฟล์');
+    const moncols=[]; for(let j=0;j<hdr.length;j++){ const y=diyYm(hdr[j]); if(y) moncols.push([j,y]); }
+    if(!moncols.length) throw new Error('ไม่พบคอลัมน์เดือน (หัวคอลัมน์ต้องเป็นวันที่)');
+    let matched=0, unmatched=0;
+    const changed={};
+    if(kind==='sales'){
+      const cBrand=findCol('brand'), cCost=findCol('cost'), cNP=findCol('np');
+      for(let i=1;i<aoa.length;i++){ const r=aoa[i]||[]; const plu=r[cPLU]!=null?String(r[cPLU]).trim():''; if(!plu) continue;
+        if(cBrand>=0){ const b=String(r[cBrand]||'').trim().toUpperCase(); if(b!=='ENRICH') continue; }
+        const enr=pluMap[plu]; if(!enr){ unmatched++; continue; }
+        const mon=[]; moncols.forEach(([j,y])=>{ const q=diyNum(r[j]); if(q>0) mon.push([y, q===Math.round(q)?Math.round(q):Math.round(q*100)/100]); });
+        const prev=(window.BC_MRDIY&&window.BC_MRDIY[enr])||{};
+        const np=cNP>=0?diyNum(r[cNP]):(prev.np||0), cost=cCost>=0?diyNum(r[cCost]):(prev.cost||0);
+        changed[enr]={plu, np:(np===Math.round(np)?Math.round(np):np), cost:(cost===Math.round(cost)?Math.round(cost):cost), mon};
+        matched++;
+      }
+      window.BC_MRDIY=Object.assign({}, window.BC_MRDIY||{}, changed);
+    } else {
+      for(let i=1;i<aoa.length;i++){ const r=aoa[i]||[]; const plu=r[cPLU]!=null?String(r[cPLU]).trim():''; if(!plu) continue;
+        const enr=pluMap[plu]; if(!enr){ unmatched++; continue; }
+        const mon=[]; moncols.forEach(([j,y])=>{ const q=diyNum(r[j]); if(q>0) mon.push([y, q===Math.round(q)?Math.round(q):Math.round(q*100)/100]); });
+        changed[enr]={mon}; matched++;
+      }
+      window.BC_MRDIYSTOCK=Object.assign({}, window.BC_MRDIYSTOCK||{}, changed);
+    }
+    diySaveLocal();                     // เก็บลงเครื่อง (ทับตอนโหลดครั้งหน้า)
+    try{ mergeCust(); }catch(e){}       // เอาข้อมูลใหม่ผูกกลับเข้า ITEMS
+    try{ if(typeof renderFlowchart==='function') renderFlowchart(); }catch(e){}
+    try{ renderSearch(); }catch(e){}
+    diyStatus('✅ นำเข้า'+(kind==='sales'?'ยอดขาย':'สต๊อก')+' DIY สำเร็จ · จับคู่ได้ '+matched+' รายการ'+(unmatched?(' · ข้ามที่ไม่พบรหัส '+unmatched):'')+' · อัปเดตกราฟแล้ว','good');
+    try{ if(typeof presAct==='function') presAct('นำเข้า'+(kind==='sales'?'ยอดขาย':'สต๊อก')+' DIY ('+matched+' รายการ)'); }catch(e){}
+    diyPushCloud();                     // อัปขึ้นส่วนกลางให้ทุกคนเห็น (เงียบ)
+  }catch(err){ diyStatus('❌ '+(err&&err.message||err),'bad'); }
+  finally{ if(inp) inp.value=''; }
+}
+// เก็บ/อ่าน DIY จาก localStorage (ทับตอนเริ่มแอป)
+function diySaveLocal(){ try{ localStorage.setItem(DIY_STORE_KEY, JSON.stringify({sales:window.BC_MRDIY||{}, stock:window.BC_MRDIYSTOCK||{}, ts:Date.now(), by:diyWho()})); }catch(e){} }
+function diyApplyStartup(){ try{ const raw=localStorage.getItem(DIY_STORE_KEY); if(!raw) return; const o=JSON.parse(raw); if(o&&o.sales&&Object.keys(o.sales).length) window.BC_MRDIY=o.sales; if(o&&o.stock&&Object.keys(o.stock).length) window.BC_MRDIYSTOCK=o.stock; }catch(e){} }
+// ซิงก์ส่วนกลาง (SharePoint) — เงียบ ไม่เด้ง popup ถ้าไม่ได้ล็อกอิน
+async function diyPushCloud(){ try{ if(!(window.GraphStorage&&window.GraphStorage.saveData&&window.GraphAuth&&window.GraphAuth.getGraphTokenSilent)) return; if(!(await window.GraphAuth.getGraphTokenSilent())) return; await window.GraphStorage.saveData(DIY_STORE_KEY, {sales:window.BC_MRDIY||{}, stock:window.BC_MRDIYSTOCK||{}, ts:Date.now(), by:diyWho()}); }catch(e){} }
+async function diyPullCloud(){ try{ if(!(window.GraphStorage&&window.GraphStorage.loadData)) return false; const raw=await window.GraphStorage.loadData(DIY_STORE_KEY); if(!raw) return false; const o=(typeof raw==='string')?JSON.parse(raw):raw; let ch=false; if(o&&o.sales&&Object.keys(o.sales).length){ window.BC_MRDIY=o.sales; ch=true; } if(o&&o.stock&&Object.keys(o.stock).length){ window.BC_MRDIYSTOCK=o.stock; ch=true; } if(ch){ diySaveLocal(); try{ mergeCust(); }catch(e){} } return ch; }catch(e){ return false; } }
+
+/* ---- PO DIY (PDF) เก็บส่วนกลาง + รายการให้ดู/ดาวน์โหลด (metadata เก็บใน presence key 'podiy-') ---- */
+async function diyUploadPO(inp){
+  const file=inp && inp.files && inp.files[0]; if(!file){ return; }
+  try{
+    if(!(window.GraphStorage&&window.GraphStorage.uploadFile&&window.GraphAuth)) throw new Error('ต้องเข้าสู่ระบบ (SharePoint) ก่อนจึงจะอัปโหลดได้');
+    diyStatus('กำลังอัปโหลด '+file.name+' ขึ้นส่วนกลาง ...','');
+    const safe=file.name.replace(/[\\/:*?"<>|]+/g,'_');
+    const fname='PODIY_'+Date.now().toString(36)+'_'+safe;
+    const item=await window.GraphStorage.uploadFile(fname, file);
+    const url=(item&&(item.webUrl||item['@microsoft.graph.downloadUrl']))||'';
+    const id='podiy-'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
+    await window.GraphStorage.presenceSet(id, {name:file.name, url, size:file.size, ts:Date.now(), by:diyWho()});
+    diyStatus('✅ อัปโหลด PO DIY สำเร็จ: '+file.name,'good');
+    try{ if(typeof presAct==='function') presAct('อัปโหลด PO DIY: '+file.name); }catch(e){}
+    diyRenderPOList();
+  }catch(err){ diyStatus('❌ '+(err&&err.message||err),'bad'); }
+  finally{ if(inp) inp.value=''; }
+}
+async function diyRenderPOList(){
+  const el=document.getElementById('diy-po-list'); if(!el) return;
+  if(!(window.GraphStorage&&window.GraphStorage.presenceList)){ el.innerHTML=''; return; }
+  el.innerHTML='<div class="muted" style="font-size:12px;">กำลังโหลดรายการ PO DIY ...</div>';
+  let rows=null; try{ rows=await window.GraphStorage.presenceList('podiy-'); }catch(e){}
+  if(rows==null){ el.innerHTML='<div class="muted" style="font-size:12px;">เข้าสู่ระบบเพื่อดูรายการ PO DIY ที่อัปโหลดไว้</div>'; return; }
+  const list=rows.map(r=>{ let v={}; try{ v=JSON.parse(r.value||'{}'); }catch(e){} v._key=r.key; return v; }).filter(v=>v&&v.name).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  if(!list.length){ el.innerHTML='<div class="muted" style="font-size:12px;">ยังไม่มีไฟล์ PO DIY — อัปโหลดไฟล์ PDF ด้านบนได้เลย</div>'; return; }
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const d=ts=>{ if(!ts) return '-'; const x=new Date(+ts); const p=n=>String(n).padStart(2,'0'); return p(x.getDate())+'/'+p(x.getMonth()+1)+'/'+(x.getFullYear()+543)+' '+p(x.getHours())+':'+p(x.getMinutes()); };
+  const sz=n=>{ n=+n||0; return n>1048576?(Math.round(n/104857.6)/10+' MB'):(n>1024?(Math.round(n/102.4)/10+' KB'):(n+' B')); };
+  el.innerHTML='<div class="section-title">📄 ไฟล์ PO DIY ในส่วนกลาง ('+list.length+')</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="background:var(--brand-soft);"><th style="padding:6px 8px;text-align:left;">ชื่อไฟล์</th><th style="padding:6px 8px;text-align:left;white-space:nowrap;">อัปโหลดเมื่อ</th><th style="padding:6px 8px;text-align:left;">โดย</th><th style="padding:6px 8px;text-align:right;">ขนาด</th><th style="padding:6px 8px;"></th></tr></thead><tbody>'
+    + list.map(v=>`<tr><td style="padding:5px 8px;border-bottom:1px solid var(--line);"><b>${esc(v.name)}</b></td><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;">${d(v.ts)}</td><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;">${esc(v.by||'-')}</td><td style="padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;">${sz(v.size)}</td><td style="padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;">${v.url?`<a href="${esc(v.url)}" target="_blank" rel="noopener" style="color:var(--brand);font-weight:700;text-decoration:none;">เปิด/ดาวน์โหลด ↗</a>`:'<span class="muted">-</span>'}</td></tr>`).join('')
+    + '</tbody></table></div>';
+}
+
 function renderSearch(){
   const itemNo = comboValue('s-item');
   const it = getItem(itemNo);
@@ -6855,81 +6994,9 @@ function renderSearch(){
   html += '</div>';
   html += '</div>';
 
-  // Lead Time + แหล่งผลิต
-  html += '<div class="card"><h2>Lead Time &amp; แหล่งผลิต</h2>';
-  if(it.leadReal){
-    html += `<table>
-      <tr><td>Lead Time โรงงานผลิตสินค้า</td><td class="num"><b>${it.leadFactory}</b> วัน</td></tr>
-      <tr><td>Lead Time เรือจีน → ไทย</td><td class="num"><b>${it.leadShip}</b> วัน</td></tr>
-      <tr><td><b>รวมระยะเวลาถึงไทย</b></td><td class="num"><b style="color:var(--brand)">${it.leadTime}</b> วัน</td></tr>
-    </table>`;
-    if(it.sources && it.sources.length){
-      html += '<div class="section-title">Vendor / Factory</div><table><tr><th>#</th><th>Vendor</th><th>Factory</th></tr>';
-      it.sources.forEach((s,idx)=>{ html += `<tr><td>${idx+1}</td><td><b>${s.vendor}</b></td><td>${s.factory}</td></tr>`; });
-      html += '</table>';
-    }
-  } else html += '<div class="empty">สินค้านี้ยังไม่มีข้อมูล Lead Time ในไฟล์</div>';
-  html += '</div>';
-
-  // ยอดคงเหลือแยกตามคลัง — แบ่งกลุ่ม คลังขาย / จอง / อื่น ๆ
-  const loc = it.loc || {};
-  const locKeys = Object.keys(loc);
-  const sell=[], res=[], other=[];
-  locKeys.forEach(L=>{
-    const rec={L, q:loc[L]};
-    if(SELL_LOCS.includes(L)) sell.push(rec);
-    else if(RESERVE_LOCS.includes(L)) res.push(rec);
-    else other.push(rec);
-  });
-  const sumq = a=>a.reduce((s,x)=>s+x.q,0);
-  const sellSum=sumq(sell), resSum=sumq(res), otherSum=sumq(other);
-  const locBlock = (title, arr, color) => {
-    if(!arr.length) return '';
-    let h = `<div class="section-title" style="color:${color||'var(--muted)'}">${title}</div><table>`;
-    arr.slice().sort((a,b)=>b.q-a.q).forEach(x=>{ h += `<tr><td><b>${x.L}</b></td><td class="num">${fmtNum(x.q)} <span class="muted">${it.uom}</span></td></tr>`; });
-    return h + '</table>';
-  };
-
-  html += `<div class="card"><h2>📍 สินค้านี้อยู่คลังไหนบ้าง</h2>`;
-  if(locKeys.length){
-    html += `<p class="hint">แยกกลุ่มคลัง เพื่อดู "ของที่ขายได้จริง" (คลังขาย) แยกจากของที่กันไว้ (จอง)</p>`;
-    // กล่องสรุป 3 กลุ่ม
-    html += `<div class="kpis">`;
-    html += kpi('🟢 พร้อมขาย (คลังขาย)', fmtNum(sellSum)+` <small>${it.uom}</small>`, 'good');
-    html += kpi('🔒 จอง (WH-RESERVE)', fmtNum(resSum)+` <small>${it.uom}</small>`, resSum>0?'warn':'');
-    html += kpi('📦 คลังอื่น ๆ', fmtNum(otherSum)+` <small>${it.uom}</small>`, '');
-    html += `</div>`;
-    // รายละเอียดแต่ละกลุ่ม
-    html += locBlock('คลังสำหรับขาย (HO689 · WH1-B2 · WH1-B1)', sell, 'var(--good)');
-    html += locBlock('จอง / กันไว้ (ไม่นับขาย)', res, 'var(--warn)');
-    html += locBlock('คลังอื่น ๆ', other, 'var(--muted)');
-    html += `<table style="margin-top:8px;"><tr style="border-top:2px solid var(--line)"><td><b>รวมทุกคลัง</b></td><td class="num"><b>${fmtNum(onHand)}</b> ${it.uom}</td></tr></table>`;
-  } else html += '<div class="empty">ไม่มีข้อมูลคลัง (สินค้านี้ไม่มีการเคลื่อนไหวใน ILE)</div>';
-  html += '</div>';
-
-  // Open PO (จริง) — แยกประเภท POA/POC/POS
-  const byType = t => pos.filter(p=>poType(p.docNo).code===t).reduce((s,p)=>s+p.outstanding,0);
-  const qA=byType('POA'), qC=byType('POC'), qS=byType('POS');
-  html += `<div class="card"><h2>Purchase Order ที่ยังไม่รับเข้า (Open PO)</h2>`;
-  if(pos.length){
-    html += `<div class="kpis" style="margin-bottom:6px;">
-      ${kpi('🛒 จัดซื้อ (POA)', fmtNum(qA)+` <small>${it.uom}</small>`, qA>0?'good':'')}
-      ${kpi('🔧 เคลม (POC)', fmtNum(qC)+` <small>${it.uom}</small>`, qC>0?'warn':'')}
-      ${kpi('🎁 ตัวอย่าง (POS)', fmtNum(qS)+` <small>${it.uom}</small>`, '')}
-    </div>`;
-    html += '<div class="chartbox"><table><tr><th>ประเภท</th><th>เลขที่ PO</th><th>ผู้ขาย</th><th class="num">ค้างรับ</th><th>กำหนดรับ (ETA)</th><th>สถานะ</th></tr>';
-    pos.forEach(p=>{ html += poRow(p, it.uom); });
-    html += '</table></div>';
-  } else html += '<div class="empty">ไม่มี PO ค้างรับสำหรับสินค้านี้</div>';
-  html += '</div>';
-
-  // (กราฟยอดขายจริงรายเดือนถูกตัดออก — ใช้กราฟ "ลูกค้าหลัก → รวมลูกค้าทั้งหมด" แทน)
-
-  // ลูกค้าหลักที่ซื้อสินค้านี้ + กราฟรายเดือน (scope 's')
-  html += custCardHtml(it, 's');
-
+  // [ปรับ 19 ก.ย. 2026] ตัดการ์ด Lead Time & แหล่งผลิต / สินค้านี้อยู่คลังไหนบ้าง / Open PO / ลูกค้าหลัก ออกจากหน้า 🔎
+  // เหลือเฉพาะการ์ดสรุปสินค้าด้านบน + ส่วนนำเข้าข้อมูลภายนอก DIY (ดู #sec-diy-import)
   document.getElementById('s-result').innerHTML = html;
-  if(it.topCust && it.topCust.length) renderCustChart('s');
 }
 
 /* =====================================================================
@@ -11916,7 +11983,7 @@ function renderTab(tab){
   try{ if(typeof packCentralLoad==='function') packCentralLoad(); }catch(e){}   // โหลดมิติกลาง (SharePoint) มาใช้กับ pkItem/Packing
 
   if(tab==='flowchart'){ if(typeof poLoadFollow==='function') poLoadFollow(); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderFlowchart(); }
-  else if(tab==='search'){ renderSearch(); renderItemList(); }   // หน้าค้นหารวมรายการสินค้าแล้ว
+  else if(tab==='search'){ renderSearch(); renderItemList(); try{ diyRenderPOList(); }catch(e){} try{ diyPullCloud().then(ch=>{ if(ch){ try{ renderSearch(); }catch(e){} try{ if(typeof renderFlowchart==='function') renderFlowchart(); }catch(e){} } }); }catch(e){} }   // หน้าค้นหารวมรายการสินค้าแล้ว + นำเข้าข้อมูล DIY
   else if(tab==='leadtime'){ poLoadFollow(); const _pr=poPruneStaleFollow(); if(_pr && _pr.length && typeof pkToast==='function') pkToast('ล้างรายการติดตาม PO เก่าที่ไม่ตรงข้อมูล BC แล้ว '+_pr.length+' รายการ','good'); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderUrgent(); renderPoFollow(); renderArrivedMatrix(); }
   else if(tab==='packing'){ renderPacking(); pkLoadLog(); renderPkLog(); if(typeof renderArrivedMatrix==='function') renderArrivedMatrix(); }
   else if(tab==='payment'){ renderPayment(); }
@@ -12185,6 +12252,7 @@ function init(){
     const ltMatched = mergeLeadTime();   // รวม Lead Time (โรงงาน+เรือ) + Vendor/Factory + รหัสลูกค้า
     const freshOH = applyFreshOnHand();  // ทับยอดคงเหลือ+รายคลังด้วยค่าสดจาก Power Automate (ถ้ามี bc-onhand.js)
     const poMatched = mergePO();         // รวม PO ค้างรับจริง
+    try{ diyApplyStartup(); }catch(e){}   // ทับข้อมูล DIY (ยอดขาย/สต๊อก) ที่เคยนำเข้าไว้ ก่อนผูกเข้า ITEMS
     mergeCust();                          // รวม Top ลูกค้าต่อสินค้า
     // สินค้าที่ยังไม่มี ILE -> ประมาณอัตราใช้/วันจากยอดคงเหลือ เพื่อให้หน้า Lead Time แสดงผลได้
     ITEMS.forEach(it=>{ if(!it.avgUse) it.avgUse = Math.max(1, Math.round((it.inventory||140)/120)); });
@@ -12238,7 +12306,7 @@ async function paySyncFromCloud(){ if(!window.GraphStorage) return;
 async function payPushToCloud(){ if(!window.GraphStorage) return; payLoadOv(); payLoadCheck(); payLoadExtra(); payLoadDocs(); payLoadDepOv(); await window.GraphStorage.saveData('payXferOvV1', window.payXferOv||{}); await window.GraphStorage.saveData('payCheckV1', window.payCheck||{}); await window.GraphStorage.saveData('payExtraV1', window.payExtra||[]); await window.GraphStorage.saveData('payDocsV1', window.payDocs||{}); await window.GraphStorage.saveData('payDepOvV1', window.payDepOv||{}); payLoadPi(); await window.GraphStorage.saveData('payPiV1', window.payPi||{}); }
 function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent','renderPayment','renderPayment2'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
 async function cloudPullNow(){ const b=document.getElementById('bc-pull'); if(b) b.disabled=true;
-  try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); cloudRerenderAll(); bcSetTs('bcCloudSyncAt'); try{ auditLog('⬇️ ดึงข้อมูลล่าสุด'); }catch(e){} pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
+  try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); try{ await diyPullCloud(); }catch(e){} cloudRerenderAll(); try{ if(typeof renderSearch==='function') renderSearch(); }catch(e){} bcSetTs('bcCloudSyncAt'); try{ auditLog('⬇️ ดึงข้อมูลล่าสุด'); }catch(e){} pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
   catch(e){ console.error(e); pkToast('ดึงข้อมูลไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
   if(b) b.disabled=false;
 }
