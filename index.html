@@ -7880,14 +7880,20 @@ function paidWindowRange(it, from, to, custGroup){
   if(custGroup==='3'){ let s=0; for(const c in cm){ if(c!=='DOCUS23120013'&&c!=='DOCUS23120083') s+=salesRangeSum(cm[c],from,to); } return s; }
   return salesRangeSum(it.monthly&&it.monthly.length?it.monthly:(it.itemMon||[]), from, to);   // all
 }
+// วันที่ปัจจุบันจริง (YYYY-MM-DD) — ใช้ตัดสิน "เลยวันกำหนดส่งแล้ว" (ไม่ยึด APP_TODAY ที่อาจถูกตรึงไว้)
+function poDiyTodayStr(){ const n=new Date(); const p=x=>String(x).padStart(2,'0'); return n.getFullYear()+'-'+p(n.getMonth()+1)+'-'+p(n.getDate()); }
 // จอง PO DIY ที่ "ยังเหลือ" = จำนวนจอง − ยอดขายจริงที่ส่งให้ DIY ในเดือนเดียวกับกำหนดส่ง PO
 // (match ระดับเดือน · จองจะหมดไปเมื่อมีการขายให้ DIY ในเดือนนั้น)
+// [เพิ่ม 19 ก.ย. 2026] ถ้าเลยวันกำหนดส่ง (delivery date) ของ PO ใบนั้นไปแล้ว → ไม่นับเป็นยอดจองอีก (หักออกจาก Flowchart อัตโนมัติ)
 function poDiyCommitted(itemNo){
   const D = (typeof window!=='undefined') ? window.BC_PODIY : null;
   if(!D || !D[itemNo]) return 0;
   const DM = (typeof window!=='undefined' && window.BC_DIYMON && window.BC_DIYMON[itemNo]) ? window.BC_DIYMON[itemNo] : {};
+  const today = poDiyTodayStr();
   return D[itemNo].reduce((s,o)=>{
-    const ym = String(o.deliv||'').slice(0,7);       // เดือนกำหนดส่ง เช่น 2026-09
+    const dv = String(o.deliv||'');
+    if(dv && dv < today) return s;                   // เลยวันกำหนดส่งแล้ว → หักออก ไม่นับเป็นยอดจอง
+    const ym = dv.slice(0,7);                         // เดือนกำหนดส่ง เช่น 2026-09
     const soldToDiy = +DM[ym] || 0;                  // ยอดขายจริงให้ DIY ในเดือนนั้น
     return s + Math.max(0, (+o.qty||0) - soldToDiy); // เหลือจอง (ถ้าขายครบแล้วเป็น 0)
   }, 0);
