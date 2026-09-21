@@ -10081,6 +10081,14 @@ function poPackedMap(){
     (s.rows||[]).forEach(r=>{ if(!r.po) return; const q=r.pcs||0; if(!q) return; if(!m[r.po]) m[r.po]={qty:0,items:{},rounds:new Set()}; m[r.po].qty+=q; m[r.po].items[r.item]=(m[r.po].items[r.item]||0)+q; m[r.po].rounds.add(idx); }); });
   return m;
 }
+// เหมือน poPackedMap แต่ "นับตู้ที่ถึงคลังแล้ว + ตู้ที่ import จาก CSV ข้างนอก" ด้วย (ข้ามเฉพาะดราฟรอเปิด PO)
+// ใช้กับลิสท์ "พร้อมจัดตู้" เท่านั้น — เพื่อหักจำนวนที่จัดตู้ไปแล้วออก แม้ผู้ใช้จะจัดตู้/รับของจากข้างนอกไว้แล้ว (อ้างอิงจาก POA)
+function poPackedMapAll(){
+  const m={};
+  (window.pkLog||[]).forEach((s,idx)=>{ if(s.pending) return;   // ดราฟรอเปิด PO ยังไม่นับเป็นจัดตู้จริง
+    (s.rows||[]).forEach(r=>{ if(!r.po) return; const q=r.pcs||0; if(!q) return; if(!m[r.po]) m[r.po]={qty:0,items:{},rounds:new Set()}; m[r.po].qty+=q; m[r.po].items[r.item]=(m[r.po].items[r.item]||0)+q; m[r.po].rounds.add(idx); }); });
+  return m;
+}
 function poSchedule(po,item){
   const o=poFI(po,item), doc=window.BC_PODATE?window.BC_PODATE[po]:null, lead=+o.leadDays||0;
   // extra: ผลิตล่าช้า = +วัน · เร่งการผลิต = −วัน (รวมทั้งรอบ 1 และ 2)
@@ -10230,7 +10238,7 @@ function poTrackedList(){
 function poRelLot(po,item){ const rel=(window.BC_POREL&&window.BC_POREL[item])||[]; const e=rel.find(x=>x[0]===po); return e?{lot:e[1],rmb:e[2],out:e[3]}:null; }
 // รายการที่พร้อมจัดตู้ (ครบกำหนด · หรือจัดไปบางส่วนยังเหลือ) → [{po,item,remaining,packed,lot,outQty}]
 function poReadyList(){
-  const packed=poPackedMap(), out=[];
+  const packed=poPackedMapAll(), out=[];   // นับรวมตู้ที่ถึงคลัง/import CSV ด้วย → หักจำนวนที่จัดตู้ไปแล้วออกจาก "พร้อมจัดตู้"
   for(const po in window.poFollow){ const items=(window.poFollow[po]||{}).items||{}; for(const item in items){
     const pq=packed[po]?(packed[po].items[item]||0):0; const st=poStatus(po,item,pq);
     if(st.key!=='due' && st.key!=='partial' && st.key!=='loadwait') continue;   // ค้างโหลดตู้ = ให้กลับไปจัดตู้ได้ด้วย
