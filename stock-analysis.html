@@ -10332,13 +10332,20 @@ function poTrkRowsHtml(){
 }
 function poTrkFilter(){ window.poTrkQuery=(document.getElementById('po-trk-search')||{}).value||''; const c=document.getElementById('po-trk-rows'); if(c) c.innerHTML=poTrkRowsHtml(); }
 // ===== ตู้ที่ถึงคลังแล้ว (สรุปตาม ETA) — matrix ปี×เดือน + กางดูรายตู้ =====
+// +n วันปฏิทินจากวันที่ 'YYYY-MM-DD' → คืน 'YYYY-MM-DD' (ใช้ buffer ETA ตู้ที่ยังไม่ถึงคลัง)
+function pkEtaPlus(dstr,n){ const m=String(dstr||'').match(/^(\d{4})-(\d{2})-(\d{2})/); if(!m) return dstr; const d=new Date(+m[1],+m[2]-1,+m[3]); d.setDate(d.getDate()+(+n||0)); const p=x=>String(x).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
 function pkArrivedContainers(){
   const out=[];
   (window.pkLog||[]).forEach(function(s){ if(s.mode!=='released'||s.pending) return;   // ทุกตู้ที่บันทึกจริง (Released)
     const arrived=(typeof pkRoundArrived==='function')&&pkRoundArrived(s);
-    (s.containers||[]).forEach(function(ct,ci){ const d=ct.dates||{}; const eta=d.arrWh||d.arrTH||d.eta||d.cls||d.load||''; const ym=(eta||pkRoundDate(s)||'').slice(0,7);
-      const ctv=(s.contTotals||[])[ci]||{};
+    (s.containers||[]).forEach(function(ct,ci){ const d=ct.dates||{};
       const stg=(typeof pkShipStage==='function')?pkShipStage(d):-1;
+      const ctArrived = arrived || (stg>=4);                              // ถึงคลังแล้วจริง (arrWh ≤ วันนี้ หรือ PO รับเข้า)
+      const etaRaw=d.arrWh||d.arrTH||d.eta||d.cls||d.load||'';
+      const _today=(typeof poToday==='function')?poToday():'';
+      const eta=(!ctArrived && etaRaw && etaRaw>_today) ? pkEtaPlus(etaRaw,2) : etaRaw;   // ตู้ที่ยังไม่ถึงคลัง + ETA ยังไม่ถึงวันนี้ → +2 วัน (buffer) เฉพาะตารางนี้ · ถึงคลังแล้ว = วันตาม ETA เดิม
+      const ym=(eta||pkRoundDate(s)||'').slice(0,7);
+      const ctv=(s.contTotals||[])[ci]||{};
       const so=stg>=0?PK_SHIP_STAGES[stg]:{label:'ยังไม่กำหนด/รอโหลด',emoji:'⏳',color:'#94a3b8'};
       const stLabel=(arrived && stg<4)?'🏭 ถึงคลังแล้ว (PO รับเข้า)':(so.emoji+' '+so.label);   // ถ้า PO รับเข้าแล้ว = ถึงคลัง
       const stColor=(arrived && stg<4)?'#16a34a':so.color;
