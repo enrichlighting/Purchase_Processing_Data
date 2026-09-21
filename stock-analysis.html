@@ -440,32 +440,7 @@
 
   <!-- ============ PAGE 1: STOCK SEARCH + ITEM LIST ============ -->
   <div class="page" id="page-search">
-    <div class="card" id="sec-search">
-      <h2>ค้นหา / เลือกสินค้า</h2>
-      <p class="hint">พิมพ์เลือกรหัสสินค้าด้านล่าง หรือคลิกจากตารางรายการสินค้า เพื่อดูรายละเอียด (คงเหลือ · Lead Time · แหล่งผลิต · ลูกค้า)</p>
-      <div class="controls">
-        <div class="field">
-          <label>Item Type</label>
-          <select id="s-type"></select>
-        </div>
-        <div class="field">
-          <label>Item SubType</label>
-          <select id="s-subtype"></select>
-        </div>
-        <div class="field">
-          <label>Vendor / Factory</label>
-          <select id="s-vendor"></select>
-        </div>
-      </div>
-      <div class="controls" style="margin-top:14px;">
-        <div class="field" style="flex:2;">
-          <label>รหัสสินค้า (Item No.) — <span id="s-itemcount" class="muted"></span></label>
-          <div class="combo"><input type="text" id="s-item-input" placeholder="พิมพ์รหัสหรือชื่อสินค้าเพื่อค้นหา..." autocomplete="off"><div class="combo-list" id="s-item-list"></div></div>
-        </div>
-        <button class="go" id="s-btn">ดูรายละเอียด</button>
-      </div>
-    </div>
-    <div id="s-result"></div>
+    <!-- (การค้นหา/เลือกสินค้า ถูกยุบรวมเข้า "รายการสินค้าทั้งหมด" ด้านล่างแล้ว) -->
 
     <!-- นำเข้าข้อมูลภายนอก DIY (ยอดขาย/สต๊อก Excel + PO DIY PDF เก็บส่วนกลาง) -->
     <div class="card" id="sec-diy-import">
@@ -494,8 +469,9 @@
 
     <!-- รายการสินค้าทั้งหมด (ยุบรวมมาจากแท็บเดิม) -->
     <div class="card" id="sec-itemlist">
-      <h2>📋 รายการสินค้าทั้งหมด (Brand ENRICH)</h2>
-      <p class="hint">ค้นหา/กรองได้ทั้งจาก รหัส · ชื่อ · Vendor · Factory · รหัส DIY/Big C · คลิกที่รหัสสินค้าเพื่อดูรายละเอียดด้านบน</p>
+      <h2>📋 รายการสินค้าทั้งหมด (ทุกแบรนด์)</h2>
+      <p class="hint">ค้นหา/กรองได้ทั้งจาก รหัส · ชื่อ · Vendor · Factory · รหัส DIY/Big C · <b>คลิกที่แถว เพื่อกางตารางแก้ไข Vendor / Factory / Lead Time</b> (เพิ่มได้หลายแหล่ง · บันทึกส่วนกลาง · ลิงก์ไปหน้า Flowchart ทันที)</p>
+      <datalist id="il-vendor-dl"></datalist><datalist id="il-factory-dl"></datalist>
       <div class="controls">
         <div class="field" style="flex:2;">
           <label>ค้นหา (รหัส / ชื่อ / Vendor / Factory / รหัส DIY-BigC)</label>
@@ -7083,6 +7059,7 @@ async function diyDeletePO(key){
 
 
 function renderSearch(){
+  if(!document.getElementById('s-result')) return;   // การ์ดค้นหาเดิมถูกยุบรวมเข้ารายการสินค้าแล้ว
   const itemNo = comboValue('s-item');
   const it = getItem(itemNo);
   if(!it){ document.getElementById('s-result').innerHTML = '<div class="card"><div class="empty">ไม่พบสินค้า — ปรับตัวกรองด้านบน</div></div>'; return; }
@@ -7663,8 +7640,6 @@ function fillSelects(){
   // dropdown กรอง Item Type / SubType (จากข้อมูลจริง)
   const typeOpts = '<option value="">ทุก Type</option>' + distinct('itemType').map(v=>`<option value="${v}">${v}</option>`).join('');
   const subOpts  = '<option value="">ทุก SubType</option>' + distinct('subType').map(v=>`<option value="${v}">${v}</option>`).join('');
-  document.getElementById('s-type').innerHTML = typeOpts;
-  document.getElementById('s-subtype').innerHTML = subOpts;
   document.getElementById('il-type').innerHTML = typeOpts;
   document.getElementById('il-subtype').innerHTML = subOpts;
   document.getElementById('u-type').innerHTML = typeOpts;
@@ -7678,16 +7653,15 @@ function fillSelects(){
     '<option value="">ทุก Vendor</option>' + allVendors().map(v=>`<option value="${v}">${v}</option>`).join('');
   document.getElementById('il-factory').innerHTML =
     '<option value="">ทุก Factory</option>' + allFactories().map(v=>`<option value="${v}">${v}</option>`).join('');
-  // หน้าค้นหา: dropdown รวม Vendor + Factory (จับได้ทั้งสองแบบ)
-  const combo = [...new Set([...allVendors(), ...allFactories()])].sort();
-  document.getElementById('s-vendor').innerHTML =
-    '<option value="">ทุก Vendor/Factory</option>' + combo.map(v=>`<option value="${v}">${v}</option>`).join('');
+  // datalist สำหรับช่องแก้ไข Vendor/Factory ในตารางรายการสินค้า (พิมพ์เองหรือเลือกจากที่มี)
+  { const vdl=document.getElementById('il-vendor-dl'), fdl=document.getElementById('il-factory-dl');
+    if(vdl) vdl.innerHTML=allVendors().map(v=>`<option value="${v}">`).join('');
+    if(fdl) fdl.innerHTML=allFactories().map(v=>`<option value="${v}">`).join(''); }
   // หน้า Lead Time: dropdown Vendor + Factory
   document.getElementById('l-vendor').innerHTML =
     '<option value="">ทุก Vendor</option>' + allVendors().map(v=>`<option value="${v}">${v}</option>`).join('');
   document.getElementById('l-factory').innerHTML =
     '<option value="">ทุก Factory</option>' + allFactories().map(v=>`<option value="${v}">${v}</option>`).join('');
-  populateSearchItems();
   populateLeadtimeItems();
   fillUrgentFilters();   // ให้ตัวเลือกของตาราง "ต้องรีบสั่ง" อิงเฉพาะสินค้าที่มี ILE ตั้งแต่แรก
 }
@@ -7723,6 +7697,93 @@ function populateLeadtimeItems(){
 }
 
 // ตารางรายการสินค้าทั้งหมด (แท็บรายการสินค้า)
+/* =====================================================================
+   แก้ไข Vendor / Factory / Lead Time ต่อสินค้า (หลายแหล่งได้) — เก็บส่วนกลาง (SharePoint) + ลิงก์ไป Flowchart
+   override เก็บใน window.LT_CENTRAL[itemNo] = [{v,f,lt}] · ทับ it.ltOpts/sources/leadTime หลัง mergeLeadTime
+   ===================================================================== */
+const LT_EDIT_KEY='ltEditV1';
+function ltCentralEnsure(){ if(!window.LT_CENTRAL) window.LT_CENTRAL={}; return window.LT_CENTRAL; }
+function ltCentralLoadLocal(){ try{ const raw=localStorage.getItem(LT_EDIT_KEY); window.LT_CENTRAL=raw?JSON.parse(raw):{}; }catch(e){ window.LT_CENTRAL={}; } return window.LT_CENTRAL; }
+function ltCentralSaveLocal(){ try{ localStorage.setItem(LT_EDIT_KEY, JSON.stringify(ltCentralEnsure())); }catch(e){} }
+function ltIsOverridden(no){ const C=window.LT_CENTRAL||{}; return !!C[no]; }
+// ทับ Lead Time/Vendor/Factory ของสินค้าตัวเดียวจาก override (หรือคืนค่าจากข้อมูลฝัง BC_LEADTIME ถ้าไม่มี override)
+function ltApplyOne(no){
+  const it=(typeof getItem==='function')?getItem(no):null; if(!it) return;
+  const ovr=(window.LT_CENTRAL||{})[no];
+  let opts;
+  if(ovr && ovr.length){ opts = ovr.map(o=>({vendor:String(o.v||'').trim(), factory:String(o.f||o.v||'').trim(), lead:+o.lt||0})).filter(o=>o.vendor||o.factory); }
+  else { const d=(window.BC_LEADTIME||{})[no]; opts = (d&&Array.isArray(d.opts)) ? d.opts.map(o=>({vendor:o.v, factory:o.f||o.v, lead:+o.lt||0})) : []; }
+  it.ltOpts=opts;
+  it.sources=opts.map(o=>({vendor:o.vendor, factory:o.factory}));
+  const sel=(typeof leadSelLoad==='function')?leadSelLoad():(window.leadSel||{});
+  const si=Math.min(Math.max(0,+(sel[no]||0)),Math.max(0,opts.length-1));
+  it.leadSelIdx=si; const o=opts[si]||opts[0]||{lead:0};
+  it.leadTime=o.lead||0; it.leadFactory=o.lead||0; it.leadShip=0;
+  it.leadReal=opts.length>0 && (o.lead>0);
+}
+function ltApplyOverrides(){ const C=window.LT_CENTRAL||{}; for(const no in C){ try{ ltApplyOne(no); }catch(e){} } }
+async function ltPushCloud(){ try{ if(!(window.GraphStorage&&window.GraphStorage.saveData&&window.GraphAuth&&window.GraphAuth.getGraphTokenSilent)) return; if(!(await window.GraphAuth.getGraphTokenSilent())) return; await window.GraphStorage.saveData(LT_EDIT_KEY, ltCentralEnsure()); }catch(e){} }
+async function ltPullCloud(){ try{ if(!(window.GraphStorage&&window.GraphStorage.loadData)) return false; const raw=await window.GraphStorage.loadData(LT_EDIT_KEY); if(!raw) return false; const o=(typeof raw==='string')?JSON.parse(raw):raw; if(o&&typeof o==='object'){ window.LT_CENTRAL=o; ltCentralSaveLocal(); ltApplyOverrides(); return true; } return false; }catch(e){ return false; } }
+
+// ----- inline editor (กางใต้แถวในรายการสินค้า) -----
+function ilCurrentOpts(no){ const it=(typeof getItem==='function')?getItem(no):null; const arr=(it&&it.ltOpts)||[]; return arr.map(o=>({v:o.vendor||'', f:o.factory||'', lt:+o.lead||0})); }
+function ilToggleRow(no){ const ex=document.getElementById('iledit-'+cssId(no)); if(ex){ ilCollapseRow(no); } else { ilExpandRow(no, true); } }
+function ilCollapseRow(no){ const ex=document.getElementById('iledit-'+cssId(no)); if(ex) ex.remove(); if(window._ltDraft) delete window._ltDraft[no]; const r=document.getElementById('ilrow-'+cssId(no)); if(r) r.classList.remove('il-open'); }
+function cssId(no){ return String(no).replace(/[^A-Za-z0-9_-]/g,'_'); }
+function ilExpandRow(no, keep){
+  const row=document.getElementById('ilrow-'+cssId(no)); if(!row) return;
+  let ex=document.getElementById('iledit-'+cssId(no));
+  if(!window._ltDraft) window._ltDraft={};
+  if(!ex){ window._ltDraft[no]=ilCurrentOpts(no); ex=document.createElement('tr'); ex.id='iledit-'+cssId(no); ex.className='il-editrow'; const td=document.createElement('td'); td.colSpan=7; td.style.cssText='background:var(--brand-soft,#fff7e6);padding:12px 14px;'; ex.appendChild(td); row.parentNode.insertBefore(ex, row.nextSibling); row.classList.add('il-open'); }
+  ilDraftRender(no);
+}
+function ilDraftRender(no){
+  const ex=document.getElementById('iledit-'+cssId(no)); if(!ex) return; const td=ex.firstChild;
+  const it=(typeof getItem==='function')?getItem(no):null; const draft=(window._ltDraft&&window._ltDraft[no])||[];
+  const inv=(typeof stockOnHand==='function')?stockOnHand(no):0; const cost=(it&&it.unitCost)||0; const ov=ltIsOverridden(no);
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const rowsH=draft.map((o,i)=>`<tr>
+    <td style="padding:3px 5px;"><input list="il-vendor-dl" value="${esc(o.v)}" data-no="${esc(no)}" data-i="${i}" data-k="v" onchange="ilDraftSet('${esc(no)}',${i},'v',this.value)" style="width:100%;min-width:120px;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);"></td>
+    <td style="padding:3px 5px;"><input list="il-factory-dl" value="${esc(o.f)}" data-no="${esc(no)}" data-i="${i}" data-k="f" onchange="ilDraftSet('${esc(no)}',${i},'f',this.value)" style="width:100%;min-width:120px;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);"></td>
+    <td style="padding:3px 5px;"><input type="number" min="0" value="${o.lt||0}" data-no="${esc(no)}" data-i="${i}" data-k="lt" onchange="ilDraftSet('${esc(no)}',${i},'lt',this.value)" style="width:90px;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);text-align:right;"></td>
+    <td style="padding:3px 5px;text-align:center;"><button type="button" onclick="ilDraftDel('${esc(no)}',${i})" title="ลบแหล่งนี้" style="padding:3px 9px;border-radius:6px;border:1px solid #dc2626;background:var(--bg);color:#dc2626;cursor:pointer;font-weight:700;">🗑️</button></td>
+  </tr>`).join('');
+  td.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+      <div style="font-weight:800;">✎ แก้ไขแหล่งผลิต & Lead Time — <span style="color:var(--brand);">${esc(no)}</span> <span class="muted" style="font-weight:400;">${esc((it&&it.desc)||'')}</span></div>
+      <div class="muted" style="font-size:12px;">คงเหลือ <b>${fmtNum(inv)}</b> ${esc((it&&it.uom)||'')} · ต้นทุน/หน่วย <b>฿${fmt1(cost)}</b>${ov?' · <span style="color:#b45309;font-weight:700;">มีการแก้ไข (ส่วนกลาง)</span>':''}</div>
+    </div>
+    <div style="overflow-x:auto;"><table style="width:auto;border-collapse:collapse;font-size:13px;"><thead><tr style="background:var(--bg);">
+      <th style="padding:5px 8px;text-align:left;">Vendor</th><th style="padding:5px 8px;text-align:left;">Factory</th><th style="padding:5px 8px;text-align:right;">Lead Time (วัน)</th><th style="padding:5px 8px;"></th></tr></thead>
+      <tbody>${rowsH || '<tr><td colspan="4" class="muted" style="padding:8px;">ยังไม่มีแหล่งผลิต — กด "➕ เพิ่มแหล่งผลิต"</td></tr>'}</tbody></table></div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <button type="button" onclick="ilDraftAdd('${esc(no)}')" style="padding:6px 12px;border-radius:8px;border:1px solid var(--brand);background:var(--bg);color:var(--brand);cursor:pointer;font-weight:700;">➕ เพิ่มแหล่งผลิต</button>
+      <button type="button" onclick="ilSave('${esc(no)}')" class="go" style="padding:6px 14px;">💾 บันทึก (ส่วนกลาง)</button>
+      ${ov?`<button type="button" onclick="ilReset('${esc(no)}')" style="padding:6px 12px;border-radius:8px;border:1px solid #64748b;background:var(--bg);color:#64748b;cursor:pointer;font-weight:700;">↩︎ คืนค่าเดิม (ลบที่แก้)</button>`:''}
+      <button type="button" onclick="ilCollapseRow('${esc(no)}')" style="padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;">ปิด</button>
+      <span class="muted" style="font-size:11.5px;">* บันทึกแล้วจะแสดงผลในหน้า Flowchart ทันที (Vendor/Factory + LT ใต้ชื่อสินค้า)</span>
+    </div>`;
+}
+function ilDraftSync(no){ const ex=document.getElementById('iledit-'+cssId(no)); if(!ex) return; const d=(window._ltDraft&&window._ltDraft[no])||[]; ex.querySelectorAll('input[data-k]').forEach(inp=>{ const i=+inp.getAttribute('data-i'), k=inp.getAttribute('data-k'); if(!d[i]) return; d[i][k]= (k==='lt')?(+inp.value||0):inp.value; }); }
+function ilDraftSet(no,i,k,val){ if(!window._ltDraft||!window._ltDraft[no]||!window._ltDraft[no][i]) return; window._ltDraft[no][i][k]=(k==='lt')?(+val||0):val; }
+function ilDraftAdd(no){ ilDraftSync(no); if(!window._ltDraft) window._ltDraft={}; (window._ltDraft[no]=window._ltDraft[no]||[]).push({v:'',f:'',lt:0}); ilDraftRender(no); }
+function ilDraftDel(no,i){ ilDraftSync(no); if(window._ltDraft&&window._ltDraft[no]) window._ltDraft[no].splice(i,1); ilDraftRender(no); }
+function ilSave(no){
+  ilDraftSync(no);
+  const draft=((window._ltDraft&&window._ltDraft[no])||[]).map(o=>({v:String(o.v||'').trim(), f:String(o.f||o.v||'').trim(), lt:+o.lt||0})).filter(o=>o.v||o.f);
+  ltCentralEnsure()[no]=draft; ltCentralSaveLocal();
+  ltApplyOne(no);
+  ltPushCloud();
+  try{ if(typeof presAct==='function') presAct('แก้ Vendor/Factory/Lead Time: '+no+' ('+draft.length+' แหล่ง)'); }catch(e){}
+  ilCollapseRow(no);
+  try{ renderItemList(); }catch(e){}
+  try{ if(typeof renderFlowchart==='function') renderFlowchart(); }catch(e){}
+  if(typeof pkToast==='function') pkToast('บันทึก Vendor/Factory/Lead Time ของ '+no+' แล้ว ✅ (ส่วนกลาง)','good');
+}
+function ilReset(no){
+  const doIt=()=>{ if(window.LT_CENTRAL) delete window.LT_CENTRAL[no]; ltCentralSaveLocal(); ltApplyOne(no); ltPushCloud(); ilCollapseRow(no); try{ renderItemList(); }catch(e){} try{ if(typeof renderFlowchart==='function') renderFlowchart(); }catch(e){} if(typeof pkToast==='function') pkToast('คืนค่า Lead Time เดิมของ '+no+' แล้ว','good'); };
+  if(typeof pkConfirm==='function') pkConfirm('คืนค่า Vendor/Factory/Lead Time ของ '+no+' กลับเป็นข้อมูลเดิมที่ฝังในเว็บ? (ลบที่แก้ไว้)', doIt); else if(confirm('คืนค่าเดิม?')) doIt();
+}
+
 function renderItemList(){
   const q  = (document.getElementById('il-search').value||'').trim().toLowerCase();
   const t  = document.getElementById('il-type').value;
@@ -7740,14 +7801,17 @@ function renderItemList(){
     const inv = stockOnHand(i.no);
     const val = inv*(i.unitCost||0);
     totQty+=inv; totVal+=val;
-    const lead = i.leadReal ? `${i.leadTime} <span class="muted">(${i.leadFactory}+${i.leadShip})</span>` : '<span class="muted">-</span>';
-    const src  = i.leadReal && i.sources && i.sources.length ? sourcesText(i) : '<span class="muted">-</span>';
-    return `<tr>
-      <td><a href="#" onclick="openItemDetail('${i.no}');return false;"><b>${i.no}</b></a></td>
+    const ov = ltIsOverridden(i.no);
+    const nopt = (i.ltOpts||[]).length;
+    const lead = (nopt && i.leadTime) ? `${i.leadTime} <span class="muted">วัน</span>` : '<span class="muted">-</span>';
+    const src  = (i.sources && i.sources.length) ? sourcesText(i) : '<span class="muted">-</span>';
+    const eid  = 'ilrow-'+cssId(i.no);
+    return `<tr id="${eid}" class="il-row" style="cursor:pointer;" onclick="ilToggleRow('${i.no}')" title="คลิกเพื่อกาง/ปิด ตารางแก้ไข Vendor / Factory / Lead Time">
+      <td><span class="muted" style="font-size:10px;">▸</span> <b>${i.no}</b>${ov?' <span title="แก้ไข Vendor/Factory/Lead Time แล้ว (ส่วนกลาง)" style="color:#b45309;">✎</span>':''}</td>
       <td>${i.desc||''}</td>
       <td>${i.subType||'-'}</td>
       <td class="num">${lead}</td>
-      <td>${src}</td>
+      <td>${src}${nopt>1?` <span class="muted" style="font-size:10px;">(${nopt} แหล่ง)</span>`:''}</td>
       <td class="num">${fmtNum(inv)} <span class="muted">${i.uom||''}</span></td>
       <td class="num">฿${fmtNum(val)}</td>
     </tr>`;
@@ -7847,11 +7911,8 @@ function openItemDetail(no){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.querySelector('.tab[data-tab="search"]').classList.add('active');
   document.getElementById('page-search').classList.add('active');
-  document.getElementById('s-type').value=''; document.getElementById('s-subtype').value=''; document.getElementById('s-vendor').value='';
-  populateSearchItems();
-  comboSetValue('s-item', no, false);
-  renderSearch();
-  window.scrollTo(0,0);
+  try{ if(typeof renderTab==='function') renderTab('search'); else renderItemList(); }catch(e){}
+  setTimeout(()=>{ try{ ilExpandRow(no, true); const r=document.getElementById('ilrow-'+CSS.escape(no)); if(r) r.scrollIntoView({block:'center'}); }catch(e){} }, 60);   // กางตารางแก้ไขของสินค้านั้น
 }
 // คลิกจากลิสท์ด่วน -> เปิดหน้ารายละเอียดสินค้า (แท็บค้นหา) เพื่อดูการวิเคราะห์เต็ม
 function openLeadtime(no){ openItemDetail(no); }
@@ -8169,6 +8230,7 @@ function renderUrgent(){
 
 // เติมรายการสินค้าในหน้าค้นหา ตาม Type/SubType/Vendor-Factory ที่เลือก
 function populateSearchItems(){
+  if(!document.getElementById('s-type')) return;   // การ์ดค้นหาเดิมถูกยุบรวมแล้ว
   const t = document.getElementById('s-type').value;
   const st = document.getElementById('s-subtype').value;
   const vf = document.getElementById('s-vendor').value;   // ชื่อ vendor หรือ factory
@@ -12134,7 +12196,7 @@ function renderTab(tab){
   try{ if(typeof packCentralLoad==='function') packCentralLoad(); }catch(e){}   // โหลดมิติกลาง (SharePoint) มาใช้กับ pkItem/Packing
 
   if(tab==='flowchart'){ if(typeof poLoadFollow==='function') poLoadFollow(); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderFlowchart(); }
-  else if(tab==='search'){ renderSearch(); renderItemList(); try{ diyRenderPOList(); }catch(e){} try{ Promise.all([diyPullCloud(), diyPoImpPullCloud()]).then(rs=>{ if(rs.some(Boolean)){ try{ renderSearch(); }catch(e){} try{ if(typeof renderFlowchart==='function') renderFlowchart(); }catch(e){} } }); }catch(e){} }   // หน้าค้นหารวมรายการสินค้าแล้ว + นำเข้าข้อมูล DIY (ยอดขาย/สต๊อก + PO DIY)
+  else if(tab==='search'){ renderSearch(); renderItemList(); try{ diyRenderPOList(); }catch(e){} try{ Promise.all([diyPullCloud(), diyPoImpPullCloud(), ltPullCloud()]).then(rs=>{ if(rs.some(Boolean)){ try{ renderItemList(); }catch(e){} try{ renderSearch(); }catch(e){} try{ if(typeof renderFlowchart==='function') renderFlowchart(); }catch(e){} } }); }catch(e){} }   // หน้าค้นหารวมรายการสินค้าแล้ว + ซิงก์ DIY + Vendor/Factory/Lead Time ส่วนกลาง
   else if(tab==='leadtime'){ poLoadFollow(); const _pr=poPruneStaleFollow(); if(_pr && _pr.length && typeof pkToast==='function') pkToast('ล้างรายการติดตาม PO เก่าที่ไม่ตรงข้อมูล BC แล้ว '+_pr.length+' รายการ','good'); if(!window.pkLog||!window.pkLog.length) pkLoadLog(); renderUrgent(); renderPoFollow(); renderArrivedMatrix(); }
   else if(tab==='packing'){ renderPacking(); pkLoadLog(); renderPkLog(); if(typeof renderArrivedMatrix==='function') renderArrivedMatrix(); }
   else if(tab==='payment'){ renderPayment(); }
@@ -12169,10 +12231,7 @@ document.getElementById('pk-import').onclick = ()=>document.getElementById('pk-i
 { const _rb=document.getElementById('pk-restore-rmb'); if(_rb) _rb.onclick=()=>document.getElementById('pk-restore-rmb-file').click(); const _rf=document.getElementById('pk-restore-rmb-file'); if(_rf) _rf.onchange=function(){ pkRestoreRmbFromCsv(this.files[0]); this.value=''; }; }
 document.getElementById('pk-importfile').onchange = function(){ pkImportBackup(this.files[0]); this.value=''; };
 pkLoadLog(); pkLoadDraft(); pkRestoreDir(); pkDimEditLoad();   // กู้แบบร่างการจัดตู้ + ขนาดที่แก้ไว้ (ถ้ามี)
-document.getElementById('s-type').onchange = ()=>{ populateSearchItems(); renderSearch(); };
-document.getElementById('s-subtype').onchange = ()=>{ populateSearchItems(); renderSearch(); };
-document.getElementById('s-vendor').onchange = ()=>{ populateSearchItems(); renderSearch(); };
-document.getElementById('s-btn').onclick = renderSearch;
+// (ตัวกรอง/ปุ่มค้นหาเดิม s-* ถูกยุบรวมเข้าตัวกรองของ "รายการสินค้าทั้งหมด" (il-*) แล้ว)
 document.getElementById('l-vendor').onchange = ()=>{ fillFactoryDropdown('l-factory', document.getElementById('l-vendor').value); populateLeadtimeItems(); renderLeadtime(); };
 document.getElementById('l-factory').onchange = ()=>{ populateLeadtimeItems(); renderLeadtime(); };
 window.RBASIS = window.RBASIS || 180;
@@ -12394,13 +12453,14 @@ window.appPresenceStart=function(){
 // safety net: เริ่ม presence เมื่อผ่านด่านรหัสแล้ว (เผื่อ hook ใน unlock ไม่ทำงาน) — ลองซ้ำจนกว่าด่านจะหาย
 (function(){ let n=0; const iv=setInterval(function(){ n++; if(window._authGateStarted || n>40){ clearInterval(iv); return; } if(!document.getElementById('pw-gate')){ try{ window.appAuthGateStart&&window.appAuthGateStart(); }catch(e){} clearInterval(iv); } }, 500); })();
 function init(){
-  comboInit('s-item', renderSearch);      // ช่องค้นหาสินค้าแบบพิมพ์ได้
+  if(document.getElementById('s-item-input')) comboInit('s-item', renderSearch);      // (การ์ดค้นหาเดิมถูกยุบรวมแล้ว — คงไว้เผื่อมี element)
   comboInit('l-item', renderLeadtime);
   const live = loadBCItems();
   if(live){
     ITEMS.length = 0; ITEMS.push(...live);
     VENDORS.length = 0;   // ใช้ Vendor/Factory จากไฟล์ Lead Time แทน
     const ltMatched = mergeLeadTime();   // รวม Lead Time (โรงงาน+เรือ) + Vendor/Factory + รหัสลูกค้า
+    try{ ltCentralLoadLocal(); ltApplyOverrides(); }catch(e){}   // ทับ Vendor/Factory/Lead Time ที่แก้ไว้ (ส่วนกลาง) → มีผลทั้งรายการสินค้าและ Flowchart
     const freshOH = applyFreshOnHand();  // ทับยอดคงเหลือ+รายคลังด้วยค่าสดจาก Power Automate (ถ้ามี bc-onhand.js)
     const poMatched = mergePO();         // รวม PO ค้างรับจริง
     try{ diyApplyStartup(); }catch(e){}   // ทับข้อมูล DIY (ยอดขาย/สต๊อก) ที่เคยนำเข้าไว้ ก่อนผูกเข้า ITEMS
@@ -12458,7 +12518,7 @@ async function paySyncFromCloud(){ if(!window.GraphStorage) return;
 async function payPushToCloud(){ if(!window.GraphStorage) return; payLoadOv(); payLoadCheck(); payLoadExtra(); payLoadDocs(); payLoadDepOv(); await window.GraphStorage.saveData('payXferOvV1', window.payXferOv||{}); await window.GraphStorage.saveData('payCheckV1', window.payCheck||{}); await window.GraphStorage.saveData('payExtraV1', window.payExtra||[]); await window.GraphStorage.saveData('payDocsV1', window.payDocs||{}); await window.GraphStorage.saveData('payDepOvV1', window.payDepOv||{}); payLoadPi(); await window.GraphStorage.saveData('payPiV1', window.payPi||{}); }
 function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent','renderPayment','renderPayment2'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
 async function cloudPullNow(){ const b=document.getElementById('bc-pull'); if(b) b.disabled=true;
-  try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); try{ await diyPullCloud(); }catch(e){} try{ await diyPoImpPullCloud(); }catch(e){} cloudRerenderAll(); try{ if(typeof renderSearch==='function') renderSearch(); }catch(e){} bcSetTs('bcCloudSyncAt'); try{ auditLog('⬇️ ดึงข้อมูลล่าสุด'); }catch(e){} pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
+  try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); try{ await diyPullCloud(); }catch(e){} try{ await diyPoImpPullCloud(); }catch(e){} try{ await ltPullCloud(); }catch(e){} cloudRerenderAll(); try{ if(typeof renderSearch==='function') renderSearch(); }catch(e){} try{ if(typeof renderItemList==='function') renderItemList(); }catch(e){} bcSetTs('bcCloudSyncAt'); try{ auditLog('⬇️ ดึงข้อมูลล่าสุด'); }catch(e){} pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
   catch(e){ console.error(e); pkToast('ดึงข้อมูลไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
   if(b) b.disabled=false;
 }
