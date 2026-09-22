@@ -11617,7 +11617,7 @@ const PAY_NO_FACTORY_VENDORS={'VINCENT':1};   // Vendor ที่ไม่ต้
 function payExtraKindLabel(v){ const k=PAY_EXTRA_KINDS.find(x=>x.v===v); return k?(k.th+' ('+k.v+')'):(v||''); }
 // รายชื่อ Factory ทั้งหมด (จาก Lead Time opts) ให้เลือกในฟอร์มค่าใช้จ่าย
 function payAllFactoriesList(){ if(window._payAllFac) return window._payAllFac; const set=new Set(), LT=window.BC_LEADTIME||{}; Object.keys(LT).forEach(k=>(((LT[k]||{}).opts)||[]).forEach(o=>{ if(o&&o.f) set.add(o.f); })); window._payAllFac=[...set].sort((a,b)=>String(a).localeCompare(String(b))); return window._payAllFac; }
-function payVendorChoices(){ const set=new Set(payShortVendorList()); PAY_EXTRA_VENDORS.forEach(v=>set.add(v)); return [...set].sort((a,b)=>String(a).localeCompare(String(b))); }
+function payVendorChoices(){ const set=new Set(); payShortVendorList().forEach(v=>set.add(payNormVendor(v))); PAY_EXTRA_VENDORS.forEach(v=>set.add(payNormVendor(v))); return [...set].sort((a,b)=>String(a).localeCompare(String(b))); }   // รวม QILI/QILI(TUBO)→QILI, KTL/KTL(Dingding)→KTL
 function payAddExtra(){ payExtraModal(null); }
 function payEditExtra(id){ payExtraModal(id); }
 function payExtraModal(id){
@@ -12003,7 +12003,7 @@ function renderPayment(opt){
   let data=payRowsData(opt.splitLot, opt.splitPo);
   // ---- ค่าใช้จ่ายอื่น (ไม่ใช่สินค้า) ที่เพิ่มเอง — รวมเข้าตารางเดียวกัน ให้ไหลตามสูตรเดิม ----
   payLoadExtra();
-  (window.payExtra||[]).forEach(e=>{ const load=e.cont?payLoadDateOfCont(e.cont):''; const cur=(e.cur==='USD')?'USD':'RMB'; const amt=(e.amt!=null?+e.amt:(+e.amtRmb||0)); const exRow={cont:e.cont||'', load, eta:'', factory:e.factory||'', vendor:(e.vendor||'').trim()||'(ค่าใช้จ่ายอื่น)', term:'', lot:'', po:'', amtRmb:(cur==='USD'?0:amt), amtUsd:(cur==='USD'?amt:0), _cur:cur, _amtOrig:amt, xfer:e.xfer||'', seg:'', _extra:true, _extraId:e.id, _kind:e.kind||''}; if(opt.piCol) payEmitRow(data, exRow, opt.splitPo); else data.push(exRow); });   // ค่าใช้จ่ายอื่น: หน้า ACC ให้คีย์ PI แยกบรรทัดได้เหมือนแถวสินค้า
+  (window.payExtra||[]).forEach(e=>{ const load=e.cont?payLoadDateOfCont(e.cont):''; const cur=(e.cur==='USD')?'USD':'RMB'; const amt=(e.amt!=null?+e.amt:(+e.amtRmb||0)); const exRow={cont:e.cont||'', load, eta:'', factory:e.factory||'', vendor:(payNormVendor((e.vendor||'').trim())||'(ค่าใช้จ่ายอื่น)'), term:'', lot:'', po:'', amtRmb:(cur==='USD'?0:amt), amtUsd:(cur==='USD'?amt:0), _cur:cur, _amtOrig:amt, xfer:e.xfer||'', seg:'', _extra:true, _extraId:e.id, _kind:e.kind||''}; if(opt.piCol) payEmitRow(data, exRow, opt.splitPo); else data.push(exRow); });   // ค่าใช้จ่ายอื่น: หน้า ACC ให้คีย์ PI แยกบรรทัดได้เหมือนแถวสินค้า
   const vKey='paySelVendor'+opt.sfx, cKey='paySelCt'+opt.sfx;
   // ---- ตัวเลือก Vendor ----
   const vsel=document.getElementById(opt.vSel);
