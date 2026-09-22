@@ -345,7 +345,6 @@
         </fieldset>
         <fieldset style="border:1.5px dashed var(--good);border-radius:10px;padding:6px 12px 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0;">
           <legend style="font-size:12px;font-weight:800;color:var(--good);padding:0 6px;">💾 บันทึก</legend>
-          <button class="go" id="pk-savedraft" style="background:var(--warn);" title="เก็บสิ่งที่กำลังจัดค้างไว้ กันหายเมื่อปิด/เปิดใหม่ (ยังไม่ลงประวัติ)">💾 บันทึกแบบร่าง (กันหาย)</button>
           <button class="go" id="pk-save" style="background:var(--brand);">💾 บันทึกข้อมูลการจัดตู้</button>
           <button class="go" id="pk-savenew" style="background:#0891b2;" title="บันทึกลิสท์ปัจจุบันเป็นรอบใหม่ (ไม่ทับของเดิม) — เหมาะกับการคัดลอกตู้เก่ามาแก้เป็นตู้ใหม่">💾 บันทึกเป็นตู้ใหม่</button>
         </fieldset>
@@ -12239,7 +12238,7 @@ document.getElementById('pk-fx').oninput = pkSetFx;
 document.querySelectorAll('input[name="pk-mode"]').forEach(rb=>{ rb.onchange = function(){ if(this.checked) pkSetMode(this.value); }; });
 document.getElementById('pk-save').onclick = ()=>pkSaveRound(false);
 document.getElementById('pk-savenew').onclick = ()=>pkSaveRound(true);
-document.getElementById('pk-savedraft').onclick = ()=>pkSaveDraft(false);
+{ const _sd=document.getElementById('pk-savedraft'); if(_sd) _sd.onclick = ()=>pkSaveDraft(false); }   // ปุ่มบันทึกแบบร่างถูกเอาออกแล้ว (auto-save เงียบยังทำงาน)
 document.getElementById('pk-setdir').onclick = pkSetDir;
 document.getElementById('pk-export').onclick = pkExportBackup;
 document.getElementById('pk-dimexport').onclick = pkDimEditExport;
