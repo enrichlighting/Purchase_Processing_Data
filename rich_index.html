@@ -11775,10 +11775,12 @@ function payRowVendor(s, r, factory){
 }
 // รวมชื่อ Vendor ที่เป็นเจ้าเดียวกันในหน้า Payment/Payment for ACC (เช่น "QILI (TUBO)"→"QILI", "KTL(DINGDING)"→"KTL") — ตัดส่วนในวงเล็บทิ้งเฉพาะชื่อในลิสต์
 const PAY_VENDOR_MERGE = ['QILI','KTL'];
+const PAY_VENDOR_ALIAS = {'TUBO':'QILI'};   // ชื่อพ้องที่เป็นเจ้าเดียวกัน (base ต่างกันแต่รวมเป็นตัวเดียว) เช่น TUBO = QILI
 function payNormVendor(v){
   const s=String(v||'').trim(); if(!s) return s;
   const base=s.split('(')[0].trim();                 // "QILI (TUBO)"→"QILI" · "KTL(DINGDING)"→"KTL"
   const u=base.toUpperCase();
+  if(PAY_VENDOR_ALIAS[u]) return PAY_VENDOR_ALIAS[u];   // ชื่อพ้อง เช่น TUBO → QILI
   for(const b of PAY_VENDOR_MERGE){ if(u===b.toUpperCase()) return b; }
   return s;                                          // เจ้าอื่นคงชื่อเดิม (รวมวงเล็บ)
 }
