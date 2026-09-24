@@ -6707,7 +6707,11 @@ function mergeCust(){
     { const arr=(typeof window!=='undefined' && window.BC_PODIY) ? (window.BC_PODIY[it.no]||null) : null; let dp=null;
       if(arr && arr.length){ dp={}; arr.forEach(o=>{ const ym=String(o.deliv||'').slice(0,7); if(ym) dp[ym]=(dp[ym]||0)+(+o.qty||0); }); }
       it.diyPo = dp; }   // {ym:qty} หรือ null
-    it.itemMon = (typeof window!=='undefined' && window.BC_ITEMMON) ? (window.BC_ITEMMON[it.no]||[]) : [];  // ยอดขายรวมรายเดือน (ทุกลูกค้า)
+    // [แก้ 24 ก.ย. 2026 · งาน A] ใช้ยอดรายเดือนสดจาก BC_ILE.mon (/api/ile — สดถึงวันนี้) เป็นหลัก;
+    // พิสูจน์แล้วว่า BC_ILE.mon == BC_ITEMMON เป๊ะทุกรายการ · static bc-itemmon.js เป็นแค่ fallback
+    it.itemMon = (typeof window!=='undefined' && window.BC_ILE && window.BC_ILE[it.no] && window.BC_ILE[it.no].mon && window.BC_ILE[it.no].mon.length)
+      ? window.BC_ILE[it.no].mon
+      : ((typeof window!=='undefined' && window.BC_ITEMMON) ? (window.BC_ITEMMON[it.no]||[]) : []);  // ยอดขายรวมรายเดือน (ทุกลูกค้า)
     matched++;
   });
   return matched;
