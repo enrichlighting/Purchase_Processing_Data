@@ -12137,7 +12137,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
     .concat(opt.piCol?['PI No.']:[])
     .concat(opt.poa?['POA']:[])
     .concat(opt.splitLot?['Lot No.']:[])
-    .concat(opt.poa?['Quantity POA','Outstanding']:[])
+    .concat(opt.poa?['Quantity','Outstanding']:[])
     .concat(['AMOUNT']).concat(opt.poa?['Remark']:[]).concat(['TOTAL AMOUNT (SUPPLIER - RMB)','TOTAL AMOUNT (SUPPLIER - BAHT)'])
     .concat(opt.docs?['PI','INV','PL No']:[]);
   const nLeftData=LEFT.length-1; if(typeof payLoadRemark==='function') payLoadRemark();   // จำนวนเซลล์ซ้าย (ไม่รวม WEEK) ที่ restCells ต้อง emit
