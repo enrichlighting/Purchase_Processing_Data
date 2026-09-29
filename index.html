@@ -12506,6 +12506,9 @@ async function appTryLogin(){
     const ov=document.getElementById('app-login-ov'); if(ov) ov.remove();
     appApplyRoleTabs(result.role);
     if(window.appPresenceStart) window.appPresenceStart();
+    // [แก้ 29 ก.ย. 2026] bootstrap /api ยิงตอนเปิดหน้า "ก่อน" มี token → ได้ข้อมูล static (fallback 1 ก.ย.)
+    // reload ให้ยิง /api ใหม่พร้อม token (เซฟใน sessionStorage แล้ว · gate ข้ามเพราะ appAuthInfo ยังอยู่) → ได้ข้อมูลสด
+    location.reload();
   }catch(e){
     if(err) err.textContent = 'เข้าสู่ระบบไม่สำเร็จ: '+(e && e.message ? e.message : 'unknown error');
     if(btn){ btn.disabled=false; btn.textContent='เข้าสู่ระบบ'; }
