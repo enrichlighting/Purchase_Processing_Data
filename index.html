@@ -6670,9 +6670,23 @@ function applyFreshOnHand(){
 }
 
 /* --- รวม Purchase Orders ค้างรับ (incoming) เข้ากับสินค้า --- */
+// [เพิ่ม 29 ก.ย. 2026] แก้บั๊ก /api/po double-count: /api/po (สด) ส่ง PO เดิมซ้ำหลายแถว (ต่างแค่ ETA จาก JOIN)
+// → ยุบแถวที่ (PO|จำนวน|vendor|status) เหมือนกันเหลือแถวเดียว (เก็บ ETA เร็วสุด) + คำนวณ e.in ใหม่จากที่ยุบแล้ว
+// แบ่งงวดจริง (จำนวนต่างกัน) = คนละ key จึงไม่ถูกยุบ · idempotent · safety-net รอ backend แก้ที่ต้นทาง /api/po
+function bcDedupePO(){
+  const D = (typeof window!=='undefined') ? window.BC_PO : null; if(!D) return;
+  for(const k in D){ const e=D[k]; if(!e||!Array.isArray(e.pos)) continue;
+    const seen={}, out=[];
+    e.pos.forEach(p=>{ const key=p[0]+'|'+p[1]+'|'+(p[3]||'')+'|'+(p[4]||'');
+      if(seen[key]){ const pv=seen[key]; if(p[2] && (!pv[2]||p[2]<pv[2])) pv[2]=p[2]; return; }  // ซ้ำ (ต่างแค่ ETA) → เก็บ ETA เร็วสุด
+      seen[key]=p; out.push(p); });
+    e.pos=out; e.in=out.reduce((s,p)=>s+(+p[1]||0),0);
+  }
+}
 function mergePO(){
   const D = (typeof window!=='undefined') ? window.BC_PO : null;
   if(!D) return 0;
+  bcDedupePO();
   let matched=0;
   ITEMS.forEach(it=>{
     const e = D[it.no];
