@@ -11520,6 +11520,24 @@ function paySaveDepOv(){ try{ localStorage.setItem('payDepOvV1', JSON.stringify(
 function payFmtPct(ratio){ let n=Math.round(ratio*10000)/100; return Number.isInteger(n)?String(n):String(parseFloat(n.toFixed(2))); }   // สัดส่วน 0-1 → "%" (ทศนิยมได้สูงสุด 2 ตำแหน่ง ตัด 0 ท้าย)
 // ---- คีย์เลข PI (เอกสาร) ต่อบรรทัด ACC · คีย์ได้หลายเอกสาร (แต่ละ PI ระบุจำนวนเงิน) → แยกบรรทัด ----
 window._payPiRowTotal=window._payPiRowTotal||{};
+// [เพิ่ม 29 ก.ย. 2026] หมายเหตุ (Remark) ต่อบรรทัด หน้า Payment for ACC — เก็บ localStorage + cloud (เหมือน payPi/payDocs)
+function payLoadRemark(){ if(window.payRemark) return; try{ window.payRemark=JSON.parse(localStorage.getItem('payRemarkV1')||'{}'); }catch(e){ window.payRemark={}; } }
+function payRemarkPersist(){ try{ localStorage.setItem('payRemarkV1', JSON.stringify(window.payRemark||{})); }catch(e){} if(typeof payPushToCloud==='function'){ try{ payPushToCloud(); }catch(e){} } }
+function payEditRemark(enc){ const key=decodeURIComponent(enc||''); if(!key) return; payLoadRemark(); const cur=(window.payRemark&&window.payRemark[key])||'';
+  let ov=document.getElementById('pay-rmk-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='pay-rmk-ov'; ov.style.cssText='position:fixed;inset:0;z-index:100013;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:18px 20px;max-width:460px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);">
+    <div style="font-weight:800;font-size:15px;margin-bottom:8px;">📝 หมายเหตุ (Remark)</div>
+    <textarea id="pay-rmk-input" rows="4" placeholder="กรอกหมายเหตุสำหรับบรรทัดนี้ (เกิดอะไรขึ้นกับเคสนี้)..." style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;font-family:inherit;resize:vertical;">${payEsc(cur)}</textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap;">
+      <button onclick="document.getElementById('pay-rmk-ov').remove()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:700;">ยกเลิก</button>
+      <button onclick="paySaveRemark('${encodeURIComponent(key)}')" style="padding:7px 14px;border-radius:8px;border:0;background:var(--brand);color:#fff;cursor:pointer;font-weight:800;">บันทึก</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov); const ta=document.getElementById('pay-rmk-input'); if(ta) ta.focus();
+}
+function paySaveRemark(enc){ const key=decodeURIComponent(enc||''); if(!key) return; payLoadRemark(); const ta=document.getElementById('pay-rmk-input'); const v=ta?ta.value.trim():''; if(v) window.payRemark[key]=v; else delete window.payRemark[key]; payRemarkPersist(); const ov=document.getElementById('pay-rmk-ov'); if(ov) ov.remove(); if(typeof payRefresh==='function') payRefresh(); pkToast(v?'บันทึกหมายเหตุแล้ว':'ลบหมายเหตุแล้ว','good'); }
 function payLoadPi(){ if(window.payPi) return; try{ window.payPi=JSON.parse(localStorage.getItem('payPiV1')||'{}'); }catch(e){ window.payPi={}; } }
 function paySavePi(){ try{ localStorage.setItem('payPiV1', JSON.stringify(window.payPi||{})); }catch(e){} if(typeof payPushToCloud==='function'){ try{ payPushToCloud(); }catch(e){} } }
 function payEmitRow(out, row, splitPo){   // ACC: แตกบรรทัดตามเลข PI ที่คีย์ (พร้อมจำนวนเงินต่อ PI) · เหลือที่ยังไม่ระบุ = บรรทัด "ยังไม่ระบุ PI" (ยอดรวมคงเดิม) · รองรับแถวค่าใช้จ่ายอื่น (_extra) ด้วย
@@ -12120,9 +12138,9 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
     .concat(opt.poa?['POA']:[])
     .concat(opt.splitLot?['Lot No.']:[])
     .concat(opt.poa?['Quantity POA','Outstanding']:[])
-    .concat(['AMOUNT','TOTAL AMOUNT (SUPPLIER - RMB)','TOTAL AMOUNT (SUPPLIER - BAHT)'])
+    .concat(['AMOUNT']).concat(opt.poa?['Remark']:[]).concat(['TOTAL AMOUNT (SUPPLIER - RMB)','TOTAL AMOUNT (SUPPLIER - BAHT)'])
     .concat(opt.docs?['PI','INV','PL No']:[]);
-  const nLeftData=LEFT.length-1;   // จำนวนเซลล์ซ้าย (ไม่รวม WEEK) ที่ restCells ต้อง emit
+  const nLeftData=LEFT.length-1; if(typeof payLoadRemark==='function') payLoadRemark();   // จำนวนเซลล์ซ้าย (ไม่รวม WEEK) ที่ restCells ต้อง emit
   const RIGHT=['TOTAL AMOUNT (1-15)','TOTAL AMOUNT (16-31)'].concat(opt.hideCF?[]:['บัญชี CF','SUPPLIER CF','BANK SLIP']);
   const bTh='border:1px solid #a8801f;padding:5px 6px;white-space:normal;word-break:break-word;line-height:1.2;background:#d4af37;color:#3a2a00;font-weight:800;text-align:center;font-size:11.5px;';
   const bTd='border:1px solid #d8c893;height:28px;padding:3px 7px;white-space:nowrap;color:#111;';
@@ -12171,6 +12189,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
        + (opt.poa?`<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;color:#111;${(+r.qtyPOA>0)?'cursor:pointer;text-decoration:underline dotted #2563eb;':''}" ${(+r.qtyPOA>0)?`onclick="accItemsPopup(this,'qty')" data-d="${encodeURIComponent(JSON.stringify(r.itemsDetail||[]))}" data-po="${encodeURIComponent(r.po||'')}" data-cont="${encodeURIComponent(r.cont||'')}"`:''} title="คลิกดูรายการสินค้าของ POA นี้ในตู้นี้">${(+r.qtyPOA>0)?fmtNum(r.qtyPOA):'<span style="color:#9ca3af;">-</span>'}</td>`:'')
        + (opt.poa?`<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:700;color:${(+r.outstanding>0)?'#b91c1c':'#9ca3af'};${(+r.outstanding>0)?'cursor:pointer;text-decoration:underline dotted;':''}" ${(+r.outstanding>0)?`onclick="accItemsPopup(this,'out')" data-d="${encodeURIComponent(JSON.stringify(r.itemsDetail||[]))}" data-po="${encodeURIComponent(r.po||'')}" data-cont="${encodeURIComponent(r.cont||'')}"`:''} title="คลิกดูรายการค้างรับของ POA นี้">${(+r.outstanding>0)?fmtNum(r.outstanding):'0'}</td>`:'')
        + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:700;color:${(((r._cur==='USD'?(+r.amtUsd||0):(+r.amtRmb||0))<0)||(+r.outstanding>0))?'#b91c1c':'#111'};">${(r._cur==='USD')?('$'+f2(r.amtUsd)):('¥'+f2(r.amtRmb))}${r.seg?(r._dep?`<div onclick="payEditDeposit('${encodeURIComponent(r.cont+'|'+r.vendor+'|'+r.factory)}')" title="คลิกแก้ % มัดจำ (เหมาจ่ายมัดจำ → ปรับ %)" style="font-size:9px;font-weight:700;color:#7f1d1d;cursor:pointer;text-decoration:underline dotted;">${payEsc(r.seg)} ✎</div>`:`<div style="font-size:9px;font-weight:700;color:#7f1d1d;">${payEsc(r.seg)}</div>`):''}</td>`
+       + (opt.poa?(function(){ const rk=r._piKey||r._key||''; const rv=(window.payRemark&&window.payRemark[rk])||''; return `<td style="${bTd}background:#fffdf5;text-align:left;white-space:normal;min-width:150px;max-width:240px;font-size:11px;color:#111;cursor:pointer;" onclick="payEditRemark('${encodeURIComponent(rk)}')" title="คลิกเพื่อกรอก/แก้ไขหมายเหตุ">${rv?('<span style="white-space:pre-wrap;">'+payEsc(rv)+'</span> <span style="color:#2563eb;font-weight:700;">✎</span>'):'<span style="color:#2563eb;">✎ เพิ่มหมายเหตุ</span>'}</td>`; })():'')
        + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?((venShow.usd>0)?('$'+f2(venShow.usd)):('¥'+f2(venShow.rmb))):''}</td>`
        + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?('฿'+f2(venShow.rmb*fx + venShow.usd*usd)):''}</td>`
        + (opt.docs?(payDocCell(r,'pi',bTd)+payDocCell(r,'inv',bTd)+payDocCell(r,'pl',bTd)):'');
@@ -12582,8 +12601,9 @@ async function paySyncFromCloud(){ if(!window.GraphStorage) return;
   const dc=await window.GraphStorage.loadData('payDocsV1'); if(dc){ window.payDocs= typeof dc==='string'?JSON.parse(dc):dc; if(!window.payDocs||typeof window.payDocs!=='object') window.payDocs={}; try{ localStorage.setItem('payDocsV1', JSON.stringify(window.payDocs)); }catch(e){} }
   const dp=await window.GraphStorage.loadData('payDepOvV1'); if(dp){ window.payDepOv= typeof dp==='string'?JSON.parse(dp):dp; if(!window.payDepOv||typeof window.payDepOv!=='object') window.payDepOv={}; try{ localStorage.setItem('payDepOvV1', JSON.stringify(window.payDepOv)); }catch(e){} }
   const pi=await window.GraphStorage.loadData('payPiV1'); if(pi){ window.payPi= typeof pi==='string'?JSON.parse(pi):pi; if(!window.payPi||typeof window.payPi!=='object') window.payPi={}; try{ localStorage.setItem('payPiV1', JSON.stringify(window.payPi)); }catch(e){} }
+  const rmk=await window.GraphStorage.loadData('payRemarkV1'); if(rmk){ window.payRemark= typeof rmk==='string'?JSON.parse(rmk):rmk; if(!window.payRemark||typeof window.payRemark!=='object') window.payRemark={}; try{ localStorage.setItem('payRemarkV1', JSON.stringify(window.payRemark)); }catch(e){} }
 }
-async function payPushToCloud(){ if(!window.GraphStorage) return; payLoadOv(); payLoadCheck(); payLoadExtra(); payLoadDocs(); payLoadDepOv(); await window.GraphStorage.saveData('payXferOvV1', window.payXferOv||{}); await window.GraphStorage.saveData('payCheckV1', window.payCheck||{}); await window.GraphStorage.saveData('payExtraV1', window.payExtra||[]); await window.GraphStorage.saveData('payDocsV1', window.payDocs||{}); await window.GraphStorage.saveData('payDepOvV1', window.payDepOv||{}); payLoadPi(); await window.GraphStorage.saveData('payPiV1', window.payPi||{}); }
+async function payPushToCloud(){ if(!window.GraphStorage) return; payLoadOv(); payLoadCheck(); payLoadExtra(); payLoadDocs(); payLoadDepOv(); await window.GraphStorage.saveData('payXferOvV1', window.payXferOv||{}); await window.GraphStorage.saveData('payCheckV1', window.payCheck||{}); await window.GraphStorage.saveData('payExtraV1', window.payExtra||[]); await window.GraphStorage.saveData('payDocsV1', window.payDocs||{}); await window.GraphStorage.saveData('payDepOvV1', window.payDepOv||{}); payLoadPi(); await window.GraphStorage.saveData('payPiV1', window.payPi||{}); payLoadRemark(); await window.GraphStorage.saveData('payRemarkV1', window.payRemark||{}); }
 function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent','renderPayment','renderPayment2'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
 async function cloudPullNow(){ const b=document.getElementById('bc-pull'); if(b) b.disabled=true;
   try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); try{ await diyPullCloud(); }catch(e){} try{ await diyPoImpPullCloud(); }catch(e){} try{ await ltPullCloud(); }catch(e){} cloudRerenderAll(); try{ if(typeof renderSearch==='function') renderSearch(); }catch(e){} try{ if(typeof renderItemList==='function') renderItemList(); }catch(e){} bcSetTs('bcCloudSyncAt'); try{ auditLog('⬇️ ดึงข้อมูลล่าสุด'); }catch(e){} pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
