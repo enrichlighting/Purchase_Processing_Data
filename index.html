@@ -10254,6 +10254,9 @@ function poTrackedList(){
 }
 // Lot ที่ Released ของ (PO, สินค้า) จาก BC_POREL
 function poRelLot(po,item){ const rel=(window.BC_POREL&&window.BC_POREL[item])||[]; const e=rel.find(x=>x[0]===po); return e?{lot:e[1],rmb:e[2],out:e[3]}:null; }
+// [แก้ 29 ก.ย. 2026] Outstanding รายตู้/ACC คิดจาก BC_PO (/api/po สด · เก็บเฉพาะที่ยังค้างรับจริง) แทน BC_POREL (static ค้าง 1 ก.ย.)
+// รับของครบแล้ว → หายจาก BC_PO → คืน 0 อัตโนมัติ · ค่าผ่าน bcDedupePO มาแล้ว (ไม่ซ้ำ)
+function poOutstanding(po,item){ const e=(window.BC_PO&&window.BC_PO[item])||null; if(!e||!Array.isArray(e.pos)) return 0; return e.pos.reduce((s,p)=>(p[0]===po?s+(+p[1]||0):s),0); }
 // รายการที่พร้อมจัดตู้ (ครบกำหนด · หรือจัดไปบางส่วนยังเหลือ) → [{po,item,remaining,packed,lot,outQty}]
 function poReadyList(){
   const packed=poPackedMapAll(), out=[];   // นับรวมตู้ที่ถึงคลัง/import CSV ด้วย → หักจำนวนที่จัดตู้ไปแล้วออกจาก "พร้อมจัดตู้"
@@ -11946,7 +11949,7 @@ function payRowsData(splitLot, splitPo){
         if(segs.length===2 && /มัดจำ/.test(segs[0].label||'')){ _isDep=true; const dov=window.payDepOv[_dk];
           if(dov!=null && dov!=='' && +dov>0 && +dov<1){ const dep=+dov; const suf=(segs[1].label||'').replace(/^[\d.]+%\s*/,''); segs=[Object.assign({},segs[0],{r:dep,label:payFmtPct(dep)+'% มัดจำ'}), Object.assign({},segs[1],{r:1-dep,label:payFmtPct(1-dep)+'%'+(suf?(' '+suf):'')})]; }
         }
-        const _itemsDet=Object.keys(g.byItem||{}).sort().map(it=>{ let o=0; if(splitPo && typeof poRelLot==='function' && g.po){ try{ const rl=poRelLot(g.po,it); o=rl?Math.max(0,+rl.out||0):0; }catch(e){} } return {item:it, qty:g.byItem[it]||0, out:o}; });
+        const _itemsDet=Object.keys(g.byItem||{}).sort().map(it=>{ let o=0; if(splitPo && g.po){ try{ o=poOutstanding(g.po,it); }catch(e){} } return {item:it, qty:g.byItem[it]||0, out:o}; });
         const _accOut=_itemsDet.reduce((s,x)=>s+(+x.out||0),0);
         const base={cont:ct.name||('ตู้'+(ci+1)), load, eta, factory:g.factory, vendor:g.vendor||'(ไม่ทราบ vendor)', term, lot:g.lot||'', po:g.po||'', item:g.item||'', qtyPOA:g.qty||0, outstanding:_accOut, itemsDetail:_itemsDet,
                     poList:[...g.pos].sort().join(', '), lotList:[...g.lots].sort().join(', '),
