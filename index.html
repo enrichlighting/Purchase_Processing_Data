@@ -11540,6 +11540,30 @@ function payEditPi(enc){ const key=decodeURIComponent(enc); if(!key) return; pay
   window._payPiEdit=(window.payPi[key]||[]).map(e=>({pi:e.pi||'', amt:(e.amt!=null?e.amt:'')})); if(!window._payPiEdit.length) window._payPiEdit=[{pi:'',amt:''}];
   window._payPiEditKey=key; payRenderPiModal();
 }
+function accItemsPopup(el, mode){
+  let list=[]; try{ list=JSON.parse(decodeURIComponent(el.getAttribute('data-d')||'[]')); }catch(e){}
+  const po=decodeURIComponent(el.getAttribute('data-po')||''); const cont=decodeURIComponent(el.getAttribute('data-cont')||'');
+  const isOut=(mode==='out');
+  const shown=list.filter(x=> isOut?(+x.out>0):(+x.qty>0));
+  const body=shown.map(x=>{ const it=(typeof getItem==='function')?getItem(x.item):null; const dsc=(it&&it.desc)||''; const v=isOut?(+x.out||0):(+x.qty||0);
+    return `<tr><td style="border:1px solid var(--line);padding:5px 8px;font-weight:700;white-space:nowrap;">${payEsc(x.item)}</td><td style="border:1px solid var(--line);padding:5px 8px;font-size:12px;">${payEsc(dsc)||'<span style="color:#9ca3af;">-</span>'}</td><td style="border:1px solid var(--line);padding:5px 8px;text-align:right;font-weight:800;${isOut?'color:#b91c1c;':''}">${fmtNum(v)}</td></tr>`; }).join('');
+  const tot=shown.reduce((s,x)=>s+(isOut?(+x.out||0):(+x.qty||0)),0);
+  let ov=document.getElementById('acc-items-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='acc-items-ov'; ov.style.cssText='position:fixed;inset:0;z-index:100012;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:18px 20px;max-width:560px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);max-height:90vh;overflow:auto;">
+    <div style="font-weight:800;font-size:15px;margin-bottom:2px;">${isOut?'📦 รายการค้างรับ (Outstanding)':'📦 รายการสินค้าในตู้ (Quantity POA)'}</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px;">PO <b>${payEsc(po)||'-'}</b>${cont?(' · ตู้ '+payEsc(cont)):''} · ${shown.length} รายการ</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="background:var(--bg);">
+      <th style="border:1px solid var(--line);padding:5px 8px;text-align:left;">รหัสสินค้า</th>
+      <th style="border:1px solid var(--line);padding:5px 8px;text-align:left;">ชื่อสินค้า</th>
+      <th style="border:1px solid var(--line);padding:5px 8px;text-align:right;">${isOut?'ค้างรับ':'จำนวนในตู้'}</th></tr></thead>
+    <tbody>${body||'<tr><td colspan="3" style="padding:10px;text-align:center;" class="muted">ไม่มีรายการ</td></tr>'}</tbody>
+    <tfoot><tr style="font-weight:800;background:var(--bg);"><td colspan="2" style="border:1px solid var(--line);padding:5px 8px;text-align:right;">รวม</td><td style="border:1px solid var(--line);padding:5px 8px;text-align:right;${isOut?'color:#b91c1c;':''}">${fmtNum(tot)}</td></tr></tfoot></table>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px;"><button onclick="document.getElementById('acc-items-ov').remove()" style="padding:7px 14px;border-radius:8px;border:0;background:var(--brand);color:#fff;cursor:pointer;font-weight:800;">ปิด</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+}
 function payRenderPiModal(){ const key=window._payPiEditKey; const parts=key.split('|'); const total=(window._payPiRowTotal&&window._payPiRowTotal[key]!=null)?window._payPiRowTotal[key]:null;
   const f=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   let ov=document.getElementById('pay-pi-ov'); if(ov) ov.remove();
@@ -11908,8 +11932,8 @@ function payRowsData(splitLot, splitPo){
         const lotAll = (((per&&per.lot)||r.costLot||((typeof pkLotFromPO==='function')?pkLotFromPO(r.item, r.po||''):'')||'')).trim();
         const lot = splitLot ? lotAll : '';   // แยก/แสดง Lot No. โดยใช้ค่าเต็ม (รวม fallback ดึงจาก POA) ไม่งั้นตู้ที่ไม่ได้คีย์ Lot จะว่าง
         const gk=f+'||'+ven+(splitLot?('||'+lot):'')+(splitPo?('||'+(r.po||'')):'');   // แยกกลุ่มตาม Vendor + Factory (+ Lot ถ้าเปิด splitLot · + POA ถ้าเปิด splitPo)
-        const g=groups[gk]||(groups[gk]={factory:f, vendor:ven, lot:lot, rmb:0, qty:0, item:r.item, po:r.po||'', pos:new Set(), lots:new Set(), items:new Set(), brk:{}});
-        g.rmb+=(+per.valRmb||0); g.qty+=q; g.items.add(r.item); if(!g.item) g.item=r.item; if(!g.po) g.po=r.po||'';
+        const g=groups[gk]||(groups[gk]={factory:f, vendor:ven, lot:lot, rmb:0, qty:0, item:r.item, po:r.po||'', pos:new Set(), lots:new Set(), items:new Set(), byItem:{}, brk:{}});
+        g.rmb+=(+per.valRmb||0); g.qty+=q; g.items.add(r.item); g.byItem[r.item]=(g.byItem[r.item]||0)+q; if(!g.item) g.item=r.item; if(!g.po) g.po=r.po||'';
         if(r.po) g.pos.add(r.po); if(lotAll) g.lots.add(lotAll);
         const bk=(r.po||'')+'\u0001'+lotAll; g.brk[bk]=(g.brk[bk]||0)+(+per.valRmb||0);   // มูลค่าแยกราย PO × Lot No.   // 1 กลุ่ม (ตู้×Vendor×Factory) อาจมีหลาย POA / หลาย Lot
       });
@@ -11922,8 +11946,9 @@ function payRowsData(splitLot, splitPo){
         if(segs.length===2 && /มัดจำ/.test(segs[0].label||'')){ _isDep=true; const dov=window.payDepOv[_dk];
           if(dov!=null && dov!=='' && +dov>0 && +dov<1){ const dep=+dov; const suf=(segs[1].label||'').replace(/^[\d.]+%\s*/,''); segs=[Object.assign({},segs[0],{r:dep,label:payFmtPct(dep)+'% มัดจำ'}), Object.assign({},segs[1],{r:1-dep,label:payFmtPct(1-dep)+'%'+(suf?(' '+suf):'')})]; }
         }
-        const _accOut=(splitPo && typeof poRelLot==='function' && g.po) ? [...g.items].reduce((s,it)=>{ try{ const rl=poRelLot(g.po,it); return s+(rl?Math.max(0,+rl.out||0):0); }catch(e){ return s; } },0) : 0;
-        const base={cont:ct.name||('ตู้'+(ci+1)), load, eta, factory:g.factory, vendor:g.vendor||'(ไม่ทราบ vendor)', term, lot:g.lot||'', po:g.po||'', item:g.item||'', qtyPOA:g.qty||0, outstanding:_accOut,
+        const _itemsDet=Object.keys(g.byItem||{}).sort().map(it=>{ let o=0; if(splitPo && typeof poRelLot==='function' && g.po){ try{ const rl=poRelLot(g.po,it); o=rl?Math.max(0,+rl.out||0):0; }catch(e){} } return {item:it, qty:g.byItem[it]||0, out:o}; });
+        const _accOut=_itemsDet.reduce((s,x)=>s+(+x.out||0),0);
+        const base={cont:ct.name||('ตู้'+(ci+1)), load, eta, factory:g.factory, vendor:g.vendor||'(ไม่ทราบ vendor)', term, lot:g.lot||'', po:g.po||'', item:g.item||'', qtyPOA:g.qty||0, outstanding:_accOut, itemsDetail:_itemsDet,
                     poList:[...g.pos].sort().join(', '), lotList:[...g.lots].sort().join(', '),
                     lotRows: Object.keys(g.brk).sort().map(k=>({po:k.split('\u0001')[0], lot:k.split('\u0001')[1], rmb:g.brk[k]}))};
         if(!segs.length){ payEmitRow(out, Object.assign({}, base, {amtRmb:g.rmb, xfer:'', seg:''}), splitPo); }
@@ -12140,8 +12165,8 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
        + (opt.piCol?`<td ${r._piKey?`onclick="payEditPi('${encodeURIComponent(r._piKey)}')" style="${bTd}background:${vbg};text-align:center;white-space:normal;min-width:100px;cursor:pointer;font-size:11px;color:#111;"`:`style="${bTd}background:${vbg};"`} title="คลิกคีย์เลข PI (คีย์ได้หลายเอกสาร → แยกบรรทัด)">${r.pi?('<b>'+payEsc(r.pi)+'</b>'):(r._piKey?'<span style="color:#2563eb;">+ PI</span>':'')}${r._piRemainder?'<div style="font-size:9px;color:#b45309;">ยังไม่ระบุ PI</div>':''}</td>`:'')
        + (opt.poa?`<td style="${bTd}background:${vbg};text-align:center;white-space:normal;min-width:110px;font-size:11px;color:#111;">${r.poList?('<b>'+payEsc(r.poList)+'</b>'):(r.po?('<b>'+payEsc(r.po)+'</b>'):'<span style="color:#9ca3af;">-</span>')}</td>`:'')
        + (opt.splitLot?`<td style="${bTd}background:${vbg};text-align:center;white-space:nowrap;color:#111;">${r.lot?('<b>'+payEsc(r.lot)+'</b>'):'<span style="color:#9ca3af;">-</span>'}</td>`:'')
-       + (opt.poa?`<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;color:#111;" title="จำนวนสินค้าของ POA นี้ที่อยู่ในตู้นี้">${(+r.qtyPOA>0)?fmtNum(r.qtyPOA):'<span style="color:#9ca3af;">-</span>'}</td>`:'')
-       + (opt.poa?`<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:700;color:${(+r.outstanding>0)?'#b91c1c':'#9ca3af'};" title="จำนวนค้างรับของ POA นี้ (ยังไม่ได้รับเข้า)">${(+r.outstanding>0)?fmtNum(r.outstanding):'0'}</td>`:'')
+       + (opt.poa?`<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;color:#111;${(+r.qtyPOA>0)?'cursor:pointer;text-decoration:underline dotted #2563eb;':''}" ${(+r.qtyPOA>0)?`onclick="accItemsPopup(this,'qty')" data-d="${encodeURIComponent(JSON.stringify(r.itemsDetail||[]))}" data-po="${encodeURIComponent(r.po||'')}" data-cont="${encodeURIComponent(r.cont||'')}"`:''} title="คลิกดูรายการสินค้าของ POA นี้ในตู้นี้">${(+r.qtyPOA>0)?fmtNum(r.qtyPOA):'<span style="color:#9ca3af;">-</span>'}</td>`:'')
+       + (opt.poa?`<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:700;color:${(+r.outstanding>0)?'#b91c1c':'#9ca3af'};${(+r.outstanding>0)?'cursor:pointer;text-decoration:underline dotted;':''}" ${(+r.outstanding>0)?`onclick="accItemsPopup(this,'out')" data-d="${encodeURIComponent(JSON.stringify(r.itemsDetail||[]))}" data-po="${encodeURIComponent(r.po||'')}" data-cont="${encodeURIComponent(r.cont||'')}"`:''} title="คลิกดูรายการค้างรับของ POA นี้">${(+r.outstanding>0)?fmtNum(r.outstanding):'0'}</td>`:'')
        + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:700;color:${(((r._cur==='USD'?(+r.amtUsd||0):(+r.amtRmb||0))<0)||(+r.outstanding>0))?'#b91c1c':'#111'};">${(r._cur==='USD')?('$'+f2(r.amtUsd)):('¥'+f2(r.amtRmb))}${r.seg?(r._dep?`<div onclick="payEditDeposit('${encodeURIComponent(r.cont+'|'+r.vendor+'|'+r.factory)}')" title="คลิกแก้ % มัดจำ (เหมาจ่ายมัดจำ → ปรับ %)" style="font-size:9px;font-weight:700;color:#7f1d1d;cursor:pointer;text-decoration:underline dotted;">${payEsc(r.seg)} ✎</div>`:`<div style="font-size:9px;font-weight:700;color:#7f1d1d;">${payEsc(r.seg)}</div>`):''}</td>`
        + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?((venShow.usd>0)?('$'+f2(venShow.usd)):('¥'+f2(venShow.rmb))):''}</td>`
        + `<td style="${bTd}background:${vbg};text-align:right;white-space:nowrap;font-weight:800;color:#111;">${venShow!=null?('฿'+f2(venShow.rmb*fx + venShow.usd*usd)):''}</td>`
