@@ -8575,6 +8575,7 @@ function pkMatchApply(){
 }
 // เรียกเดิม (ปุ่ม) → เปิดหน้าจับคู่
 function pkConvertDraftToReleased(){ pkOpenMatchModal(); }
+function pkSetLotManual(i,v){ const r=window.packingRows[i]; if(!r) return; r.costLot=String(v||'').trim(); r.costIdx=null; if(window.pkMode==='released') r.lotMax=null; renderPacking(); }
 function pkSetCostLot(i, v){
   const r=window.packingRows[i];
   const oldPo=((pkRowCost(r)||{}).po)||'';   // PO เดิมก่อนเปลี่ยน
@@ -8704,7 +8705,7 @@ function pkPickLot(i, v){
   if(idx<0) idx=list.findIndex(e=>String(e.lot||'').toLowerCase()===v.toLowerCase() || (e.lot && v.toLowerCase().indexOf(String(e.lot).toLowerCase())>=0));
   if(idx>=0){ pkSetCostLot(i, String(idx)); return; }
   // [เพิ่ม 30 ก.ย.] ไม่พบใน Lot list (เช่น PO ของ Osram ที่ไม่อยู่ในรายการ) → ระบุ PO เอง แล้วดึง Lot จาก pkLotFromPO (BC_POREL/BC_POCOST)
-  if(/^PO/i.test(v)){ r.po=v; r.costLot=(pkLotFromPO(r.item, v)||''); r.costIdx=null; if(window.pkMode==='released') r.lotMax=null; renderPacking(); pkToast(r.costLot?('ตั้ง PO '+v+' · Lot '+r.costLot):('ตั้ง PO '+v+' (ยังไม่พบ Lot อัตโนมัติในระบบ)'),'good'); return; }
+  { const _m=v.match(/PO[A-Z]?\d+/i); if(_m){ const _po=_m[0].toUpperCase(); r.po=_po; const _lt=pkLotFromPO(r.item, _po); if(_lt) r.costLot=_lt; r.costIdx=null; if(window.pkMode==='released') r.lotMax=null; renderPacking(); pkToast(_lt?('ตั้ง PO '+_po+' · Lot '+_lt):('ตั้ง PO '+_po+' (กรอก Lot No เองได้ในช่องด้านล่าง)'),'good'); return; } }
   pkToast('ไม่พบ Lot/PO — เลือกจากรายการ หรือพิมพ์เลข PO (ขึ้นต้นด้วย PO)','bad');
 }
 // ตู้ที่กำลังแก้ไขเป็นรอบที่ "ถึงคลังแล้ว" หรือไม่ — ใช้ปลดล็อกการจำกัดจำนวนตอนแก้ PO ย้อนหลัง (ของเข้าคลังแล้ว จำนวนในตู้เป็นข้อมูลจริง ไม่ควรถูกตัดตามค้างรับที่เหลือ)
@@ -8981,7 +8982,14 @@ function renderPacking(){
     let costSel, capNote='';
     if(cust){ const cd=(window.pkCustomDims||{})[r.item]||{}; costSel=`<input type="number" min="0" step="0.01" value="${cd.rmb==null?'':cd.rmb}" onchange="pkCustSet(${i},'rmb',this.value)" placeholder="RMB/ชิ้น (ถ้ามี)" title="ต้นทุน RMB ต่อชิ้น — ไม่บังคับ" style="width:120px;font-size:12px;padding:5px 7px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">`; }
     else if(!r.item){ costSel=`<span class="muted" style="font-size:11px;">—</span>`; }
-    else if(!lotList.length){ costSel=`<span class="muted" style="font-size:11px;">${window.pkMode==='released'?'ไม่มี PO Released ค้างรับ':'ไม่มีข้อมูล PO'}</span>`; }
+    else if(!lotList.length){
+      const _alt=[]; const _seen={};
+      ((window.BC_POREL&&window.BC_POREL[r.item])||[]).forEach(function(e){ if(e&&e[0]&&!_seen[e[0]]){ _seen[e[0]]=1; _alt.push(e[0]+(e[1]?(' · Lot '+e[1]):'')); } });
+      ((window.BC_POCOST&&window.BC_POCOST[r.item])||[]).forEach(function(e){ if(e&&e[2]&&!_seen[e[2]]){ _seen[e[2]]=1; _alt.push(e[2]+(e[0]?(' · Lot '+e[0]):'')); } });
+      const _dl='<datalist id="pk-poadl-'+i+'">'+_alt.map(function(o){return '<option value="'+o.replace(/"/g,'&quot;')+'"></option>';}).join('')+'</datalist>';
+      const _poV=(r.po||'').replace(/"/g,'&quot;'); const _lotV=(r.costLot||'').replace(/"/g,'&quot;');
+      costSel=`<input list="pk-poadl-${i}" type="text" value="${_poV}" onchange="pkPickLot(${i},this.value)" onfocus="this.select()" placeholder="เลข POA (กรอกเอง)" autocomplete="off" title="ไม่มี PO Released ค้างรับในระบบ — พิมพ์/เลือกเลข POA เอง (ถ้ามีข้อมูลจะดึง Lot ให้)" style="width:150px;font-size:11.5px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">${_dl}<input type="text" value="${_lotV}" onchange="pkSetLotManual(${i},this.value)" placeholder="Lot No (ถ้าต้องการ)" title="กรอก Lot No เอง (ถ้าระบบดึงจาก POA ไม่ได้)" style="width:150px;font-size:11.5px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);margin-top:3px;"><div style="font-size:9px;color:var(--muted);margin-top:2px;">ไม่มี PO Released ค้างรับ · กรอกเอง</div>`;
+    }
     else {
       const lotDl='<datalist id="pk-lotdl-'+i+'">'+lotList.map(e=>`<option value="${pkLotLabelOf(e).replace(/"/g,'&quot;')}"></option>`).join('')+'</datalist>';
       const curLot=(r.costIdx!=null && lotList[r.costIdx])? pkLotLabelOf(lotList[r.costIdx]) : '';
