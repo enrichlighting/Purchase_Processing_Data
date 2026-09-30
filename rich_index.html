@@ -8441,6 +8441,7 @@ function pkRowCost(r){
   const list=pkLotList(r.item);
   if(!list.length || r.costIdx==null || r.costIdx==='' || !list[r.costIdx]){
     if(r && r.rmbFixed!=null && r.rmbFixed!==''){ const rf=+r.rmbFixed; return {lot:(r.costLot||pkLotFromPO(r.item, r.po||'')||''), po:r.po||'', rmb:rf, thb:rf*pkFxVal(), out:(r.lotMax!=null?r.lotMax:null)}; }   // ตู้ import: ใช้ต้นทุนที่กรอกมา (ไม่มี Lot ในระบบ)
+    if(r && (r.po || r.costLot)){ const _lot=(r.costLot||pkLotFromPO(r.item, r.po||'')||''); const _rmb=pkCurrentRmbFor(r.item, r.po||'', _lot); return {lot:_lot, po:r.po||'', rmb:(_rmb!=null?_rmb:null), thb:(_rmb!=null?_rmb*pkFxVal():null), out:null}; }   // [เพิ่ม 30 ก.ย.] ระบุ PO เองในช่อง LOT (เช่น Osram ที่ PO ไม่อยู่ใน Lot list) → ดึง Lot/ต้นทุนจาก PO ตรง ๆ
     return {lot:'', po:'', rmb:null, thb:null, out:null};
   }
   const e=list[r.costIdx];
@@ -8701,7 +8702,10 @@ function pkPickLot(i, v){
   let idx=list.findIndex(e=>pkLotLabelOf(e)===v);
   if(idx<0) idx=list.findIndex(e=>String(e.po||'').toLowerCase()===v.toLowerCase() || (e.po && v.toLowerCase().indexOf(String(e.po).toLowerCase())>=0));   // พิมพ์เลข PO ตรงๆ ก็เลือกได้ (เช่น POA26050020)
   if(idx<0) idx=list.findIndex(e=>String(e.lot||'').toLowerCase()===v.toLowerCase() || (e.lot && v.toLowerCase().indexOf(String(e.lot).toLowerCase())>=0));
-  if(idx>=0) pkSetCostLot(i, String(idx)); else pkToast('ไม่พบ Lot/PO — เลือกจากรายการที่ระบบแนะนำ','bad');
+  if(idx>=0){ pkSetCostLot(i, String(idx)); return; }
+  // [เพิ่ม 30 ก.ย.] ไม่พบใน Lot list (เช่น PO ของ Osram ที่ไม่อยู่ในรายการ) → ระบุ PO เอง แล้วดึง Lot จาก pkLotFromPO (BC_POREL/BC_POCOST)
+  if(/^PO/i.test(v)){ r.po=v; r.costLot=(pkLotFromPO(r.item, v)||''); r.costIdx=null; if(window.pkMode==='released') r.lotMax=null; renderPacking(); pkToast(r.costLot?('ตั้ง PO '+v+' · Lot '+r.costLot):('ตั้ง PO '+v+' (ยังไม่พบ Lot อัตโนมัติในระบบ)'),'good'); return; }
+  pkToast('ไม่พบ Lot/PO — เลือกจากรายการ หรือพิมพ์เลข PO (ขึ้นต้นด้วย PO)','bad');
 }
 // ตู้ที่กำลังแก้ไขเป็นรอบที่ "ถึงคลังแล้ว" หรือไม่ — ใช้ปลดล็อกการจำกัดจำนวนตอนแก้ PO ย้อนหลัง (ของเข้าคลังแล้ว จำนวนในตู้เป็นข้อมูลจริง ไม่ควรถูกตัดตามค้างรับที่เหลือ)
 function pkEditingArrived(){ if(window.pkEditIdx==null) return false; const s=(window.pkLog||[])[window.pkEditIdx]; return !!(s && typeof pkRoundArrived==='function' && pkRoundArrived(s)); }
@@ -10074,6 +10078,7 @@ function poToggleVendorIdx(i){ const v=(window._poVendList||[])[i]; if(v==null) 
 function poToggleY(y){ window.poExpY=window.poExpY||{}; window.poExpY[y]=!window.poExpY[y]; renderPoFollow(); }
 function poToggleM(ym){ window.poExpM=window.poExpM||{}; window.poExpM[ym]=!window.poExpM[ym]; renderPoFollow(); }
 function poToggleIt(it){ window.poExpIt=window.poExpIt||{}; window.poExpIt[it]=!window.poExpIt[it]; renderPoFollow(); }
+function poItemFilter(q){ window.poItemSearch=q||''; const s=String(q||'').trim().toLowerCase(); document.querySelectorAll('tr.po-item-row').forEach(function(tr){ const k=(tr.getAttribute('data-k')||''); const it=(tr.getAttribute('data-it')||''); const show=!s||k.indexOf(s)>=0; tr.style.display=show?'':'none'; try{ document.querySelectorAll('tr.po-poa-row[data-it="'+it+'"]').forEach(function(pr){ pr.style.display=show?'':'none'; }); }catch(e){} }); }
 function poToggleV(k){ window.poExpV=window.poExpV||{}; window.poExpV[k]=!window.poExpV[k]; renderPoFollow(); }
 // เลือก PO จากช่องค้นหา (datalist) — ดึงเลข PO จากส่วนหน้าของ label
 function poPickFromSearch(v){
@@ -10485,17 +10490,18 @@ function renderPoFollow(){
   const itemsSorted=Object.values(itAgg).sort((a,b)=> (b.out-a.out) || (b.val-a.val));
   let rowsI='';
   itemsSorted.forEach((A,idx)=>{ const iOpen=!!window.poExpIt[A.item]; const dsc=payEsc(((getItem(A.item)||{}).desc)||'').slice(0,42);
-    rowsI+=`<tr style="cursor:pointer;background:#fff7ed;" onclick="poToggleIt('${escq(A.item)}')"><td style="text-align:center;">${iOpen?'▼':'▶'}</td><td><b>${idx+1}. ${A.item}</b>${dsc?(' <span class="muted" style="font-size:10px;">'+dsc+'</span>'):''}<br><span class="muted" style="font-size:10px;">${A.pos.length} POA</span></td><td class="num"><b style="color:var(--bad)">${fmtNum(A.out)}</b> ชิ้น<br><span class="muted" style="font-size:10px;">${yuan(A.val)}</span></td></tr>`;
+    rowsI+=`<tr class="po-item-row" data-it="${payEsc(A.item)}" data-k="${payEsc((A.item+' '+((getItem(A.item)||{}).desc||'')).toLowerCase())}" style="cursor:pointer;background:#fff7ed;" onclick="poToggleIt('${escq(A.item)}')"><td style="text-align:center;">${iOpen?'▼':'▶'}</td><td><b>${idx+1}. ${A.item}</b>${dsc?(' <span class="muted" style="font-size:10px;">'+dsc+'</span>'):''}<br><span class="muted" style="font-size:10px;">${A.pos.length} POA</span></td><td class="num"><b style="color:var(--bad)">${fmtNum(A.out)}</b> ชิ้น<br><span class="muted" style="font-size:10px;">${yuan(A.val)}</span></td></tr>`;
     if(!iOpen) return;
     A.pos.slice().sort((a,b)=>{ const ea=a.eta,eb=b.eta; if(ea&&eb) return ea<eb?-1:1; if(ea) return -1; if(eb) return 1; return a.po<b.po?-1:1; }).forEach(p=>{
-      rowsI+=`<tr style="cursor:pointer;${window.poSelected===p.po?'outline:2px solid var(--brand);':''}" onclick="poSelectPO('${p.po}')" title="เลือก PO นี้ กรอก Lead Time ด้านล่าง"><td></td><td style="padding-left:24px;"><b style="font-size:11px;">${p.po}</b>${p.lot?' <span class="muted" style="font-size:10px;">Lot '+p.lot+'</span>':''}<br><span class="muted" style="font-size:10px;">${p.eta?('📅 ETA '+poThaiShort(p.eta)+' · '+etaWaitTxt(p.eta)):'ไม่ระบุ ETA'}</span></td><td class="num" style="font-size:11px;"><b>${fmtNum(p.out)}</b> ชิ้น<br><span class="muted" style="font-size:10px;">${yuan(p.val)}</span></td></tr>`;
+      rowsI+=`<tr class="po-poa-row" data-it="${payEsc(A.item)}" style="cursor:pointer;${window.poSelected===p.po?'outline:2px solid var(--brand);':''}" onclick="poSelectPO('${p.po}')" title="เลือก PO นี้ กรอก Lead Time ด้านล่าง"><td></td><td style="padding-left:24px;"><b style="font-size:11px;">${p.po}</b>${p.lot?' <span class="muted" style="font-size:10px;">Lot '+p.lot+'</span>':''}<br><span class="muted" style="font-size:10px;">${p.eta?('📅 ETA '+poThaiShort(p.eta)+' · '+etaWaitTxt(p.eta)):'ไม่ระบุ ETA'}</span></td><td class="num" style="font-size:11px;"><b>${fmtNum(p.out)}</b> ชิ้น<br><span class="muted" style="font-size:10px;">${yuan(p.val)}</span></td></tr>`;
     });
   });
   const tblItem=`<div style="width:100%;margin-top:18px;border-top:1px solid var(--line);padding-top:14px;">
     <div style="font-weight:700;font-size:15px;margin-bottom:3px;">📦 อันดับสินค้าค้างรับมากสุด <span class="muted" style="font-weight:400;font-size:11px;">(รวมทุก POA · คลิกกางดูราย POA)</span></div>
-    <div class="muted" style="font-size:11px;margin-bottom:6px;">เรียงตาม<b>จำนวนค้างรับรวมมากสุด</b> · แยกราย POA พร้อม ETA และมูลค่า (ต้นทุน RMB × ค้างรับ) · คลิก POA เพื่อกรอก Lead Time ด้านล่าง</div>
+    <div class="muted" style="font-size:11px;margin-bottom:6px;">เรียงตาม<b>จำนวนค้างรับรวมมากสุด</b> · แยกราย POA พร้อม ETA และมูลค่า (ต้นทุน RMB × ค้างรับ) · แสดง ~10 อันดับแรก เลื่อนดูเพิ่มในกรอบ · คลิก POA เพื่อกรอก Lead Time ด้านล่าง</div>
+    <input type="text" id="po-item-search" value="${payEsc(window.poItemSearch||'')}" oninput="poItemFilter(this.value)" placeholder="🔍 ค้นหาสินค้า (รหัส/ชื่อ)" autocomplete="off" style="width:100%;max-width:340px;margin-bottom:6px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;">
     ${rowsI?'':'<div class="muted" style="font-size:12px;padding:8px 4px;">ไม่มีสินค้าค้างรับ</div>'}
-    <div style="overflow-x:auto;"><table style="width:100%;font-size:12px;table-layout:fixed;"><tr><th style="width:18px;"></th><th>อันดับ / สินค้า / POA</th><th class="num" style="width:120px;">ค้างรับ / มูลค่า ¥</th></tr>${rowsI}</table></div></div>`;
+    <div style="max-height:440px;overflow:auto;border:1px solid var(--line);border-radius:8px;"><table style="width:100%;font-size:12px;table-layout:fixed;"><thead><tr><th style="width:18px;position:sticky;top:0;background:var(--card);z-index:1;"></th><th style="position:sticky;top:0;background:var(--card);z-index:1;">อันดับ / สินค้า / POA</th><th class="num" style="width:120px;position:sticky;top:0;background:var(--card);z-index:1;">ค้างรับ / มูลค่า ¥</th></tr></thead><tbody>${rowsI}</tbody></table></div></div>`;
   // ===== dropdown เลือก PO =====
   const sorted=list.filter(po=>/^PO[AC]/i.test(po.po||'')).sort((a,b)=>a.po<b.po?-1:1);   // รับเฉพาะ POA / POC
   const poShort=iso=>{ if(!iso) return ''; const p=String(iso).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0].slice(2)}`:''; };   // dd/mm/yy
@@ -10609,7 +10615,7 @@ function renderPoFollow(){
       <button onclick="poGoPackSelected()" class="go" style="background:var(--bad);">➡️ นำรายการที่เลือกไปหน้า Packing List</button>
     </div>`;
   }
-  el.innerHTML=readyHtml+tbl+tblItem+leftCol+trkTbl;
+  el.innerHTML=readyHtml+tbl+tblItem+leftCol+trkTbl; try{ if(window.poItemSearch) poItemFilter(window.poItemSearch); }catch(e){}
 }
 function poPhaseBlock(po, item, r, fx, dueDate, today, color){
   const title = r===1 ? 'ตามโรงงานรอบที่ 1 (เริ่มผลิตหรือยัง)' : 'ตามโรงงานรอบที่ 2 (ความคืบหน้า)';
