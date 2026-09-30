@@ -10073,6 +10073,7 @@ function poTrkToggleVend(el){ const v=decodeURIComponent(el.getAttribute('data-v
 function poToggleVendorIdx(i){ const v=(window._poVendList||[])[i]; if(v==null) return; window.poVendorExpanded=(window.poVendorExpanded===v)?null:v; renderPoFollow(); }
 function poToggleY(y){ window.poExpY=window.poExpY||{}; window.poExpY[y]=!window.poExpY[y]; renderPoFollow(); }
 function poToggleM(ym){ window.poExpM=window.poExpM||{}; window.poExpM[ym]=!window.poExpM[ym]; renderPoFollow(); }
+function poToggleIt(it){ window.poExpIt=window.poExpIt||{}; window.poExpIt[it]=!window.poExpIt[it]; renderPoFollow(); }
 function poToggleV(k){ window.poExpV=window.poExpV||{}; window.poExpV[k]=!window.poExpV[k]; renderPoFollow(); }
 // เลือก PO จากช่องค้นหา (datalist) — ดึงเลข PO จากส่วนหน้าของ label
 function poPickFromSearch(v){
@@ -10474,6 +10475,27 @@ function renderPoFollow(){
     <div class="muted" style="font-size:11px;margin-bottom:6px;">แสดง<b>เฉพาะ PO ที่ Released &amp; ยังไม่ปิด (มีค้างรับ) และเลยกำหนด ETA แล้ว</b> · มูลค่าค้างรับ = ต้นทุน RMB × จำนวนค้างรับ · <b>วันค้างนับจาก ETA</b> · คลิกกางย่อยแล้วคลิก PO เพื่อกรอก Lead Time ด้านล่าง</div>
     ${rowsT?'':'<div class="muted" style="font-size:12px;padding:8px 4px;">🎉 ไม่มี PO ที่เลย ETA</div>'}
     <div style="overflow-x:auto;"><table style="width:100%;font-size:12px;table-layout:fixed;"><tr><th style="width:18px;"></th><th>ช่วง / ผู้ขาย / PO</th><th class="num" style="width:104px;">มูลค่า ¥ / ค้าง</th></tr>${rowsT}</table></div></div>`;
+  // ===== [เพิ่ม 30 ก.ย. 2026] อันดับสินค้าค้างรับมากสุด (รวมทุก POA) — ต่อท้ายตาราง "อันดับค้างรับ" =====
+  window.poExpIt=window.poExpIt||{};
+  const itAgg={};
+  list.forEach(po=>{ if(!/^PO[AC]/i.test(po.po||'')) return;
+    (po.items||[]).forEach(x=>{ const o=+x.out||0; if(o<=0) return; const rl=poRelLot(po.po,x.item)||{}; const eta=poEtaOf(po.po,x.item); const val=o*(+rl.rmb||0);
+      const A=itAgg[x.item]||(itAgg[x.item]={item:x.item, out:0, val:0, pos:[]}); A.out+=o; A.val+=val; A.pos.push({po:po.po, out:o, eta:eta, val:val, lot:rl.lot||''}); });
+  });
+  const itemsSorted=Object.values(itAgg).sort((a,b)=> (b.out-a.out) || (b.val-a.val));
+  let rowsI='';
+  itemsSorted.forEach((A,idx)=>{ const iOpen=!!window.poExpIt[A.item]; const dsc=payEsc(((getItem(A.item)||{}).desc)||'').slice(0,42);
+    rowsI+=`<tr style="cursor:pointer;background:#fff7ed;" onclick="poToggleIt('${escq(A.item)}')"><td style="text-align:center;">${iOpen?'▼':'▶'}</td><td><b>${idx+1}. ${A.item}</b>${dsc?(' <span class="muted" style="font-size:10px;">'+dsc+'</span>'):''}<br><span class="muted" style="font-size:10px;">${A.pos.length} POA</span></td><td class="num"><b style="color:var(--bad)">${fmtNum(A.out)}</b> ชิ้น<br><span class="muted" style="font-size:10px;">${yuan(A.val)}</span></td></tr>`;
+    if(!iOpen) return;
+    A.pos.slice().sort((a,b)=>{ const ea=a.eta,eb=b.eta; if(ea&&eb) return ea<eb?-1:1; if(ea) return -1; if(eb) return 1; return a.po<b.po?-1:1; }).forEach(p=>{
+      rowsI+=`<tr style="cursor:pointer;${window.poSelected===p.po?'outline:2px solid var(--brand);':''}" onclick="poSelectPO('${p.po}')" title="เลือก PO นี้ กรอก Lead Time ด้านล่าง"><td></td><td style="padding-left:24px;"><b style="font-size:11px;">${p.po}</b>${p.lot?' <span class="muted" style="font-size:10px;">Lot '+p.lot+'</span>':''}<br><span class="muted" style="font-size:10px;">${p.eta?('📅 ETA '+poThaiShort(p.eta)+' · '+etaWaitTxt(p.eta)):'ไม่ระบุ ETA'}</span></td><td class="num" style="font-size:11px;"><b>${fmtNum(p.out)}</b> ชิ้น<br><span class="muted" style="font-size:10px;">${yuan(p.val)}</span></td></tr>`;
+    });
+  });
+  const tblItem=`<div style="width:100%;margin-top:18px;border-top:1px solid var(--line);padding-top:14px;">
+    <div style="font-weight:700;font-size:15px;margin-bottom:3px;">📦 อันดับสินค้าค้างรับมากสุด <span class="muted" style="font-weight:400;font-size:11px;">(รวมทุก POA · คลิกกางดูราย POA)</span></div>
+    <div class="muted" style="font-size:11px;margin-bottom:6px;">เรียงตาม<b>จำนวนค้างรับรวมมากสุด</b> · แยกราย POA พร้อม ETA และมูลค่า (ต้นทุน RMB × ค้างรับ) · คลิก POA เพื่อกรอก Lead Time ด้านล่าง</div>
+    ${rowsI?'':'<div class="muted" style="font-size:12px;padding:8px 4px;">ไม่มีสินค้าค้างรับ</div>'}
+    <div style="overflow-x:auto;"><table style="width:100%;font-size:12px;table-layout:fixed;"><tr><th style="width:18px;"></th><th>อันดับ / สินค้า / POA</th><th class="num" style="width:120px;">ค้างรับ / มูลค่า ¥</th></tr>${rowsI}</table></div></div>`;
   // ===== dropdown เลือก PO =====
   const sorted=list.filter(po=>/^PO[AC]/i.test(po.po||'')).sort((a,b)=>a.po<b.po?-1:1);   // รับเฉพาะ POA / POC
   const poShort=iso=>{ if(!iso) return ''; const p=String(iso).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0].slice(2)}`:''; };   // dd/mm/yy
@@ -10587,7 +10609,7 @@ function renderPoFollow(){
       <button onclick="poGoPackSelected()" class="go" style="background:var(--bad);">➡️ นำรายการที่เลือกไปหน้า Packing List</button>
     </div>`;
   }
-  el.innerHTML=readyHtml+tbl+leftCol+trkTbl;
+  el.innerHTML=readyHtml+tbl+tblItem+leftCol+trkTbl;
 }
 function poPhaseBlock(po, item, r, fx, dueDate, today, color){
   const title = r===1 ? 'ตามโรงงานรอบที่ 1 (เริ่มผลิตหรือยัง)' : 'ตามโรงงานรอบที่ 2 (ความคืบหน้า)';
