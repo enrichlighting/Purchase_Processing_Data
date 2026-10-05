@@ -11574,6 +11574,40 @@ function payEditRemark(enc){ const key=decodeURIComponent(enc||''); if(!key) ret
   document.body.appendChild(ov); const ta=document.getElementById('pay-rmk-input'); if(ta) ta.focus();
 }
 function paySaveRemark(enc){ const key=decodeURIComponent(enc||''); if(!key) return; payLoadRemark(); const ta=document.getElementById('pay-rmk-input'); const v=ta?ta.value.trim():''; if(v) window.payRemark[key]=v; else delete window.payRemark[key]; payRemarkPersist(); const ov=document.getElementById('pay-rmk-ov'); if(ov) ov.remove(); if(typeof payRefresh==='function') payRefresh(); pkToast(v?'บันทึกหมายเหตุแล้ว':'ลบหมายเหตุแล้ว','good'); }
+// [เพิ่ม 5 ต.ค. 2026] 3 คอลัมน์หน้า Payment for ACC: เลข Piyin (text) + เรทที่จ่ายจริง (คูณยอดหยวน→บาท เฉพาะช่องนี้ ไม่กระทบเรทหลัก) + วันที่จ่าย (ปฏิทิน) — เก็บ localStorage + cloud (payAcc3V1)
+function payLoadAcc3(){ if(window.payAcc3) return; try{ window.payAcc3=JSON.parse(localStorage.getItem('payAcc3V1')||'{}'); }catch(e){ window.payAcc3={}; } if(!window.payAcc3||typeof window.payAcc3!=='object') window.payAcc3={}; }
+function payAcc3Persist(){ try{ localStorage.setItem('payAcc3V1', JSON.stringify(window.payAcc3||{})); }catch(e){} if(typeof payPushToCloud==='function'){ try{ payPushToCloud(); }catch(e){} } }
+function paySetAcc3(enc, field, val){ const key=decodeURIComponent(enc||''); if(!key) return; payLoadAcc3(); const o=window.payAcc3[key]||(window.payAcc3[key]={}); val=String(val==null?'':val).trim(); if(val) o[field]=val; else delete o[field]; if(!Object.keys(o).length) delete window.payAcc3[key]; payAcc3Persist(); try{ if(typeof presAct==='function') presAct('แก้ '+field+' (ACC)'); }catch(e){} }
+function payEditRate(enc, amt){ const key=decodeURIComponent(enc||''); if(!key) return; payLoadAcc3(); amt=+amt||0; const cur=(window.payAcc3[key]&&window.payAcc3[key].rate!=null)?window.payAcc3[key].rate:'';
+  const f=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  let ov=document.getElementById('pay-rate-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='pay-rate-ov'; ov.style.cssText='position:fixed;inset:0;z-index:100014;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:18px 20px;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);">
+    <div style="font-weight:800;font-size:15px;margin-bottom:4px;">💱 เรทค่าเงิน ณ ตอนจ่ายจริง</div>
+    <div class="muted" style="font-size:12px;margin-bottom:12px;line-height:1.5;">ยอดเงินบรรทัดนี้: <b>¥${f(amt)}</b><br>กรอกเรท (บาท/หยวน) ที่จ่ายจริงช่วงนั้น → คำนวณเป็นเงินบาทเฉพาะช่องนี้ (ไม่กระทบเรทหลักของหน้า)</div>
+    <label style="font-size:13px;font-weight:700;">เรท (บาท/หยวน)<br><input type="number" id="pay-rate-input" value="${cur}" step="0.0001" placeholder="เช่น 5.05" oninput="var v=parseFloat(this.value)||0;var el=document.getElementById('pay-rate-prev'); if(el) el.textContent='฿'+(${amt}*v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:14px;"></label>
+    <div style="margin-top:10px;font-size:13px;">เป็นเงินบาทที่จ่ายจริง: <b id="pay-rate-prev" style="color:#7f1d1d;font-size:15px;">฿${f(amt*(+cur||0))}</b></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;">
+      <button onclick="document.getElementById('pay-rate-ov').remove()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:700;">ยกเลิก</button>
+      ${cur!==''?`<button onclick="paySaveRate('${encodeURIComponent(key)}','')" style="padding:7px 14px;border-radius:8px;border:1px solid #b45309;background:var(--card);color:#b45309;cursor:pointer;font-weight:700;">ล้างเรท</button>`:''}
+      <button onclick="paySaveRate('${encodeURIComponent(key)}')" style="padding:7px 14px;border-radius:8px;border:0;background:var(--brand);color:#fff;cursor:pointer;font-weight:800;">บันทึก</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov); const inp=document.getElementById('pay-rate-input'); if(inp){ inp.focus(); inp.select(); }
+}
+function paySaveRate(enc, forceEmpty){ const key=decodeURIComponent(enc||''); if(!key) return; payLoadAcc3(); const o=window.payAcc3[key]||(window.payAcc3[key]={});
+  let v; if(forceEmpty===''){ v=''; } else { const el=document.getElementById('pay-rate-input'); v=el?String(el.value).trim():''; }
+  if(v!=='' && !isNaN(+v) && +v>0){ o.rate=+v; } else { delete o.rate; }
+  if(!Object.keys(o).length) delete window.payAcc3[key]; payAcc3Persist();
+  const ov=document.getElementById('pay-rate-ov'); if(ov) ov.remove(); if(typeof payRefresh==='function') payRefresh(); pkToast((v!==''&&+v>0)?'บันทึกเรทแล้ว':'ล้างเรทแล้ว','good'); }
+// แถบ scroll ซ้าย-ขวา เพิ่มที่ด้านบนตาราง (ซิงก์กับแถบล่าง) — หน้า Payment ทั้งสอง
+function paySyncTopScrollers(){ try{
+  if(!window._acc3Resize){ window._acc3Resize=1; window.addEventListener('resize', function(){ try{ paySyncTopScrollers(); }catch(e){} }); }
+  document.querySelectorAll('.pay-scroll-wrap').forEach(function(wrap){ const host=wrap.parentElement; if(!host) return; const top=host.querySelector('.pay-hscroll-top'); if(!top) return; const inner=top.querySelector('.pay-hscroll-top-inner'); if(!inner) return; const tbl=wrap.querySelector('table'); const w=(tbl?tbl.scrollWidth:wrap.scrollWidth)||0; inner.style.width=w+'px';
+    if(!top._synced){ top._synced=1; top.addEventListener('scroll',function(){ if(top._lk) return; top._lk=1; wrap.scrollLeft=top.scrollLeft; top._lk=0; }); wrap.addEventListener('scroll',function(){ if(top._lk) return; top._lk=1; top.scrollLeft=wrap.scrollLeft; top._lk=0; }); }
+  });
+}catch(e){} }
 function payLoadPi(){ if(window.payPi) return; try{ window.payPi=JSON.parse(localStorage.getItem('payPiV1')||'{}'); }catch(e){ window.payPi={}; } }
 function paySavePi(){ try{ localStorage.setItem('payPiV1', JSON.stringify(window.payPi||{})); }catch(e){} if(typeof payPushToCloud==='function'){ try{ payPushToCloud(); }catch(e){} } }
 function payEmitRow(out, row, splitPo){   // ACC: แตกบรรทัดตามเลข PI ที่คีย์ (พร้อมจำนวนเงินต่อ PI) · เหลือที่ยังไม่ระบุ = บรรทัด "ยังไม่ระบุ PI" (ยอดรวมคงเดิม) · รองรับแถวค่าใช้จ่ายอื่น (_extra) ด้วย
@@ -12088,7 +12122,7 @@ function payExportExcel(sfx){
   pkToast('Export Payment แล้ว — '+mTxt+' '+yTxt+'\n'+nRow+' บรรทัด (แตกย่อยราย Lot) · ระบุ Lot No. ได้ '+nLot+' บรรทัด','good');
 }
 const PAY_OPT1={sfx:'', body:'pay-body', mSel:'pay-month', ySel:'pay-year', vSel:'pay-vendor', ctSel:'pay-ct', fxEl:'pay-fx', usdEl:'pay-usd', splitLot:false, docs:false, noExport:true};   // หน้า Payment ปกติ — ตัดปุ่มปริ้นท์/Export ออก
-const PAY_OPT2={sfx:'2', body:'pay2-body', mSel:'pay2-month', ySel:'pay2-year', vSel:'pay2-vendor', ctSel:'pay2-ct', fxEl:'pay2-fx', usdEl:'pay2-usd', poSel:'pay2-po', lotSel:'pay2-lot', splitLot:true, splitPo:true, docs:false, poa:true, hideCF:true, multiMY:true, piCol:true, splitXferCol:true};   // หน้า Payment for ACC — แยกบรรทัดต่อ POA (แสดงเงินต่อ POA) + คอลัมน์ POA/Lot No. · ตัด บัญชี CF/SUPPLIER CF/BANK SLIP
+const PAY_OPT2={sfx:'2', body:'pay2-body', mSel:'pay2-month', ySel:'pay2-year', vSel:'pay2-vendor', ctSel:'pay2-ct', fxEl:'pay2-fx', usdEl:'pay2-usd', poSel:'pay2-po', lotSel:'pay2-lot', splitLot:true, splitPo:true, docs:false, poa:true, hideCF:true, multiMY:true, piCol:true, splitXferCol:true, acc3:true};   // หน้า Payment for ACC — แยกบรรทัดต่อ POA (แสดงเงินต่อ POA) + คอลัมน์ POA/Lot No. · ตัด บัญชี CF/SUPPLIER CF/BANK SLIP
 function renderPayment2(){ renderPayment(PAY_OPT2); }
 function payRefresh(){   // รีเฟรชหน้า Payment ที่กำลังเปิดอยู่ (รองรับทั้ง 2 หน้า)
   const p1=document.getElementById('page-payment'), p2=document.getElementById('page-payment2');
@@ -12151,6 +12185,7 @@ function renderPayment(opt){
     +`<button onclick="payExportExcel('${opt.sfx||''}')" title="Export ตารางนี้เป็น Excel (ตามปี/เดือน/Vendor/ตู้ ที่เลือกอยู่) — มีคอลัมน์ POA และ Lot No. เพิ่มให้"`
     +` style="border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:7px;padding:2px 8px;font-size:14px;line-height:1.3;cursor:pointer;">🖨️</button></div>`);   // ปุ่มปริ้นท์/Export — ซ่อนได้ด้วย opt.noExport (หน้า Payment ปกติตัดออกแล้ว)
   el.innerHTML=tools+combos.map(c=>payMonthBlock(c.y, c.m, data, fx, !multi, opt)).join('<div style="height:26px;border-top:2px dashed #d8c893;margin-top:14px;"></div>');
+  try{ paySyncTopScrollers(); }catch(e){} setTimeout(function(){ try{ paySyncTopScrollers(); }catch(e){} },60);
 }
 // สีพื้นหลังพาสเทลต่อ Vendor — แจกสีไล่ลำดับ (Vendor คนละตัว = คนละสี) จัดใน payAssignVendorColors()
 const PAY_VC_PALETTE=['#fde2e4','#d6ecf5','#e3f0d4','#efe4f7','#fff3d1','#dff5ea','#fce3d6','#e6e2f8','#d9f0f2','#f7e5ee','#eaf3d9','#f0e2d0','#dbeafe','#fae1f0','#e2f5d9','#f5e6c8'];
@@ -12176,7 +12211,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
     .concat(opt.poa?['Quantity','Outstanding']:[])
     .concat(['AMOUNT']).concat(opt.poa?['Remark']:[]).concat(['TOTAL AMOUNT (SUPPLIER - RMB)','TOTAL AMOUNT (SUPPLIER - BAHT)'])
     .concat(opt.docs?['PI','INV','PL No']:[]);
-  const nLeftData=LEFT.length-1; if(typeof payLoadRemark==='function') payLoadRemark();   // จำนวนเซลล์ซ้าย (ไม่รวม WEEK) ที่ restCells ต้อง emit
+  const nLeftData=LEFT.length-1; if(typeof payLoadRemark==='function') payLoadRemark(); if(typeof payLoadAcc3==='function') payLoadAcc3();   // จำนวนเซลล์ซ้าย (ไม่รวม WEEK) ที่ restCells ต้อง emit
   const RIGHT=['TOTAL AMOUNT (1-15)','TOTAL AMOUNT (16-31)'].concat(opt.hideCF?[]:['บัญชี CF','SUPPLIER CF','BANK SLIP']);
   const bTh='border:1px solid #a8801f;padding:5px 6px;white-space:normal;word-break:break-word;line-height:1.2;background:#d4af37;color:#3a2a00;font-weight:800;text-align:center;font-size:11.5px;';
   const bTd='border:1px solid #d8c893;height:28px;padding:3px 7px;white-space:nowrap;color:#111;';
@@ -12184,7 +12219,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
   const gapTd='<td style="background:var(--bg);border:none;width:8px;"></td>';
   const head='<tr>'+LEFT.map((h,idx)=>`<th style="${bTh}${idx===0?'width:52px;':''}">${h}</th>`).join('')+gapTh
     + weeks.map((w,i)=>`<th style="${bTh}">WEEK ${i+1}<br><span style="font-weight:400;font-size:10px;">(${w.start}-${w.end})</span></th>`).join('')
-    + gapTh + RIGHT.map(h=>`<th style="${bTh}">${h}</th>`).join('')+'</tr>';
+    + gapTh + RIGHT.map(h=>`<th style="${bTh}">${h}</th>`).join('') + (opt.acc3?`<th style="${bTh}background:#b45309;color:#fff;">เลข Piyin</th><th style="${bTh}background:#b45309;color:#fff;">(ราคา) เรทที่</th><th style="${bTh}background:#b45309;color:#fff;">วันที่จ่าย</th>`:'') +'</tr>';
   const totCols=LEFT.length+1+weeks.length+1+RIGHT.length;
   const f2=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   function wkIndex(dstr){ const mm=String(dstr||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!mm) return -2; if(+mm[1]!==y || +mm[2]!==m) return -2; const d=+mm[3];
@@ -12254,9 +12289,20 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
   const cfTypes=['cf','supcf','slip'];
   const cfCells=(r)=> opt.hideCF ? '' : (r ? cfTypes.map(t=>`<td style="${bTd}text-align:center;vertical-align:middle;"><input type="checkbox" ${payChk(r._key+'|'+t)?'checked':''} onchange="payToggleCheck('${r._key+'|'+t}',this.checked)" style="width:17px;height:17px;cursor:pointer;"></td>`).join('') : `<td style="${bTd}"></td>`.repeat(3));   // CF/SUPPLIER CF/BANK SLIP ต่อบรรทัด (ซ่อนได้ด้วย opt.hideCF)
   const cfBlank3=opt.hideCF?'':`<td style="${bTd}"></td>`.repeat(3);
+  function acc3Cells(r){
+    if(!opt.acc3) return '';
+    if(!r) return `<td style="${bTd}"></td>`.repeat(3);
+    const rk=r._piKey||r._key||''; const a=(window.payAcc3&&window.payAcc3[rk])||{};
+    const amtRmb=(+r.amtRmb||0);
+    const rate=(a.rate!=null&&a.rate!=='')?+a.rate:null; const baht=(rate!=null)?(amtRmb*rate):null;
+    const cPi=`<td style="${bTd}background:#fff7ed;text-align:center;min-width:104px;"><input type="text" value="${payEsc(a.pi||'')}" onchange="paySetAcc3('${encodeURIComponent(rk)}','pi',this.value)" placeholder="เลข Piyin" style="width:96px;box-sizing:border-box;padding:3px 5px;border-radius:5px;border:1px solid var(--line);background:var(--card);color:#111;font-size:11px;text-align:center;"></td>`;
+    const cRate=`<td onclick="payEditRate('${encodeURIComponent(rk)}',${amtRmb})" title="คลิกกรอกเรทค่าเงิน ณ ตอนจ่ายจริง (คำนวณบาทเฉพาะช่องนี้ · ไม่กระทบเรทหลัก)" style="${bTd}background:#fff7ed;text-align:right;white-space:nowrap;cursor:pointer;min-width:116px;color:#111;">${rate!=null?('<b>฿'+f2(baht)+'</b><div style="font-size:9px;color:#9a6b2f;">¥'+f2(amtRmb)+' × '+f2(rate)+' ✎</div>'):'<span style="color:#2563eb;font-weight:600;">✎ ใส่เรท</span>'}</td>`;
+    const cDate=`<td style="${bTd}background:#fff7ed;text-align:center;white-space:nowrap;min-width:132px;"><input type="date" value="${payEsc(a.pdate||'')}" onchange="paySetAcc3('${encodeURIComponent(rk)}','pdate',this.value)" style="padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--card);color:#111;font-size:11px;"></td>`;
+    return cPi+cRate+cDate;
+  }
   let body=''; const divColspan=LEFT.length+1+weeks.length;   // WEEK..คอลัมน์วีคสุดท้าย (ไม่รวมฝั่งขวา)
   const divBlank3=opt.hideCF?'':`<td style="height:2px;line-height:2px;font-size:0;padding:0;border:0;"></td>`.repeat(3);
-  const wkDivider='<tr style="height:2px;"><td colspan="'+divColspan+'" style="height:2px;line-height:2px;font-size:0;padding:0;border:0;background:#7f1d1d;"></td>'+divBlank3+'</tr>';   // เส้นคั่นวีค (ฝั่งซ้าย) + ช่อง CF ว่าง (ฝั่งขวาไม่มีเส้น)
+  const wkDivider='<tr style="height:2px;"><td colspan="'+divColspan+'" style="height:2px;line-height:2px;font-size:0;padding:0;border:0;background:#7f1d1d;"></td>'+divBlank3+(opt.acc3?`<td style="height:2px;line-height:2px;font-size:0;padding:0;border:0;"></td>`.repeat(3):'')+'</tr>';   // เส้นคั่นวีค (ฝั่งซ้าย) + ช่อง CF ว่าง (ฝั่งขวาไม่มีเส้น)
   const emitted={};
   weeks.forEach((w,wi)=>{ const rows=byWeek[wi]; const rng='('+w.start+'-'+w.end+')'; const half=halfOf(wi);
     const dataRows = rows.length ? rows : [null];
@@ -12264,14 +12310,14 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
     const wl = rows.length ? wkLabel(wi+1,rng,rows.length) : wkLabel(wi+1,rng,1);
     cells.forEach((cc,ri)=>{ const _rx=(dataRows[ri]&&dataRows[ri].xfer)?(' data-xfer="'+dataRows[ri].xfer+'"'):''; let tr='<tr'+_rx+payRowAttrs(dataRows[ri])+'>'+(ri===0?wl:'')+cc;
       if(ri===0 && !emitted[half]){ tr+=rightGroup(half, half===1?phys1:phys2); emitted[half]=true; }
-      tr+=cfCells(dataRows[ri]||null);   // checkbox CF ต่อบรรทัด (แถวว่าง=blank)
+      tr+=cfCells(dataRows[ri]||null); tr+=acc3Cells(dataRows[ri]||null);   // checkbox CF ต่อบรรทัด (แถวว่าง=blank)
       body+=tr+'</tr>';
     });
     body+=wkDivider;
   });
   if(other.length){ const oc=groupCells(other,-1);
     oc.forEach((cc,ri)=>{ let tr='<tr'+payRowAttrs(other[ri])+'>'+(ri===0?`<td rowspan="${other.length}" style="border:1px solid #5c0f0f;font-weight:800;background:#a33;text-align:center;white-space:nowrap;padding:4px 8px;color:#ffe;">อื่นๆ<div style="font-weight:500;font-size:9px;color:#ffd9d9;">นอกเดือน/ยังไม่กำหนด</div></td>`:'')+cc;
-      if(ri===0) tr+=rightBlank(other.length); tr+=cfCells(other[ri]||null); body+=tr+'</tr>'; });
+      if(ri===0) tr+=rightBlank(other.length); tr+=cfCells(other[ri]||null); tr+=acc3Cells(other[ri]||null); body+=tr+'</tr>'; });
   }
   const usdTot=grandUsd;   // รวมยอดฝั่ง USD (จากค่าใช้จ่ายที่เลือกสกุล USD)
   const tdT='text-align:right;padding:8px 14px;border:1px solid #a8801f;color:#111;';
@@ -12307,8 +12353,11 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
       </div>
     </div>`:'';
   return `${title}<div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:nowrap;">
-    <div style="flex:1 1 auto;min-width:0;overflow-x:auto;">
-      <table class="pay-main" style="border-collapse:collapse;font-size:12px;min-width:100%;">${head}${body}</table>
+    <div style="flex:1 1 auto;min-width:0;">
+      <div class="pay-hscroll-top" style="overflow-x:auto;overflow-y:hidden;margin-bottom:2px;"><div class="pay-hscroll-top-inner" style="height:1px;"></div></div>
+      <div class="pay-scroll-wrap" style="overflow-x:auto;">
+        <table class="pay-main" style="border-collapse:collapse;font-size:12px;min-width:100%;">${head}${body}</table>
+      </div>
       ${totals}
     </div>
     ${side}
@@ -12641,8 +12690,9 @@ async function paySyncFromCloud(){ if(!window.GraphStorage) return;
   const dp=await window.GraphStorage.loadData('payDepOvV1'); if(dp){ window.payDepOv= typeof dp==='string'?JSON.parse(dp):dp; if(!window.payDepOv||typeof window.payDepOv!=='object') window.payDepOv={}; try{ localStorage.setItem('payDepOvV1', JSON.stringify(window.payDepOv)); }catch(e){} }
   const pi=await window.GraphStorage.loadData('payPiV1'); if(pi){ window.payPi= typeof pi==='string'?JSON.parse(pi):pi; if(!window.payPi||typeof window.payPi!=='object') window.payPi={}; try{ localStorage.setItem('payPiV1', JSON.stringify(window.payPi)); }catch(e){} }
   const rmk=await window.GraphStorage.loadData('payRemarkV1'); if(rmk){ window.payRemark= typeof rmk==='string'?JSON.parse(rmk):rmk; if(!window.payRemark||typeof window.payRemark!=='object') window.payRemark={}; try{ localStorage.setItem('payRemarkV1', JSON.stringify(window.payRemark)); }catch(e){} }
+  const a3=await window.GraphStorage.loadData('payAcc3V1'); if(a3){ window.payAcc3= typeof a3==='string'?JSON.parse(a3):a3; if(!window.payAcc3||typeof window.payAcc3!=='object') window.payAcc3={}; try{ localStorage.setItem('payAcc3V1', JSON.stringify(window.payAcc3)); }catch(e){} }
 }
-async function payPushToCloud(){ if(!window.GraphStorage) return; payLoadOv(); payLoadCheck(); payLoadExtra(); payLoadDocs(); payLoadDepOv(); await window.GraphStorage.saveData('payXferOvV1', window.payXferOv||{}); await window.GraphStorage.saveData('payCheckV1', window.payCheck||{}); await window.GraphStorage.saveData('payExtraV1', window.payExtra||[]); await window.GraphStorage.saveData('payDocsV1', window.payDocs||{}); await window.GraphStorage.saveData('payDepOvV1', window.payDepOv||{}); payLoadPi(); await window.GraphStorage.saveData('payPiV1', window.payPi||{}); payLoadRemark(); await window.GraphStorage.saveData('payRemarkV1', window.payRemark||{}); }
+async function payPushToCloud(){ if(!window.GraphStorage) return; payLoadOv(); payLoadCheck(); payLoadExtra(); payLoadDocs(); payLoadDepOv(); await window.GraphStorage.saveData('payXferOvV1', window.payXferOv||{}); await window.GraphStorage.saveData('payCheckV1', window.payCheck||{}); await window.GraphStorage.saveData('payExtraV1', window.payExtra||[]); await window.GraphStorage.saveData('payDocsV1', window.payDocs||{}); await window.GraphStorage.saveData('payDepOvV1', window.payDepOv||{}); payLoadPi(); await window.GraphStorage.saveData('payPiV1', window.payPi||{}); payLoadRemark(); await window.GraphStorage.saveData('payRemarkV1', window.payRemark||{}); payLoadAcc3(); await window.GraphStorage.saveData('payAcc3V1', window.payAcc3||{}); }
 function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent','renderPayment','renderPayment2'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
 async function cloudPullNow(){ const b=document.getElementById('bc-pull'); if(b) b.disabled=true;
   try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); try{ await diyPullCloud(); }catch(e){} try{ await diyPoImpPullCloud(); }catch(e){} try{ await ltPullCloud(); }catch(e){} cloudRerenderAll(); try{ if(typeof renderSearch==='function') renderSearch(); }catch(e){} try{ if(typeof renderItemList==='function') renderItemList(); }catch(e){} bcSetTs('bcCloudSyncAt'); try{ auditLog('⬇️ ดึงข้อมูลล่าสุด'); }catch(e){} pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
