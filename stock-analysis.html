@@ -12219,7 +12219,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
   const gapTd='<td style="background:var(--bg);border:none;width:8px;"></td>';
   const head='<tr>'+LEFT.map((h,idx)=>`<th style="${bTh}${idx===0?'width:52px;':''}">${h}</th>`).join('')+gapTh
     + weeks.map((w,i)=>`<th style="${bTh}">WEEK ${i+1}<br><span style="font-weight:400;font-size:10px;">(${w.start}-${w.end})</span></th>`).join('')
-    + gapTh + RIGHT.map(h=>`<th style="${bTh}">${h}</th>`).join('') + (opt.acc3?`<th style="${bTh}background:#b45309;color:#fff;">เลข Piyin</th><th style="${bTh}background:#b45309;color:#fff;">(ราคา) เรทที่</th><th style="${bTh}background:#b45309;color:#fff;">วันที่จ่าย</th>`:'') +'</tr>';
+    + gapTh + RIGHT.map(h=>`<th style="${bTh}">${h}</th>`).join('') + (opt.acc3?`<th style="${bTh}background:#b45309;color:#fff;">เลข Piyin</th><th style="${bTh}background:#b45309;color:#fff;">วันที่จ่าย</th><th style="${bTh}background:#b45309;color:#fff;">(ราคา) เรทที่</th><th style="${bTh}background:#0f766e;color:#fff;">รวมมูลค่าเงิน</th>`:'') +'</tr>';
   const totCols=LEFT.length+1+weeks.length+1+RIGHT.length;
   const f2=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   function wkIndex(dstr){ const mm=String(dstr||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!mm) return -2; if(+mm[1]!==y || +mm[2]!==m) return -2; const d=+mm[3];
@@ -12231,6 +12231,8 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
     else if(inMonth(r.load)) other.push(r);   // Term ยังคำนวณวันโอนไม่ได้ → กองไว้ "อื่นๆ" (อิงเดือน load)
   });
   const shown=byWeek.reduce((a,x)=>a.concat(x),[]).concat(other);
+  const acc3Sum={}, acc3Seen={};
+  if(opt.acc3){ if(typeof payLoadAcc3==='function') payLoadAcc3(); shown.forEach(r=>{ const rk=r._piKey||r._key||''; const a=(window.payAcc3&&window.payAcc3[rk])||{}; const pi=(a.pi||'').trim(); const rt=(a.rate!=null&&a.rate!=='')?+a.rate:null; if(pi&&rt!=null){ acc3Sum[pi]=(acc3Sum[pi]||0)+((+r.amtRmb||0)*rt); } }); }
   const grand=shown.reduce((a,r)=>a+(+r.amtRmb||0),0);        // รวมฝั่ง RMB (แถว USD มี amtRmb=0)
   const grandUsd=shown.reduce((a,r)=>a+(+r.amtUsd||0),0);     // รวมฝั่ง USD
   const bySort=(a,b)=> String(a.xfer||'').localeCompare(String(b.xfer||'')) || String(a.vendor).localeCompare(String(b.vendor)) || String(a.cont).localeCompare(String(b.cont));   // เรียงตามวันที่โอนก่อน (น้อย→มาก)
@@ -12291,18 +12293,21 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
   const cfBlank3=opt.hideCF?'':`<td style="${bTd}"></td>`.repeat(3);
   function acc3Cells(r){
     if(!opt.acc3) return '';
-    if(!r) return `<td style="${bTd}"></td>`.repeat(3);
+    if(!r) return `<td style="${bTd}"></td>`.repeat(4);
     const rk=r._piKey||r._key||''; const a=(window.payAcc3&&window.payAcc3[rk])||{};
     const amtRmb=(+r.amtRmb||0);
-    const rate=(a.rate!=null&&a.rate!=='')?+a.rate:null; const baht=(rate!=null)?(amtRmb*rate):null;
+    const rate=(a.rate!=null&&a.rate!=='')?+a.rate:null; const baht=(rate!=null)?(amtRmb*rate):null; const pi=(a.pi||'').trim();
     const cPi=`<td style="${bTd}background:#fff7ed;text-align:center;min-width:104px;"><input type="text" value="${payEsc(a.pi||'')}" onchange="paySetAcc3('${encodeURIComponent(rk)}','pi',this.value)" placeholder="เลข Piyin" style="width:96px;box-sizing:border-box;padding:3px 5px;border-radius:5px;border:1px solid var(--line);background:var(--card);color:#111;font-size:11px;text-align:center;"></td>`;
     const cRate=`<td onclick="payEditRate('${encodeURIComponent(rk)}',${amtRmb})" title="คลิกกรอกเรทค่าเงิน ณ ตอนจ่ายจริง (คำนวณบาทเฉพาะช่องนี้ · ไม่กระทบเรทหลัก)" style="${bTd}background:#fff7ed;text-align:right;white-space:nowrap;cursor:pointer;min-width:116px;color:#111;">${rate!=null?('<b>฿'+f2(baht)+'</b><div style="font-size:9px;color:#9a6b2f;">¥'+f2(amtRmb)+' × '+f2(rate)+' ✎</div>'):'<span style="color:#2563eb;font-weight:600;">✎ ใส่เรท</span>'}</td>`;
     const cDate=`<td style="${bTd}background:#fff7ed;text-align:center;white-space:nowrap;min-width:132px;"><input type="date" value="${payEsc(a.pdate||'')}" onchange="paySetAcc3('${encodeURIComponent(rk)}','pdate',this.value)" style="padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--card);color:#111;font-size:11px;"></td>`;
-    return cPi+cRate+cDate;
+    let cSum;
+    if(pi){ if(!acc3Seen[pi]){ acc3Seen[pi]=1; const tot=acc3Sum[pi]||0; cSum=`<td style="${bTd}background:#e6f4f1;text-align:right;white-space:nowrap;font-weight:800;color:#0f766e;" title="รวมมูลค่าบาทของใบ Piyin ${pi} ทุกบรรทัด (จากคอลัมน์เรทที่)">${tot>0?('฿'+f2(tot)):'<span style=\"color:#9ca3af;font-weight:400;\">-</span>'}</td>`; } else { cSum=`<td style="${bTd}background:#e6f4f1;text-align:center;color:#9ca3af;font-size:10px;" title="รวมไว้ที่บรรทัดแรกของใบ Piyin ${pi}">⤴ รวมข้างบน</td>`; } }
+    else { cSum=`<td style="${bTd}background:#e6f4f1;"></td>`; }
+    return cPi+cDate+cRate+cSum;
   }
   let body=''; const divColspan=LEFT.length+1+weeks.length;   // WEEK..คอลัมน์วีคสุดท้าย (ไม่รวมฝั่งขวา)
   const divBlank3=opt.hideCF?'':`<td style="height:2px;line-height:2px;font-size:0;padding:0;border:0;"></td>`.repeat(3);
-  const wkDivider='<tr style="height:2px;"><td colspan="'+divColspan+'" style="height:2px;line-height:2px;font-size:0;padding:0;border:0;background:#7f1d1d;"></td>'+divBlank3+(opt.acc3?`<td style="height:2px;line-height:2px;font-size:0;padding:0;border:0;"></td>`.repeat(3):'')+'</tr>';   // เส้นคั่นวีค (ฝั่งซ้าย) + ช่อง CF ว่าง (ฝั่งขวาไม่มีเส้น)
+  const wkDivider='<tr style="height:2px;"><td colspan="'+divColspan+'" style="height:2px;line-height:2px;font-size:0;padding:0;border:0;background:#7f1d1d;"></td>'+divBlank3+(opt.acc3?`<td style="height:2px;line-height:2px;font-size:0;padding:0;border:0;"></td>`.repeat(4):'')+'</tr>';   // เส้นคั่นวีค (ฝั่งซ้าย) + ช่อง CF ว่าง (ฝั่งขวาไม่มีเส้น)
   const emitted={};
   weeks.forEach((w,wi)=>{ const rows=byWeek[wi]; const rng='('+w.start+'-'+w.end+')'; const half=halfOf(wi);
     const dataRows = rows.length ? rows : [null];
