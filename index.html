@@ -11578,16 +11578,23 @@ function paySaveRemark(enc){ const key=decodeURIComponent(enc||''); if(!key) ret
 function payLoadAcc3(){ if(window.payAcc3) return; try{ window.payAcc3=JSON.parse(localStorage.getItem('payAcc3V1')||'{}'); }catch(e){ window.payAcc3={}; } if(!window.payAcc3||typeof window.payAcc3!=='object') window.payAcc3={}; }
 function payAcc3Persist(){ try{ localStorage.setItem('payAcc3V1', JSON.stringify(window.payAcc3||{})); }catch(e){} if(typeof payPushToCloud==='function'){ try{ payPushToCloud(); }catch(e){} } }
 function paySetAcc3(enc, field, val){ const key=decodeURIComponent(enc||''); if(!key) return; payLoadAcc3(); const o=window.payAcc3[key]||(window.payAcc3[key]={}); val=String(val==null?'':val).trim(); if(val) o[field]=val; else delete o[field]; if(!Object.keys(o).length) delete window.payAcc3[key]; payAcc3Persist(); try{ if(typeof presAct==='function') presAct('แก้ '+field+' (ACC)'); }catch(e){} }
-function payEditRate(enc, amt){ const key=decodeURIComponent(enc||''); if(!key) return; payLoadAcc3(); amt=+amt||0; const cur=(window.payAcc3[key]&&window.payAcc3[key].rate!=null)?window.payAcc3[key].rate:'';
+function payEditRate(enc, amtRmb, amtUsd){ const key=decodeURIComponent(enc||''); if(!key) return; payLoadAcc3();
+  amtRmb=+amtRmb||0; amtUsd=+amtUsd||0; const a=window.payAcc3[key]||{}; const cur=(a.rate!=null)?a.rate:'';
+  const rcur0=a.rateCur||((amtUsd>0&&amtRmb<=0)?'USD':'RMB');
+  window._payRateAmt={RMB:amtRmb, USD:amtUsd}; window._payRateCur=rcur0;
   const f=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const f3=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3});
+  const btn=(c,lbl)=>`<button type="button" id="pay-rate-b${c}" onclick="payRateSetCur('${c}')" style="flex:1;padding:7px;border-radius:7px;border:1px solid var(--line);cursor:pointer;font-weight:800;font-size:13px;background:${rcur0===c?'var(--brand)':'var(--bg)'};color:${rcur0===c?'#fff':'var(--ink)'};">${lbl}</button>`;
   let ov=document.getElementById('pay-rate-ov'); if(ov) ov.remove();
   ov=document.createElement('div'); ov.id='pay-rate-ov'; ov.style.cssText='position:fixed;inset:0;z-index:100014;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:18px 20px;max-width:420px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);">
-    <div style="font-weight:800;font-size:15px;margin-bottom:4px;">💱 เรทค่าเงิน ณ ตอนจ่ายจริง</div>
-    <div class="muted" style="font-size:12px;margin-bottom:12px;line-height:1.5;">ยอดเงินบรรทัดนี้: <b>¥${f(amt)}</b><br>กรอกเรท (บาท/หยวน) ที่จ่ายจริงช่วงนั้น → คำนวณเป็นเงินบาทเฉพาะช่องนี้ (ไม่กระทบเรทหลักของหน้า)</div>
-    <label style="font-size:13px;font-weight:700;">เรท (บาท/หยวน)<br><input type="number" id="pay-rate-input" value="${cur}" step="0.001" placeholder="เช่น 5.050" oninput="var v=parseFloat(this.value)||0;var el=document.getElementById('pay-rate-prev'); if(el) el.textContent='฿'+(${amt}*v).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3});" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:14px;"></label>
-    <div style="margin-top:10px;font-size:13px;">เป็นเงินบาทที่จ่ายจริง: <b id="pay-rate-prev" style="color:#7f1d1d;font-size:15px;">฿${(amt*(+cur||0)).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3})}</b></div>
+  ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:18px 20px;max-width:440px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);">
+    <div style="font-weight:800;font-size:15px;margin-bottom:8px;">💱 เรทค่าเงิน ณ ตอนจ่ายจริง</div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:4px;">หน่วยเงินของเรท</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">${btn('RMB','¥ หยวน')}${btn('USD','$ ดอลลาร์')}</div>
+    <div class="muted" style="font-size:12px;margin-bottom:12px;line-height:1.5;">ยอดเงินบรรทัดนี้: <b id="pay-rate-amtlbl">${rcur0==='USD'?('$'+f(amtUsd)):('¥'+f(amtRmb))}</b><br>กรอกเรทที่จ่ายจริงช่วงนั้น → คำนวณเป็นเงินบาทเฉพาะช่องนี้ (ไม่กระทบเรทหลักของหน้า)</div>
+    <label style="font-size:13px;font-weight:700;">เรท (<span id="pay-rate-unit">${rcur0==='USD'?'บาท/ดอลลาร์':'บาท/หยวน'}</span>)<br><input type="number" id="pay-rate-input" value="${cur}" step="0.001" placeholder="เช่น 5.050" oninput="payRatePrev()" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:14px;"></label>
+    <div style="margin-top:10px;font-size:13px;">เป็นเงินบาทที่จ่ายจริง: <b id="pay-rate-prev" style="color:#7f1d1d;font-size:15px;">฿${f3((window._payRateAmt[rcur0]||0)*(+cur||0))}</b></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;">
       <button onclick="document.getElementById('pay-rate-ov').remove()" style="padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:700;">ยกเลิก</button>
       ${cur!==''?`<button onclick="paySaveRate('${encodeURIComponent(key)}','')" style="padding:7px 14px;border-radius:8px;border:1px solid #b45309;background:var(--card);color:#b45309;cursor:pointer;font-weight:700;">ล้างเรท</button>`:''}
@@ -11596,9 +11603,18 @@ function payEditRate(enc, amt){ const key=decodeURIComponent(enc||''); if(!key) 
   </div>`;
   document.body.appendChild(ov); const inp=document.getElementById('pay-rate-input'); if(inp){ inp.focus(); inp.select(); }
 }
+function payRateSetCur(c){ window._payRateCur=c; const f=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const bR=document.getElementById('pay-rate-bRMB'), bU=document.getElementById('pay-rate-bUSD');
+  if(bR){ bR.style.background=(c==='RMB')?'var(--brand)':'var(--bg)'; bR.style.color=(c==='RMB')?'#fff':'var(--ink)'; }
+  if(bU){ bU.style.background=(c==='USD')?'var(--brand)':'var(--bg)'; bU.style.color=(c==='USD')?'#fff':'var(--ink)'; }
+  const ul=document.getElementById('pay-rate-unit'); if(ul) ul.textContent=(c==='USD')?'บาท/ดอลลาร์':'บาท/หยวน';
+  const al=document.getElementById('pay-rate-amtlbl'); if(al){ const amt=((window._payRateAmt||{})[c])||0; al.textContent=(c==='USD'?'$':'¥')+f(amt); }
+  payRatePrev();
+}
+function payRatePrev(){ const inp=document.getElementById('pay-rate-input'); const v=inp?(parseFloat(inp.value)||0):0; const amt=((window._payRateAmt||{})[window._payRateCur])||0; const el=document.getElementById('pay-rate-prev'); if(el) el.textContent='฿'+(amt*v).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3}); }
 function paySaveRate(enc, forceEmpty){ const key=decodeURIComponent(enc||''); if(!key) return; payLoadAcc3(); const o=window.payAcc3[key]||(window.payAcc3[key]={});
   let v; if(forceEmpty===''){ v=''; } else { const el=document.getElementById('pay-rate-input'); v=el?String(el.value).trim():''; }
-  if(v!=='' && !isNaN(+v) && +v>0){ o.rate=+v; } else { delete o.rate; }
+  if(v!=='' && !isNaN(+v) && +v>0){ o.rate=+v; o.rateCur=window._payRateCur||'RMB'; } else { delete o.rate; delete o.rateCur; }
   if(!Object.keys(o).length) delete window.payAcc3[key]; payAcc3Persist();
   const ov=document.getElementById('pay-rate-ov'); if(ov) ov.remove(); if(typeof payRefresh==='function') payRefresh(); pkToast((v!==''&&+v>0)?'บันทึกเรทแล้ว':'ล้างเรทแล้ว','good'); }
 // แถบ scroll ซ้าย-ขวา เพิ่มที่ด้านบนตาราง (ซิงก์กับแถบล่าง) — หน้า Payment ทั้งสอง
@@ -12232,7 +12248,7 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
   });
   const shown=byWeek.reduce((a,x)=>a.concat(x),[]).concat(other);
   const acc3Sum={}, acc3Seen={};
-  if(opt.acc3){ if(typeof payLoadAcc3==='function') payLoadAcc3(); shown.forEach(r=>{ const rk=r._piKey||r._key||''; const a=(window.payAcc3&&window.payAcc3[rk])||{}; const pi=(a.pi||'').trim(); const rt=(a.rate!=null&&a.rate!=='')?+a.rate:null; if(pi&&rt!=null){ acc3Sum[pi]=(acc3Sum[pi]||0)+((+r.amtRmb||0)*rt); } }); }
+  if(opt.acc3){ if(typeof payLoadAcc3==='function') payLoadAcc3(); shown.forEach(r=>{ const rk=r._piKey||r._key||''; const a=(window.payAcc3&&window.payAcc3[rk])||{}; const pi=(a.pi||'').trim(); const _au=(+r.amtUsd||0),_ar=(+r.amtRmb||0); const _iu=(r._cur==='USD')||(_au>0&&_ar<=0); const _rc=a.rateCur||(_iu?'USD':'RMB'); const _bs=(_rc==='USD')?_au:_ar; const rt=(a.rate!=null&&a.rate!=='')?+a.rate:null; if(pi&&rt!=null){ acc3Sum[pi]=(acc3Sum[pi]||0)+(_bs*rt); } }); }
   const grand=shown.reduce((a,r)=>a+(+r.amtRmb||0),0);        // รวมฝั่ง RMB (แถว USD มี amtRmb=0)
   const grandUsd=shown.reduce((a,r)=>a+(+r.amtUsd||0),0);     // รวมฝั่ง USD
   const bySort=(a,b)=> String(a.xfer||'').localeCompare(String(b.xfer||'')) || String(a.vendor).localeCompare(String(b.vendor)) || String(a.cont).localeCompare(String(b.cont));   // เรียงตามวันที่โอนก่อน (น้อย→มาก)
@@ -12295,10 +12311,10 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
     if(!opt.acc3) return '';
     if(!r) return `<td style="${bTd}"></td>`.repeat(4);
     const rk=r._piKey||r._key||''; const a=(window.payAcc3&&window.payAcc3[rk])||{};
-    const amtRmb=(+r.amtRmb||0);
-    const rate=(a.rate!=null&&a.rate!=='')?+a.rate:null; const baht=(rate!=null)?(amtRmb*rate):null; const pi=(a.pi||'').trim(); const f3=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3});
+    const amtRmb=(+r.amtRmb||0); const amtUsd=(+r.amtUsd||0); const isUsdRow=(r._cur==='USD')||(amtUsd>0&&amtRmb<=0); const rcur=a.rateCur||(isUsdRow?'USD':'RMB'); const base=(rcur==='USD')?amtUsd:amtRmb;
+    const rate=(a.rate!=null&&a.rate!=='')?+a.rate:null; const baht=(rate!=null)?(base*rate):null; const pi=(a.pi||'').trim(); const f3=v=>(+v||0).toLocaleString('en-US',{minimumFractionDigits:3,maximumFractionDigits:3});
     const cPi=`<td style="${bTd}background:#fff7ed;text-align:center;min-width:104px;"><input type="text" value="${payEsc(a.pi||'')}" onchange="paySetAcc3('${encodeURIComponent(rk)}','pi',this.value)" placeholder="เลข Piyin" style="width:96px;box-sizing:border-box;padding:3px 5px;border-radius:5px;border:1px solid var(--line);background:var(--card);color:#111;font-size:11px;text-align:center;"></td>`;
-    const cRate=`<td onclick="payEditRate('${encodeURIComponent(rk)}',${amtRmb})" title="คลิกกรอกเรทค่าเงิน ณ ตอนจ่ายจริง (คำนวณบาทเฉพาะช่องนี้ · ไม่กระทบเรทหลัก)" style="${bTd}background:#fff7ed;text-align:right;white-space:nowrap;cursor:pointer;min-width:116px;color:#111;">${rate!=null?('<b>฿'+f3(baht)+'</b><div style="font-size:9px;color:#9a6b2f;">¥'+f2(amtRmb)+' × '+f3(rate)+' ✎</div>'):'<span style="color:#2563eb;font-weight:600;">✎ ใส่เรท</span>'}</td>`;
+    const cRate=`<td onclick="payEditRate('${encodeURIComponent(rk)}',${amtRmb},${amtUsd})" title="คลิกกรอกเรทค่าเงิน ณ ตอนจ่ายจริง (คำนวณบาทเฉพาะช่องนี้ · ไม่กระทบเรทหลัก)" style="${bTd}background:#fff7ed;text-align:right;white-space:nowrap;cursor:pointer;min-width:116px;color:#111;">${rate!=null?('<b>฿'+f3(baht)+'</b><div style="font-size:9px;color:#9a6b2f;">'+(rcur==='USD'?'$':'¥')+f2(base)+' × '+f3(rate)+' ✎</div>'):'<span style="color:#2563eb;font-weight:600;">✎ ใส่เรท</span>'}</td>`;
     const cDate=`<td style="${bTd}background:#fff7ed;text-align:center;white-space:nowrap;min-width:132px;"><input type="date" value="${payEsc(a.pdate||'')}" onchange="paySetAcc3('${encodeURIComponent(rk)}','pdate',this.value)" style="padding:3px 4px;border-radius:5px;border:1px solid var(--line);background:var(--card);color:#111;font-size:11px;"></td>`;
     let cSum;
     if(pi){ if(!acc3Seen[pi]){ acc3Seen[pi]=1; const tot=acc3Sum[pi]||0; cSum=`<td style="${bTd}background:#e6f4f1;text-align:right;white-space:nowrap;font-weight:800;color:#0f766e;" title="รวมมูลค่าบาทของใบ Piyin ${pi} ทุกบรรทัด (จากคอลัมน์เรทที่)">${tot>0?('฿'+f3(tot)):'<span style=\"color:#9ca3af;font-weight:400;\">-</span>'}</td>`; } else { cSum=`<td style="${bTd}background:#e6f4f1;text-align:center;color:#9ca3af;font-size:10px;" title="รวมไว้ที่บรรทัดแรกของใบ Piyin ${pi}">⤴ รวมข้างบน</td>`; } }
