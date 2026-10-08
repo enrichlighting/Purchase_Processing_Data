@@ -107,9 +107,15 @@ async function presenceSet(key, value) {
 // อ่านรายการ presence ทั้งหมด (คืน null ถ้ายังไม่ได้ล็อกอิน) · กรอง prefix ฝั่ง client
 async function presenceList(prefix) {
   const token = await _presToken(); if (!token) return null;
-  const url = `${GRAPH_BASE}/items?expand=fields(select=Title,Value)&$top=500`;
-  const d = await _presFetch(token, url);
-  return (d && d.value ? d.value : [])
+  let url = `${GRAPH_BASE}/items?expand=fields(select=Title,Value)&$top=500`;
+  let all = []; let guard = 0;
+  while (url && guard < 30) {                               // แบ่งหน้าตาม @odata.nextLink — กัน log/presence เกิน 500 แล้วรายการใหม่หลุด (Log ค้าง)
+    const d = await _presFetch(token, url);
+    if (d && d.value) all = all.concat(d.value);
+    url = (d && d['@odata.nextLink']) ? d['@odata.nextLink'] : null;
+    guard++;
+  }
+  return all
     .map(it => ({ id: it.id, key: (it.fields && it.fields.Title) || '', value: (it.fields && it.fields.Value) || '' }))
     .filter(x => x.key.indexOf(prefix) === 0);
 }
