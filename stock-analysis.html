@@ -6895,7 +6895,7 @@ function diyEnsureXLSX(){
 function diyPluMap(){ const m={}; const src=window.BC_MRDIY||{}; for(const enr in src){ const p=String((src[enr]||{}).plu||'').trim(); if(p) m[p]=enr; } return m; }
 function diyNum(v){ if(v==null) return 0; if(typeof v==='number') return v; let t=String(v).replace(/,/g,'').replace(/฿/g,'').trim(); if(t===''||/^[-–—\s]+$/.test(t)) return 0; const n=parseFloat(t); return isNaN(n)?0:n; }
 function diyYm(h){ /* diyYm-v2: รับ Date / เลข serial / ข้อความ (d/m/y แบบไทย วันก่อนเดือน) / ชื่อเดือน Eng */
-  if(h instanceof Date && !isNaN(h)) return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0');
+  if(h instanceof Date && !isNaN(h)){ var _hy=h.getFullYear(), _hm=h.getMonth(); if(h.getDate()>=28){ _hm++; if(_hm>11){ _hm=0; _hy++; } } return _hy+'-'+String(_hm+1).padStart(2,'0'); }
   if(typeof h==='number' && isFinite(h) && h>20000 && h<80000){ var dn=new Date(Date.UTC(1899,11,30)+Math.round(h)*86400000); return isNaN(dn)?null:(dn.getUTCFullYear()+'-'+String(dn.getUTCMonth()+1).padStart(2,'0')); }
   if(typeof h==='string'){ var s=h.trim(); if(!s) return null; var m;
     if((m=s.match(/^(\d{4})[-/.](\d{1,2})(?:[-/.]\d{1,2})?$/))){ var y=+m[1],mo=+m[2]; return (mo>=1&&mo<=12)?(y+'-'+String(mo).padStart(2,'0')):null; }
