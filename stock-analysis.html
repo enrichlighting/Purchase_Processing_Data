@@ -463,6 +463,14 @@
         </div>
       </div>
       <div id="diy-import-status" class="muted" style="font-size:12.5px;margin-top:8px;min-height:18px;"></div>
+      <div class="field" style="margin-top:8px;">
+        <label>🔍 ตรวจข้อมูล DIY รายสินค้า (ไม่ต้องใช้ Console)</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="diy-chk-code" placeholder="รหัสสินค้า เช่น R-ENR-000008" onkeydown="if(event.key==='Enter')diyCheckItem()" style="padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:13px;width:200px;">
+          <button class="go" type="button" onclick="diyCheckItem()">ดูข้อมูลเดือนที่เก็บไว้</button>
+        </div>
+      </div>
+      <div id="diy-chk-out" style="margin-top:8px;font-size:12px;"></div>
       <div id="diy-po-list" style="margin-top:12px;"></div>
     </div>
 
@@ -6855,6 +6863,20 @@ function poRow(p, uom){
 const DIY_STORE_KEY='mrdiyDataV1';   // key เดียวใช้ทั้ง localStorage + cloud (GraphStorage.saveData)
 function diyWho(){ try{ return (typeof payWho==='function')?payWho():(typeof presName==='function'?(presName()||'ไม่ทราบชื่อ'):'ไม่ทราบชื่อ'); }catch(e){ return 'ไม่ทราบชื่อ'; } }
 function diyStatus(msg, kind){ const el=document.getElementById('diy-import-status'); if(el) el.innerHTML=(kind==='bad'?'<span style="color:#dc2626;">':(kind==='good'?'<span style="color:#059669;">':'<span>'))+String(msg||'')+'</span>'; }
+// [เพิ่ม 8 ต.ค. 2026] ตรวจข้อมูล DIY รายสินค้าบนหน้าจอ (แทนการเปิด Console) — ดูว่าเดือนไหนถูกเก็บจริงใน BC_MRDIY/BC_MRDIYSTOCK
+function diyCheckItem(){
+  const el=document.getElementById('diy-chk-code'); const out=document.getElementById('diy-chk-out'); if(!out) return;
+  const c=String((el&&el.value)||'').trim().toUpperCase();
+  if(!c){ out.innerHTML='<span style="color:#dc2626;">กรุณาใส่รหัสสินค้า</span>'; return; }
+  const s=(window.BC_MRDIY||{})[c], st=(window.BC_MRDIYSTOCK||{})[c];
+  if(!s && !st){ out.innerHTML='<span style="color:#dc2626;">ไม่พบ '+c+' (ยังไม่เคยนำเข้า DIY หรือรหัสผิด)</span>'; return; }
+  const fmtMon=arr=> (arr&&arr.length)? arr.slice(-10).map(m=>'<span style="display:inline-block;background:var(--card);border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin:2px 3px 0 0;">'+m[0]+' = <b>'+m[1]+'</b></span>').join('') : '<span class="muted">— ไม่มีข้อมูล</span>';
+  out.innerHTML='<div style="border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:var(--bg);">'
+    +'<div style="font-weight:800;">'+c+(s&&s.plu?(' · PLU '+s.plu):'')+'</div>'
+    +'<div style="margin-top:6px;"><b style="color:#1a7a3f;">📈 ยอดขายหน้าร้าน (10 เดือนล่าสุด):</b><br>'+fmtMon(s&&s.mon)+'</div>'
+    +'<div style="margin-top:6px;"><b style="color:#334155;">📦 สต๊อกหน้าร้าน (10 เดือนล่าสุด):</b><br>'+fmtMon(st&&st.mon)+'</div>'
+    +'</div>';
+}
 // โหลด SheetJS (xlsx) แบบ lazy จาก CDN — ใช้เฉพาะตอนนำเข้า Excel
 function diyEnsureXLSX(){
   return new Promise((resolve,reject)=>{
