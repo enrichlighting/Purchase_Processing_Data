@@ -6899,7 +6899,8 @@ async function diyImportExcel(kind, inp){
     const findCol=nm=>{ for(let j=0;j<hdr.length;j++){ const c=hdr[j]; if(typeof c==='string' && c.trim().toLowerCase()===nm) return j; } return -1; };
     const cPLU=findCol('item code'); if(cPLU<0) throw new Error('ไม่พบคอลัมน์ "Item Code" ในไฟล์');
     const moncols=[]; for(let j=0;j<hdr.length;j++){ const y=diyYm(hdr[j]); if(y) moncols.push([j,y]); }
-    if(!moncols.length) throw new Error('ไม่พบคอลัมน์เดือน (หัวคอลัมน์ต้องเป็นวันที่)');
+    if(!moncols.length) throw new Error('ไม่พบคอลัมน์เดือน (หัวคอลัมน์ต้องเป็นวันที่ เช่น 1/9/2026 หรือ 2026-09)');
+    const monList=[...new Set(moncols.map(x=>x[1]))].sort();
     let matched=0, unmatched=0;
     const changed={};
     if(kind==='sales'){
@@ -6926,7 +6927,7 @@ async function diyImportExcel(kind, inp){
     try{ mergeCust(); }catch(e){}       // เอาข้อมูลใหม่ผูกกลับเข้า ITEMS
     try{ if(typeof renderFlowchart==='function') renderFlowchart(); }catch(e){}
     try{ renderSearch(); }catch(e){}
-    diyStatus('✅ นำเข้า'+(kind==='sales'?'ยอดขาย':'สต๊อก')+' DIY สำเร็จ · จับคู่ได้ '+matched+' รายการ'+(unmatched?(' · ข้ามที่ไม่พบรหัส '+unmatched):'')+' · อัปเดตกราฟแล้ว','good');
+    diyStatus('✅ นำเข้า'+(kind==='sales'?'ยอดขาย':'สต๊อก')+' DIY สำเร็จ · จับคู่ได้ '+matched+' รายการ'+(unmatched?(' · ข้ามที่ไม่พบรหัส '+unmatched):'')+' · อัปเดตกราฟแล้ว · เดือนที่อ่านได้ ('+monList.length+'): '+monList.join(', '),'good');
     try{ if(typeof presAct==='function') presAct('นำเข้า'+(kind==='sales'?'ยอดขาย':'สต๊อก')+' DIY ('+matched+' รายการ)'); }catch(e){}
     diyPushCloud();                     // อัปขึ้นส่วนกลางให้ทุกคนเห็น (เงียบ)
   }catch(err){ diyStatus('❌ '+(err&&err.message||err),'bad'); }
