@@ -6880,7 +6880,7 @@ function diyYm(h){ /* diyYm-v2: รับ Date / เลข serial / ข้อค
     if((m=s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/))){ var a=+m[1],b=+m[2],yy=+m[3]; if(yy<100) yy+=(yy>=70?1900:2000); var mm=(b>12&&a<=12)?a:b; return (mm>=1&&mm<=12)?(yy+'-'+String(mm).padStart(2,'0')):null; }
     if((m=s.match(/^(\d{1,2})[-/.](\d{4})$/))){ var m2=+m[1],y2=+m[2]; return (m2>=1&&m2<=12)?(y2+'-'+String(m2).padStart(2,'0')):null; }
     var EN={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
-    if((m=s.toLowerCase().match(/([a-z]{3})[a-z]*['\-\s.]*(\d{2,4})/))){ if(EN[m[1]]){ var y3=+m[2]; if(y3<100) y3+=2000; return y3+'-'+String(EN[m[1]]).padStart(2,'0'); } }
+    if((m=s.toLowerCase().match(/([a-z]{3})[a-z]*['\-\s./]*(\d{2,4})/))){ if(EN[m[1]]){ var y3=+m[2]; if(y3<100) y3+=2000; return y3+'-'+String(EN[m[1]]).padStart(2,'0'); } }
   }
   return null; }
 function diyPickSheet(wb, name){ if(wb.Sheets[name]) return wb.Sheets[name]; const n=(wb.SheetNames||[]).find(s=>s.toLowerCase()===name.toLowerCase()); return n?wb.Sheets[n]:wb.Sheets[wb.SheetNames[0]]; }
