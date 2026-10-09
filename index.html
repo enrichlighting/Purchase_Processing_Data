@@ -12754,13 +12754,37 @@ async function paySyncFromCloud(){ if(!window.GraphStorage) return;
 }
 async function payPushToCloud(){ if(!window.GraphStorage) return; payLoadOv(); payLoadCheck(); payLoadExtra(); payLoadDocs(); payLoadDepOv(); await window.GraphStorage.saveData('payXferOvV1', window.payXferOv||{}); await window.GraphStorage.saveData('payCheckV1', window.payCheck||{}); await window.GraphStorage.saveData('payExtraV1', window.payExtra||[]); await window.GraphStorage.saveData('payDocsV1', window.payDocs||{}); await window.GraphStorage.saveData('payDepOvV1', window.payDepOv||{}); payLoadPi(); await window.GraphStorage.saveData('payPiV1', window.payPi||{}); payLoadRemark(); await window.GraphStorage.saveData('payRemarkV1', window.payRemark||{}); payLoadAcc3(); await window.GraphStorage.saveData('payAcc3V1', window.payAcc3||{}); }
 function cloudRerenderAll(){ ['renderPoFollow','renderPkLog','renderContainers','renderShipPanel','renderUrgent','renderPayment','renderPayment2'].forEach(fn=>{ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} }); }
+// [เพิ่ม 9 ต.ค. 2026] กันเขียนทับส่วนกลาง (optimistic lock) — เตือนถ้ามีคนอัปโหลดใหม่กว่าหลังจากที่เราดึงข้อมูลล่าสุด
+function bcGetSeenTs(){ try{ return +localStorage.getItem('bcSeenUploadTs')||0; }catch(e){ return 0; } }
+function bcSetSeenTs(ts){ try{ localStorage.setItem('bcSeenUploadTs', String(ts||Date.now())); }catch(e){} }
+async function bcCloudLastUploadTs(){ try{ if(!(window.GraphStorage&&window.GraphStorage.presenceList)) return null; const rows=await window.GraphStorage.presenceList('lastupload'); if(!rows||!rows.length) return null; var v={}; try{ v=JSON.parse(rows[0].value||'{}'); }catch(e){} return (v&&v.ts)?v:null; }catch(e){ return null; } }
+function bcConfirmOverwrite(by, ts){ return new Promise(function(resolve){
+  var when=''; try{ when=new Date(+ts).toLocaleString('th-TH'); }catch(e){}
+  var ov=document.getElementById('bc-ovw-ov'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='bc-ovw-ov'; ov.style.cssText='position:fixed;inset:0;z-index:100030;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px;';
+  function done(val){ try{ ov.remove(); }catch(e){} resolve(val); }
+  ov.innerHTML='<div style="background:var(--card);color:var(--ink);border-radius:12px;padding:20px 22px;max-width:470px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35);">'
+    +'<div style="font-weight:800;font-size:16px;color:#b91c1c;margin-bottom:8px;">⚠️ มีข้อมูลใหม่กว่าในส่วนกลาง</div>'
+    +'<div style="font-size:13px;line-height:1.65;margin-bottom:16px;">มีการอัปโหลดขึ้นส่วนกลาง<b>หลังจาก</b>ที่คุณดึงข้อมูลล่าสุด<br>โดย <b>'+(by||'ไม่ทราบชื่อ')+'</b>'+(when?(' เมื่อ '+when):'')+'<br><br><b style="color:#b91c1c;">ถ้าอัปโหลดตอนนี้ ข้อมูลของเขาจะถูกทับและหาย</b><br>แนะนำให้ "ดึงข้อมูลล่าสุด" ก่อน แล้วค่อยแก้/อัปใหม่</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">'
+    +'<button id="bc-ovw-cancel" style="padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-weight:700;">ยกเลิก</button>'
+    +'<button id="bc-ovw-pull" style="padding:8px 14px;border-radius:8px;border:0;background:#3ecf7a;color:#fff;cursor:pointer;font-weight:800;">⬇️ ดึงข้อมูลล่าสุดก่อน</button>'
+    +'<button id="bc-ovw-force" style="padding:8px 14px;border-radius:8px;border:1px solid #b91c1c;background:var(--card);color:#b91c1c;cursor:pointer;font-weight:700;">อัปทับเลย</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+  ov.onclick=function(e){ if(e.target===ov) done(false); };
+  document.getElementById('bc-ovw-cancel').onclick=function(){ done(false); };
+  document.getElementById('bc-ovw-pull').onclick=function(){ done('pull'); };
+  document.getElementById('bc-ovw-force').onclick=function(){ done(true); };
+}); }
+
 async function cloudPullNow(){ const b=document.getElementById('bc-pull'); if(b) b.disabled=true;
-  try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); try{ await diyPullCloud(); }catch(e){} try{ await diyPoImpPullCloud(); }catch(e){} try{ await ltPullCloud(); }catch(e){} cloudRerenderAll(); try{ if(typeof renderSearch==='function') renderSearch(); }catch(e){} try{ if(typeof renderItemList==='function') renderItemList(); }catch(e){} bcSetTs('bcCloudSyncAt'); try{ auditLog('⬇️ ดึงข้อมูลล่าสุด'); }catch(e){} pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
+  try{ pkToast('กำลังดึงข้อมูลล่าสุด...','info'); await window.GraphAuth.signIn(); await pkSyncFromCloud(); await poSyncFromCloud(); await paySyncFromCloud(); try{ await diyPullCloud(); }catch(e){} try{ await diyPoImpPullCloud(); }catch(e){} try{ await ltPullCloud(); }catch(e){} cloudRerenderAll(); try{ if(typeof renderSearch==='function') renderSearch(); }catch(e){} try{ if(typeof renderItemList==='function') renderItemList(); }catch(e){} bcSetTs('bcCloudSyncAt'); try{ auditLog('⬇️ ดึงข้อมูลล่าสุด'); }catch(e){} bcSetSeenTs(Date.now()); pkToast('ดึงข้อมูลล่าสุดสำเร็จ ✅','good'); }
   catch(e){ console.error(e); pkToast('ดึงข้อมูลไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
   if(b) b.disabled=false;
 }
 async function cloudPushNow(){ const b=document.getElementById('bc-push'); if(b) b.disabled=true;
-  try{ pkToast('กำลังอัปโหลดขึ้นส่วนกลาง...','info'); await window.GraphAuth.signIn(); await pkPushToCloud(); await poPushToCloud(); await payPushToCloud(); bcSetTs('bcCloudSyncAt'); try{ auditLog('⬆️ อัปโหลดขึ้นส่วนกลาง'); }catch(e){} try{ if(window.GraphStorage&&window.GraphStorage.presenceSet){ window.GraphStorage.presenceSet('lastupload', {by:(typeof payWho==='function'?payWho():(presName()||'ไม่ทราบชื่อ')), role:(typeof auditRole==='function'?auditRole():''), ts:Date.now()}); } }catch(e){} try{ window._uplLast={by:(typeof payWho==='function'?payWho():(presName()||'ไม่ทราบชื่อ')), ts:Date.now()}; uplBannerPaint(); }catch(e){} setTimeout(function(){ try{ uplBannerTick(); }catch(e){} }, 4000); pkToast('อัปโหลดขึ้นส่วนกลางสำเร็จ ✅','good'); }
+  try{ pkToast('กำลังอัปโหลดขึ้นส่วนกลาง...','info'); await window.GraphAuth.signIn(); { const _lu=await bcCloudLastUploadTs(); const _cTs=(_lu&&_lu.ts)||0; const _sTs=bcGetSeenTs(); if(_cTs > _sTs+1000){ const _go=await bcConfirmOverwrite((_lu&&_lu.by)||'ไม่ทราบชื่อ', _cTs); if(_go==='pull'){ if(b) b.disabled=false; return cloudPullNow(); } if(!_go){ pkToast('ยกเลิกการอัปโหลด (กันข้อมูลคนอื่นถูกทับ)','info'); if(b) b.disabled=false; return; } } } await pkPushToCloud(); await poPushToCloud(); await payPushToCloud(); bcSetTs('bcCloudSyncAt'); try{ auditLog('⬆️ อัปโหลดขึ้นส่วนกลาง'); }catch(e){} bcSetSeenTs(Date.now()); try{ if(window.GraphStorage&&window.GraphStorage.presenceSet){ window.GraphStorage.presenceSet('lastupload', {by:(typeof payWho==='function'?payWho():(presName()||'ไม่ทราบชื่อ')), role:(typeof auditRole==='function'?auditRole():''), ts:Date.now()}); } }catch(e){} try{ window._uplLast={by:(typeof payWho==='function'?payWho():(presName()||'ไม่ทราบชื่อ')), ts:Date.now()}; uplBannerPaint(); }catch(e){} setTimeout(function(){ try{ uplBannerTick(); }catch(e){} }, 4000); pkToast('อัปโหลดขึ้นส่วนกลางสำเร็จ ✅','good'); }
   catch(e){ console.error(e); pkToast('อัปโหลดไม่สำเร็จ: '+((e&&e.message)||e),'bad'); }
   if(b) b.disabled=false;
 }
