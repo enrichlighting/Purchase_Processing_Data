@@ -8978,7 +8978,7 @@ function pkDefaultVendorFactory(item){
   if(/^R-OSR/.test(c)) return {vendor:V, factory:'Osram', term:T};
   if(/^R-WOK-/.test(c)) return {vendor:V, factory:'Wokin', term:T};
   if(/^R-VEG-/.test(c)) return {vendor:V, factory:'MEKA', term:T};
-  if(/^R-OTH-/.test(c)) return {vendor:V, factory:'NUOMI', term:T};
+  if(/^R-OTH-/.test(c)) return {vendor:V, factory:'NUOMI', term:'30%DEPOSIT IN ADVANCE,THE BALANCE BEFORE SENDING OUT FROM SELLER'};
   return null;
 }
 function renderPacking(){
@@ -12042,6 +12042,13 @@ function payPaymentSegments(term, load, eta, docDate){
     else { const md=/(\d+)\s*days?/i.exec(t); const dd=md?(+md[1]):45; push(payCalFrom(eta,dd), 0.8, '80%'); }
     return segs;
   }
+  { const mDep=/(\d+)\s*%\s*deposit/i.exec(t)||/deposit\s*(\d+)\s*%/i.exec(t);   // "N% DEPOSIT ... BALANCE BEFORE SENDING OUT" = มัดจำ N% ตามวันเอกสาร PO (POA) + ส่วนที่เหลือจ่ายตามวัน Loading (ก่อนออกจากโรงงาน)
+    if(mDep && /balance/i.test(t) && /(before\s*(send|sending|loading|shipment)|send(ing)?\s*out)/i.test(t)){
+      const dep=Math.min(0.99,Math.max(0.01,(+mDep[1])/100));
+      pushStr(docDate||load, dep, payFmtPct(dep)+'% มัดจำ');
+      push(payCalFrom(load,0), 1-dep, payFmtPct(1-dep)+'% ก่อนส่งออก');
+      return segs;
+    } }
   if(/5\s*,\s*15\s*,\s*25/.test(t) || /pay every/i.test(t) || /after\s*closing\s*date/i.test(t)){ push(payNextPayDayStr(load),1,''); return segs; }   // "pay every 5,15,25" + "T/T AFTER CLOSING DATE" = จ่ายรอบ 5/15/25 หลังปิดตู้
   const mLoad=/(\d+)\s*days?\s*after\s*loading/i.exec(t); if(mLoad){ push(payCalFrom(load,+mLoad[1]),1,''); return segs; }   // "N DAYS AFTER LOADING" = Loading + N (ครอบ 30/40/50)
   if(/45\s*days?\s*after\s*shipment/i.test(t)){ push(payCalFrom(load,45),1,''); return segs; }
@@ -12078,6 +12085,7 @@ function payRowsData(splitLot, splitPo){
         const bk=(r.po||'')+'\u0001'+lotAll; g.brk[bk]=(g.brk[bk]||0)+(+per.valRmb||0);   // มูลค่าแยกราย PO × Lot No.   // 1 กลุ่ม (ตู้×Vendor×Factory) อาจมีหลาย POA / หลาย Lot
       });
       Object.keys(groups).forEach(gk=>{ const g=groups[gk]; const _rep=cvfRep[g.factory+'||'+g.vendor]||{item:g.item,po:g.po}; let term=payCreditTerm(_rep.item,g.vendor,g.factory);
+        if(/^STAR/.test(String(g.vendor||'').trim().toUpperCase()) && String(g.factory||'').trim().toUpperCase()==='NUOMI') term='30%DEPOSIT IN ADVANCE,THE BALANCE BEFORE SENDING OUT FROM SELLER';   // STAR + NUOMI → มัดจำ 30% (วันเอกสาร POA) + 70% ก่อนส่งออก (วันโหลด)
         if(paySmApplies(g.vendor, g.factory, load, ct.name)) term=PAY_SM_TERM;   // STAR|STAR โหลด≥4ก.ย.2026 (ยกเว้นตู้ 358/366/367) → เทอมกึ่งเดือนใหม่
         const docDate=(window.BC_PODATE&&window.BC_PODATE[_rep.po])||'';   // วันเอกสาร + TERM ยึดจากตัวแทนระดับตู้ → วันโอน ACC = วันโอน Payment
         let segs=payPaymentSegments(term, load, eta, docDate);
