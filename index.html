@@ -6685,8 +6685,8 @@ function bcDedupePO(){
   const D = (typeof window!=='undefined') ? window.BC_PO : null; if(!D) return;
   for(const k in D){ const e=D[k]; if(!e||!Array.isArray(e.pos)) continue;
     const seen={}, out=[];
-    e.pos.forEach(p=>{ const key=p[0]+'|'+p[1]+'|'+(p[3]||'')+'|'+(p[4]||'');
-      if(seen[key]){ const pv=seen[key]; if(p[2] && (!pv[2]||p[2]<pv[2])) pv[2]=p[2]; return; }  // ซ้ำ (ต่างแค่ ETA) → เก็บ ETA เร็วสุด
+    e.pos.forEach(p=>{ const key=p[0]+'|'+p[1];   // ยุบซ้ำด้วย PO+จำนวน (ต่างแค่ ETA/Vendor/Status = fan-out JOIN · PO เดียวกัน vendor เดียวกัน) · จำนวนต่างกัน (แบ่งงวดจริง) = คนละ key ไม่ยุบ
+      if(seen[key]){ const pv=seen[key]; if(p[2] && (!pv[2]||p[2]<pv[2])) pv[2]=p[2]; if(!pv[3] && p[3]) pv[3]=p[3]; if(!pv[4] && p[4]) pv[4]=p[4]; return; }  // ซ้ำ → เก็บ ETA เร็วสุด + เติม vendor/status ถ้าตัวที่เก็บว่าง
       seen[key]=p; out.push(p); });
     e.pos=out; e.in=out.reduce((s,p)=>s+(+p[1]||0),0);
   }
