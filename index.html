@@ -6726,9 +6726,15 @@ function mergeCust(){
     it.mrdiyStock = (typeof window!=='undefined' && window.BC_MRDIYSTOCK) ? (window.BC_MRDIYSTOCK[it.no]||null) : null;  // สต๊อกหน้าร้าน Mr.DIY {mon}
     it.hasPLU = !!(it.mrdiySell && it.mrdiySell.plu);   // มี PLU = ขายผ่าน Mr.DIY
     // ยอด PO DIY (Mr.DIY สั่งซื้อล่วงหน้าจากเรา) รายเดือนตาม "เดือนกำหนดส่ง" (deliv) — สำหรับเส้นในกราฟ Flowchart
-    { const arr=(typeof window!=='undefined' && window.BC_PODIY) ? (window.BC_PODIY[it.no]||null) : null; let dp=null;
-      if(arr && arr.length){ dp={}; arr.forEach(o=>{ const ym=String(o.deliv||'').slice(0,7); if(ym) dp[ym]=(dp[ym]||0)+(+o.qty||0); }); }
-      it.diyPo = dp; }   // {ym:qty} หรือ null
+    { const arr=(typeof window!=='undefined' && window.BC_PODIY) ? (window.BC_PODIY[it.no]||null) : null; let dp=null, dpc=null;
+      if(arr && arr.length){ const td=(typeof poDiyTodayStr==='function')?poDiyTodayStr():''; dp={}; dpc={};
+        arr.forEach(o=>{ const dv=String(o.deliv||''); const ym=dv.slice(0,7); if(!ym) return; const q=(+o.qty||0);
+          dp[ym]=(dp[ym]||0)+q;                      // เก็บครบทุกใบ — ใช้เรียกดู/ตัดสินว่า "มี PO DIY"
+          if(!td || dv>=td) dpc[ym]=(dpc[ym]||0)+q;  // กราฟ: เฉพาะใบที่ "เดือนกำหนดส่ง" ยังไม่เลยวันนี้ (ตัดใบที่กำหนดส่งก่อน Today ออกจากกราฟ แต่ยังเก็บใน diyPo)
+        });
+        if(!Object.keys(dpc).length) dpc=null;
+      }
+      it.diyPo = dp; it.diyPoChart = dpc; }   // diyPo={ym:qty}ครบ(หรือ null) · diyPoChart=เฉพาะใบที่ยังไม่เลยวันนี้(กราฟ)
     // [แก้ 24 ก.ย. 2026 · งาน A] ใช้ยอดรายเดือนสดจาก BC_ILE.mon (/api/ile — สดถึงวันนี้) เป็นหลัก;
     // พิสูจน์แล้วว่า BC_ILE.mon == BC_ITEMMON เป๊ะทุกรายการ · static bc-itemmon.js เป็นแค่ fallback
     it.itemMon = (typeof window!=='undefined' && window.BC_ILE && window.BC_ILE[it.no] && window.BC_ILE[it.no].mon && window.BC_ILE[it.no].mon.length)
@@ -10784,7 +10790,7 @@ function flowSalesDIY(it){
   const sMon=Object.fromEntries((sale.mon||[]).map(m=>[m[0],m[1]]));
   const kMon=Object.fromEntries(((it.mrdiyStock||{}).mon||[]).map(m=>[m[0],m[1]]));
   const ship=(window.BC_DIYMON&&window.BC_DIYMON[it.no])||{};
-  const poM=it.diyPo||{};   // ยอด PO DIY (Mr.DIY สั่งล่วงหน้า) รายเดือนตามเดือนกำหนดส่ง
+  const poM=it.diyPoChart||{};   // กราฟใช้เฉพาะ PO DIY ที่ยังไม่เลย Today (ใบที่กำหนดส่งก่อนวันนี้ถูกซ่อน · ข้อมูลครบอยู่ที่ it.diyPo)
   const yset=new Set();
   (sale.mon||[]).forEach(m=>yset.add(m[0].slice(0,4)));
   Object.keys(kMon).forEach(k=>yset.add(k.slice(0,4)));
