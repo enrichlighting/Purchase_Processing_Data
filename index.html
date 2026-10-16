@@ -12014,7 +12014,7 @@ function payNextPayDayStr(loadStr){ const mm=String(loadStr||'').match(/^(\d{4})
 const PAY_SM_TERM='T/T SEMI-MONTHLY (1–15→EOM, 16–31→15th)';
 const PAY_SM_FROM='2026-09-04';                 // วันโหลดตั้งแต่วันนี้เป็นต้นไปจึงใช้เทอมใหม่
 const PAY_SM_EXCEPT=['358','366','367'];        // ตู้ยกเว้น — เครดิต/วันโอนคงเดิม
-const PAY_SM_OLDSHIFT=['372','373'];            // ตู้ที่ใช้เทอมกึ่งเดือน แต่คงกฎเลื่อนเสาร์/อาทิตย์แบบเดิม (→ ศุกร์ถัดไป) · ตู้อื่นใช้กฎใหม่ (→ ศุกร์ก่อนหน้า)
+const PAY_SM_OLDSHIFT=['371','372','373'];            // ตู้ที่ใช้เทอมกึ่งเดือน แต่คงกฎเลื่อนเสาร์/อาทิตย์แบบเดิม (→ ศุกร์ถัดไป) · ตู้อื่นใช้กฎใหม่ (→ ศุกร์ก่อนหน้า)
 function paySmOldShift(cont){ return PAY_SM_OLDSHIFT.some(n=>new RegExp('(^|[^0-9])'+n+'([^0-9]|$)').test(String(cont||''))); }
 function paySmApplies(vendor, factory, load, cont){
   if(String(vendor||'').trim().toUpperCase()!=='STAR' || String(factory||'').trim().toUpperCase()!=='STAR') return false;
