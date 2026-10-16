@@ -12014,6 +12014,8 @@ function payNextPayDayStr(loadStr){ const mm=String(loadStr||'').match(/^(\d{4})
 const PAY_SM_TERM='T/T SEMI-MONTHLY (1–15→EOM, 16–31→15th)';
 const PAY_SM_FROM='2026-09-04';                 // วันโหลดตั้งแต่วันนี้เป็นต้นไปจึงใช้เทอมใหม่
 const PAY_SM_EXCEPT=['358','366','367'];        // ตู้ยกเว้น — เครดิต/วันโอนคงเดิม
+const PAY_SM_OLDSHIFT=['372','373'];            // ตู้ที่ใช้เทอมกึ่งเดือน แต่คงกฎเลื่อนเสาร์/อาทิตย์แบบเดิม (→ ศุกร์ถัดไป) · ตู้อื่นใช้กฎใหม่ (→ ศุกร์ก่อนหน้า)
+function paySmOldShift(cont){ return PAY_SM_OLDSHIFT.some(n=>new RegExp('(^|[^0-9])'+n+'([^0-9]|$)').test(String(cont||''))); }
 function paySmApplies(vendor, factory, load, cont){
   if(String(vendor||'').trim().toUpperCase()!=='STAR' || String(factory||'').trim().toUpperCase()!=='STAR') return false;
   const mm=String(load||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!mm) return false;
@@ -12022,24 +12024,24 @@ function paySmApplies(vendor, factory, load, cont){
   if(PAY_SM_EXCEPT.some(n=>new RegExp('(^|[^0-9])'+n+'([^0-9]|$)').test(String(cont||'')))) return false;   // ตู้ยกเว้น
   return true;
 }
-// วันจ่ายตามเทอมกึ่งเดือน: โหลด 1–15 → สิ้นเดือนที่โหลด · 16–31 → วันที่ 15 เดือนถัดไป · แล้วถ้าตก จ.–พฤ. → ศุกร์สัปดาห์เดียวกัน · ตกเสาร์/อาทิตย์ → ศุกร์ถัดไป
-function paySmPayDate(loadStr){
+// วันจ่ายตามเทอมกึ่งเดือน: โหลด 1–15 → สิ้นเดือนที่โหลด · 16–31 → วันที่ 15 เดือนถัดไป · แล้วถ้าตก จ.–พฤ. → ศุกร์สัปดาห์เดียวกัน · เสาร์/อาทิตย์ → ศุกร์ก่อนหน้า (ตู้ 372/373 คงกฎเดิม → ศุกร์ถัดไป)
+function paySmPayDate(loadStr, oldShift){
   const mm=String(loadStr||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!mm) return null;
   const y=+mm[1], mo=+mm[2], d=+mm[3];
   let base = (d<=15) ? new Date(y, mo, 0) : new Date(y, mo, 15);              // EOM ของเดือนโหลด · หรือ วันที่15 เดือนถัดไป
   const dow=base.getDay();                                                    // 0=อา,1=จ,...,5=ศ,6=ส
   let add=0;
   if(dow>=1 && dow<=4) add=5-dow;        // จ.–พฤ. → ศุกร์สัปดาห์เดียวกัน
-  else if(dow===6) add=6;                // เสาร์ → ศุกร์ถัดไป
-  else if(dow===0) add=5;                // อาทิตย์ → ศุกร์ถัดไป
+  else if(dow===6) add=oldShift?6:-1;                // เสาร์ → เดิม:ศุกร์ถัดไป(+6) / ใหม่:ศุกร์ก่อนหน้า(-1)
+  else if(dow===0) add=oldShift?5:-2;                // อาทิตย์ → เดิม:ศุกร์ถัดไป(+5) / ใหม่:ศุกร์ก่อนหน้า(-2)
   base.setDate(base.getDate()+add);      // ศุกร์อยู่แล้ว (dow===5) → add=0
   return base;
 }
 // คำนวณ "งวดการโอน" จาก Term → [{r:สัดส่วน, date:'YYYY-MM-DD', label}] · load=Load date, eta=ETA ถึงคลัง, docDate=Document date ของ PO
-function payPaymentSegments(term, load, eta, docDate){
+function payPaymentSegments(term, load, eta, docDate, cont){
   const t=String(term||''); const segs=[]; const push=(dt,r,label)=>{ if(dt) segs.push({r, date:payDkey(dt), label:label||''}); };
   const pushStr=(s,r,label)=>{ const mm=String(s||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(mm) segs.push({r, date:mm[1]+'-'+String(+mm[2]).padStart(2,'0')+'-'+String(+mm[3]).padStart(2,'0'), label:label||''}); };
-  if(/SEMI-MONTHLY/i.test(t)){ push(paySmPayDate(load), 1, ''); return segs; }   // เทอมกึ่งเดือน STAR (จ่ายงวดเดียว 100% ตามวันที่คำนวณ)
+  if(/SEMI-MONTHLY/i.test(t)){ push(paySmPayDate(load, paySmOldShift(cont)), 1, ''); return segs; }   // เทอมกึ่งเดือน STAR (จ่ายงวดเดียว 100% ตามวันที่คำนวณ)
   if(/20%\s*deposit/i.test(t) || /deposit\s*20%/i.test(t) || /80%\s*balance/i.test(t) || /20%\s*,?\s*80%/.test(t)){   // แบ่ง 2 งวด: 20% มัดจำ (วัน PO · ไม่มี→วัน Loading) · 80% = ถ้า "after shipment N day"→Load+N · ไม่งั้น BL(ETA)+N (ไม่ระบุ→45)
     pushStr(docDate||load, 0.2, '20% มัดจำ');
     const ms=/after\s*shipment\s*(\d+)\s*days?/i.exec(t);
@@ -12094,7 +12096,7 @@ function payRowsData(splitLot, splitPo){
         if(/^STAR/.test(String(g.vendor||'').trim().toUpperCase()) && String(g.factory||'').trim().toUpperCase()==='NUOMI') term='30%DEPOSIT IN ADVANCE,THE BALANCE BEFORE SENDING OUT FROM SELLER';   // STAR + NUOMI → มัดจำ 30% (วันเอกสาร POA) + 70% ก่อนส่งออก (วันโหลด)
         if(paySmApplies(g.vendor, g.factory, load, ct.name)) term=PAY_SM_TERM;   // STAR|STAR โหลด≥4ก.ย.2026 (ยกเว้นตู้ 358/366/367) → เทอมกึ่งเดือนใหม่
         const docDate=(window.BC_PODATE&&window.BC_PODATE[_rep.po])||'';   // วันเอกสาร + TERM ยึดจากตัวแทนระดับตู้ → วันโอน ACC = วันโอน Payment
-        let segs=payPaymentSegments(term, load, eta, docDate);
+        let segs=payPaymentSegments(term, load, eta, docDate, ct.name);
         // ---- แก้ % มัดจำเองต่อตู้ (บางตู้เหมาจ่ายมัดจำ → ปรับ %) · balance = 100 − มัดจำ ----
         payLoadDepOv(); const _dk=(ct.name||('ตู้'+(ci+1)))+'|'+(g.vendor||'(ไม่ทราบ vendor)')+'|'+g.factory; let _isDep=false;
         if(segs.length===2 && /มัดจำ/.test(segs[0].label||'')){ _isDep=true; const dov=window.payDepOv[_dk];
