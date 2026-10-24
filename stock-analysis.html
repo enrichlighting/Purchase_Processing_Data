@@ -8800,11 +8800,11 @@ function pkClearRows(){ pkConfirm('ล้างรายการทั้งห
 function pkAddCont(){ window.pkContainers.push({name:pkDefName(window.pkContainers.length)}); renderPacking(); }
 function pkDelCont(c){ window.pkContainers.splice(c,1); window.packingRows.forEach(r=>{ if(r.loads) r.loads.splice(c,1); if(r.lots) r.lots.splice(c,1); }); if(!window.pkContainers.length){ window.pkContainers.push({name:'ตู้ A'}); } renderPacking(); }
 function pkSetContName(c, v){ const ct=window.pkContainers[c]; const old=ct.name||pkDefName(c); ct.name=v;
-  if(String(v).trim()!==String(old).trim()){ ct.dates={}; ct.dateLog=[]; ct.editing=true;   // เปลี่ยนชื่อตู้ = ถือเป็นตู้ใหม่ → ล้างวันที่ให้กรอกใหม่
+  if(String(v).trim()!==String(old).trim()){ ct.dates={}; ct.dateLog=[]; ct.resp={}; ct.editing=true;   // เปลี่ยนชื่อตู้ = ถือเป็นตู้ใหม่ → ล้างวันที่ให้กรอกใหม่
     if(typeof pkToast==='function') pkToast('เปลี่ยนชื่อตู้เป็น "'+v+'" · ล้างวันที่ตู้แล้ว กรอกใหม่ได้เลย','info'); renderPacking(); }
   else renderContainers();
 }
-function pkClearContDates(c){ const ct=window.pkContainers[c]; pkConfirm('ล้างวันที่ตู้ "'+(ct.name||pkDefName(c))+'" ทั้งหมด เพื่อกรอกใหม่?', function(){ ct.dates={}; ct.dateLog=[]; ct.editing=true; renderShipPanel(); pkToast('ล้างวันที่ตู้แล้ว — กรอกใหม่ได้เลย','good'); }); }
+function pkClearContDates(c){ const ct=window.pkContainers[c]; pkConfirm('ล้างวันที่ตู้ "'+(ct.name||pkDefName(c))+'" ทั้งหมด เพื่อกรอกใหม่?', function(){ ct.dates={}; ct.dateLog=[]; ct.resp={}; ct.editing=true; renderShipPanel(); pkToast('ล้างวันที่ตู้แล้ว — กรอกใหม่ได้เลย','good'); }); }
 
 // จำลองตู้ตามที่กรอกจริง (แต่ละตู้ = คอลัมน์)
 window.pkView = window.pkView || 'cap';   // 'cap' = สเกลเทียบความจุ 68 · 'fill' = ขยายเต็มพื้นที่ดูสัดส่วนสินค้า
@@ -8864,7 +8864,7 @@ function pkThaiDate(iso){
   const d=new Date(iso+'T00:00:00'); if(isNaN(d)) return '';
   const dow=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'][d.getDay()];
   const mon=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'][d.getMonth()];
-  return 'วัน'+dow+'ที่ '+d.getDate()+' '+mon+' ค.ศ.'+d.getFullYear();
+  return dow+' '+d.getDate()+' '+mon+' '+d.getFullYear();
 }
 function pkFieldEdited(ct, label){ return (ct.dateLog||[]).some(l=>l.field===label && l.from); }   // เคยถูกแก้ (from ไม่ว่าง)
 function pkEditDates(c){ window.pkContainers[c].editing=true; renderShipPanel(); }
@@ -8879,21 +8879,23 @@ function pkDateChanged(c, k){
 }
 function pkSaveDates(c){
   const ct=window.pkContainers[c]; if(!ct) return;
-  if(!ct.dates) ct.dates={}; if(!ct.dateLog) ct.dateLog=[];
+  if(!ct.dates) ct.dates={}; if(!ct.dateLog) ct.dateLog=[]; if(!ct.resp) ct.resp={};
   const changes=[];
+  let respChanged=false; const respNew={}; PK_DATEF.forEach(f=>{ const ri=document.getElementById('pk-resp-'+c+'-'+f.k); const rv=ri?(ri.value||'').trim():(ct.resp[f.k]||''); respNew[f.k]=rv; if(rv!==(ct.resp[f.k]||'')) respChanged=true; });
   PK_DATEF.forEach(f=>{ const inp=document.getElementById('pk-d-'+c+'-'+f.k); const nv=inp?inp.value:''; const ov=ct.dates[f.k]||''; if(nv!==ov) changes.push({k:f.k,label:f.label,from:ov,to:nv}); });
-  if(!changes.length){ ct.editing=false; renderShipPanel(); return; }   // ไม่มีอะไรเปลี่ยน → แค่ล็อก
+  if(!changes.length && !respChanged){ ct.editing=false; renderShipPanel(); return; }   // ไม่มีอะไรเปลี่ยน
   // ช่องที่เคยมีค่าแล้วถูกแก้ ต้องมีเหตุผล (กรอก inline ใต้ช่องนั้น)
   for(const ch of changes){ if(ch.from){ const r=(document.getElementById('pk-r-'+c+'-'+ch.k)||{}).value; if(!r||!r.trim()){ pkToast('กรุณากรอกเหตุผลการแก้ไขของ '+ch.label,'bad'); const el=document.getElementById('pk-r-'+c+'-'+ch.k); if(el) el.focus(); return; } } }
   const ts=pkNowStr();
   changes.forEach(ch=>{ const reason = ch.from ? document.getElementById('pk-r-'+c+'-'+ch.k).value.trim() : '(ระบุครั้งแรก)'; ct.dates[ch.k]=ch.to; ct.dateLog.push({ts, field:ch.label, from:ch.from, to:ch.to, reason}); });
+  PK_DATEF.forEach(f=>{ if(respNew[f.k]) ct.resp[f.k]=respNew[f.k]; else delete ct.resp[f.k]; });   // บันทึกผู้รับผิดชอบต่อวันที่
   ct.editing=false;
   renderShipPanel();
   // ---- บันทึกวันที่ลง "รอบที่บันทึกไว้" ทันที (ไม่งั้นรีเฟรชแล้วหาย เพราะเดิมแก้แค่ในฟอร์มชั่วคราว) ----
   try{
     if(window.pkEditIdx!=null && window.pkLog && window.pkLog[window.pkEditIdx] && (window.pkLog[window.pkEditIdx].containers||[])[c]){
       const tgt=window.pkLog[window.pkEditIdx].containers[c];
-      tgt.dates=Object.assign({}, ct.dates); tgt.dateLog=(ct.dateLog||[]).slice();
+      tgt.dates=Object.assign({}, ct.dates); tgt.dateLog=(ct.dateLog||[]).slice(); tgt.resp=Object.assign({}, ct.resp||{});
       pkSaveLogStore();
       if(typeof renderPkLog==='function') renderPkLog();
       if(typeof pkRerenderLinked==='function') pkRerenderLinked();   // Payment ใช้วันที่คำนวณวันโอน → อัปเดตตาม
@@ -8939,6 +8941,7 @@ function renderShipPanel(){
           <input type="date" id="pk-d-${c}-${f.k}" value="${v}" oninput="pkDateChanged(${c},'${f.k}')" style="${inputStyle}">
           <div class="muted" id="pk-thai-${c}-${f.k}" style="font-size:11px;margin-top:4px;white-space:nowrap;">${v?('📅 '+pkThaiDate(v)):'— ยังไม่ระบุ —'}</div>
           <div id="pk-rbar-${c}-${f.k}" style="display:none;margin-top:5px;"><input type="text" id="pk-r-${c}-${f.k}" placeholder="เหตุผลการแก้ไข ${f.label}" style="width:100%;box-sizing:border-box;font-size:11px;padding:5px 7px;border:1px solid var(--warn);border-radius:6px;background:var(--bg);color:var(--ink);"></div>
+          <div style="margin-top:6px;"><input type="text" id="pk-resp-${c}-${f.k}" value="${(ct.resp&&ct.resp[f.k])?String(ct.resp[f.k]).replace(/"/g,'&quot;'):''}" placeholder="👤 ผู้รับผิดชอบ" style="width:100%;box-sizing:border-box;font-size:11px;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);"></div>
         </div>`;
       } else {
         const edited=pkFieldEdited(ct,f.label);
@@ -8947,6 +8950,7 @@ function renderShipPanel(){
           <div class="muted" style="font-size:10px;margin-bottom:5px;">${f.desc}</div>
           <div style="font-size:12.5px;font-weight:600;min-height:20px;white-space:nowrap;">${v?pkThaiDate(v):'<span class="muted">— ยังไม่ระบุ —</span>'}</div>
           ${edited?'<div style="color:var(--warn);font-size:11px;margin-top:2px;">(มีการแก้ไข)</div>':''}
+          ${(ct.resp&&ct.resp[f.k])?`<div style="font-size:11px;margin-top:3px;color:var(--ink);">👤 ${String(ct.resp[f.k]).replace(/</g,'&lt;')}</div>`:'<div class="muted" style="font-size:10px;margin-top:3px;">👤 —</div>'}
         </div>`;
       }
     });
@@ -9304,7 +9308,7 @@ function pkImportOldCsv(text){
     const tot={pcs:gp, boxes:gb, cbm:gc, valRmb:gvr, valThb:gvt};
     const ts=(g.dates.arrWh||g.dates.eta||g.dates.load||'') ? ((g.dates.arrWh||g.dates.eta||g.dates.load)+' 12:00:00') : pkNowStr();
     return {ts, mode:'released', cap:CAP, fx, imported:true,
-      containers:[{name:g.name, dates:g.dates, dateLog:[]}],
+      containers:[{name:g.name, dates:g.dates, dateLog:[], resp:(g.resp||{})}],
       rows, contTotals:[tot], grand:{pcs:gp,boxes:gb,cbm:gc,valRmb:gvr,valThb:gvt}};
   });
   pkLoadLog();
@@ -9473,7 +9477,7 @@ function pkDownloadTemplate(){
 // สร้างสแนปช็อตของการจัดตู้รอบปัจจุบัน
 function pkSnapshot(){
   const CAP=pkCap();
-  const conts = window.pkContainers.map((ct,c)=>({name: ct.name||pkDefName(c), dates: Object.assign({}, ct.dates||{}), dateLog: (ct.dateLog||[]).slice()}));
+  const conts = window.pkContainers.map((ct,c)=>({name: ct.name||pkDefName(c), dates: Object.assign({}, ct.dates||{}), dateLog: (ct.dateLog||[]).slice(), resp: Object.assign({}, ct.resp||{})}));
   const fx=pkFxVal();
   const rows = window.packingRows.map(r=>{
     const d=pkItem(r.item, r), rs=pkRowSum(r), rc=pkRowCost(r);
@@ -9616,7 +9620,7 @@ function pkPrintRound(idx){
 }
 function pkLoadRound(idx){
   const s=window.pkLog[idx]; if(!s) return;
-  window.pkContainers = s.containers.map(c=>({name:c.name, dates: Object.assign({}, c.dates||{}), dateLog: (c.dateLog||[]).slice()}));
+  window.pkContainers = s.containers.map(c=>({name:c.name, dates: Object.assign({}, c.dates||{}), dateLog: (c.dateLog||[]).slice(), resp: Object.assign({}, c.resp||{})}));
   window.pkCustomDims = window.pkCustomDims || {};
   window.pkRoundDims  = {};   // เลิกใช้ freeze แบบผูกรหัส — ย้ายไปเก็บมิติ "ต่อแถว" (r.dim) แทน กันบรรทัดเดียวกันลิงก์กัน
   // มิติต่อแถวจากที่บันทึกไว้ (บรรทัดใครบรรทัดมัน) — ถ้ามี r.dim ที่เซฟไว้ใช้อันนั้น ไม่งั้นสร้างจาก L/W/H/pcsPerBox ที่ resolve ไว้ตอนเซฟ
