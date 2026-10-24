@@ -10719,6 +10719,7 @@ function flowRowStatus(it,rc){
   if(!isFinite(cv)) band='purple';
   else if(cv>=12) band='purple';
   else if(cv>=9) band='pink';
+  else if(!(+it.leadTime>0)) band=(cv>2.5?'green':(cv>2?'yellow':'orange'));   // [24 ต.ค. 2026] ไม่มี LT → ยึดเกณฑ์แบบหมวด② (flowOhcColor) ให้สถานะตรงกับสีคอลัมน์ Cover (กัน lt=0 โชว์ 'เพียงพอ' ทั้งที่ cover ต่ำ)
   else if(cv<=lm) band='red';
   else if(cv<=lm+0.5) band='orange';
   else if(cv<=lm+1) band='yellow';
