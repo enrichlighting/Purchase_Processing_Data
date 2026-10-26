@@ -12105,6 +12105,7 @@ function payRowsData(splitLot, splitPo){
       });
       Object.keys(groups).forEach(gk=>{ const g=groups[gk]; const _rep=cvfRep[g.factory+'||'+g.vendor]||{item:g.item,po:g.po}; let term=payCreditTerm(_rep.item,g.vendor,g.factory);
         if(/^STAR/.test(String(g.vendor||'').trim().toUpperCase()) && String(g.factory||'').trim().toUpperCase()==='NUOMI') term='30%DEPOSIT IN ADVANCE,THE BALANCE BEFORE SENDING OUT FROM SELLER';   // STAR + NUOMI → มัดจำ 30% (วันเอกสาร POA) + 70% ก่อนส่งออก (วันโหลด)
+        if(/^STAR/.test(String(g.vendor||'').trim().toUpperCase()) && String(g.factory||'').trim().toUpperCase()==='MEKA') term='100% AFTER CLOSING DATE';   // STAR + MEKA → 100% หลังปิดตู้ (จ่ายรอบ 5/15/25)
         if(paySmApplies(g.vendor, g.factory, load, ct.name)) term=PAY_SM_TERM;   // STAR|STAR โหลด≥4ก.ย.2026 (ยกเว้นตู้ 358/366/367) → เทอมกึ่งเดือนใหม่
         const docDate=(window.BC_PODATE&&window.BC_PODATE[_rep.po])||'';   // วันเอกสาร + TERM ยึดจากตัวแทนระดับตู้ → วันโอน ACC = วันโอน Payment
         let segs=payPaymentSegments(term, load, eta, docDate, ct.name);
