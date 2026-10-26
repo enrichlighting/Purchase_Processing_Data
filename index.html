@@ -12309,11 +12309,12 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
   const shown=byWeek.reduce((a,x)=>a.concat(x),[]).concat(other);
   const acc3Sum={}, acc3Seen={};
   if(opt.acc3){ if(typeof payLoadAcc3==='function') payLoadAcc3(); shown.forEach(r=>{ const rk=r._piKey||r._key||''; const a=(window.payAcc3&&window.payAcc3[rk])||{}; const pi=(a.pi||'').trim(); const _au=(+r.amtUsd||0),_ar=(+r.amtRmb||0); const _iu=(r._cur==='USD')||(_au>0&&_ar<=0); const _rc=a.rateCur||(_iu?'USD':'RMB'); const _bs=(_rc==='USD')?_au:_ar; const rt=(a.rate!=null&&a.rate!=='')?+a.rate:null; if(pi&&rt!=null){ acc3Sum[pi]=(acc3Sum[pi]||0)+(_bs*rt); } }); }
-  const grand=shown.reduce((a,r)=>a+(+r.amtRmb||0),0);        // รวมฝั่ง RMB (แถว USD มี amtRmb=0)
-  const grandUsd=shown.reduce((a,r)=>a+(+r.amtUsd||0),0);     // รวมฝั่ง USD
+  const R2=x=>Math.round((+x||0)*100)/100;   // [26 ต.ค. 2026] รวมยอดจากค่าที่ปัด 2 ตำแหน่งต่อแถวแล้ว ให้ TOTAL ตรงกับผลบวกของช่องที่แสดง (เฉพาะตาราง Payment นี้)
+  const grand=shown.reduce((a,r)=>a+R2(r.amtRmb),0);        // รวมฝั่ง RMB (แถว USD มี amtRmb=0)
+  const grandUsd=shown.reduce((a,r)=>a+R2(r.amtUsd),0);     // รวมฝั่ง USD
   const bySort=(a,b)=> String(a.xfer||'').localeCompare(String(b.xfer||'')) || String(a.vendor).localeCompare(String(b.vendor)) || String(a.cont).localeCompare(String(b.cont));   // เรียงตามวันที่โอนก่อน (น้อย→มาก)
   byWeek.forEach(a=>a.sort(bySort)); other.sort(bySort);
-  const wkTotBaht=weeks.map((w,wi)=> byWeek[wi].reduce((a,r)=>a+rBaht(r),0));   // ยอดรวม TOTAL (SUPPLIER-BAHT) ต่อวีค (รวมทั้ง RMB/USD เป็นบาท)
+  const wkTotBaht=weeks.map((w,wi)=> byWeek[wi].reduce((a,r)=>a+R2(rBaht(r)),0));   // ยอดรวม TOTAL (SUPPLIER-BAHT) ต่อวีค (รวมทั้ง RMB/USD เป็นบาท)
   const xferSet=new Set(); data.forEach(r=>{ if(r.xfer && inMonth(r.xfer)) xferSet.add(r.xfer); });   // วันที่มีการโอน (ในเดือนนี้) → ไปมาร์กบนปฏิทิน
   function restCells(r, venShow, gwi, wkTot, n, isFirst){   // gwi=index วีคของกลุ่ม · เซลล์ยอดรวม Week merge (rowspan=n) ตรงแนวทแยง · r=null แถวว่าง
     let c;
@@ -12350,13 +12351,13 @@ function payMonthBlock(y, m, data, fx, showSide, opt){
     return c + gapTd + wkCells;   // ฝั่งขวา (TOTAL 1-15/16-31 + CF/slip) emit แยกแบบ merge ต่อครึ่งเดือน
   }
   function groupCells(rows, gwi){   // vendor total แยกต่อวีค (แถวแรกของแต่ละ vendor) + ยอดรวมวีค (merge ทั้งกลุ่ม)
-    const wv={}; rows.forEach(r=>{ const o=wv[r.vendor]||(wv[r.vendor]={rmb:0,usd:0}); o.rmb+=(+r.amtRmb||0); o.usd+=(+r.amtUsd||0); }); const seen={};
-    const wkTot=rows.reduce((a,r)=>a+rBaht(r),0), n=rows.length;
+    const wv={}; rows.forEach(r=>{ const o=wv[r.vendor]||(wv[r.vendor]={rmb:0,usd:0}); o.rmb+=R2(r.amtRmb); o.usd+=R2(r.amtUsd); }); const seen={};
+    const wkTot=rows.reduce((a,r)=>a+R2(rBaht(r)),0), n=rows.length;
     return rows.map((r,ri)=>{ const show=seen[r.vendor]?null:wv[r.vendor]; seen[r.vendor]=1; return restCells(r,show,gwi,wkTot,n,ri===0); });
   }
   const wkLabel=(no,rng,n)=>`<td rowspan="${n}" style="border:1px solid #5c0f0f;font-weight:800;background:#7f1d1d;color:#f5d67a;text-align:center;white-space:nowrap;padding:4px 8px;">WEEK ${no}<div style="font-weight:600;font-size:10px;color:#e7c877;">${rng}</div></td>`;
   // ---- ฝั่งขวา: TOTAL (1-15)/(16-31) merge ต่อครึ่งเดือน + checkbox CF/SUPPLIER CF/BANK SLIP ----
-  let tot1=0, tot2=0; byWeek.forEach(rows=>rows.forEach(r=>{ const dm=String(r.xfer).match(/-(\d{1,2})$/); const d=dm?+dm[1]:0; const b=rBaht(r); if(d>=1&&d<=15) tot1+=b; else if(d>=16) tot2+=b; }));
+  let tot1=0, tot2=0; byWeek.forEach(rows=>rows.forEach(r=>{ const dm=String(r.xfer).match(/-(\d{1,2})$/); const d=dm?+dm[1]:0; const b=R2(rBaht(r)); if(d>=1&&d<=15) tot1+=b; else if(d>=16) tot2+=b; }));
   const halfOf=wi=>weeks[wi].start<=15?1:2;
   const weekPhys=wi=>Math.max(1, byWeek[wi].length)+1;   // +1 = แถวคั่น
   let phys1=0, phys2=0; weeks.forEach((w,wi)=>{ if(halfOf(wi)===1) phys1+=weekPhys(wi); else phys2+=weekPhys(wi); });
