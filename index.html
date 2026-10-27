@@ -12195,7 +12195,7 @@ function payExportExcel(sfx){
     + '<body>'+head+wrap.innerHTML+'</body></html>';
   const safe=v=>String(v).replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'');
   const name='Payment'+(opt.sfx||'')+'_'+safe(mTxt)+'_'+safe(yTxt)+'.xls';
-  pkWriteFile(name, new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'}));
+  pkDownloadLocal(name, new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'}));
   pkToast('Export Payment แล้ว — '+mTxt+' '+yTxt+'\n'+nRow+' บรรทัด (แตกย่อยราย Lot) · ระบุ Lot No. ได้ '+nLot+' บรรทัด','good');
 }
 // ===== Export เฉพาะ WEEK → TOTAL AMOUNT (SUPPLIER-BAHT) ตาม Filter ปัจจุบัน — Excel (.xls) / PDF A4 (แนวตั้ง-แนวนอน) =====
