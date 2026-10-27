@@ -12198,6 +12198,83 @@ function payExportExcel(sfx){
   pkWriteFile(name, new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8'}));
   pkToast('Export Payment แล้ว — '+mTxt+' '+yTxt+'\n'+nRow+' บรรทัด (แตกย่อยราย Lot) · ระบุ Lot No. ได้ '+nLot+' บรรทัด','good');
 }
+// ===== Export เฉพาะ WEEK → TOTAL AMOUNT (SUPPLIER-BAHT) ตาม Filter ปัจจุบัน — Excel (.xls) / PDF A4 (แนวตั้ง-แนวนอน) =====
+function _payLoadScript(url){ return new Promise(function(res,rej){ var s=document.createElement('script'); s.src=url; s.onload=res; s.onerror=function(){ rej(new Error('โหลดไลบรารีไม่ได้: '+url)); }; document.head.appendChild(s); }); }
+// โคลนตาราง Payment ที่ render อยู่ (ตาม filter) แล้วตัดเหลือเฉพาะ WEEK..TOTAL AMOUNT(SUPPLIER-BAHT) (ตัดฝั่งขวา: gap/ยอดรวมสัปดาห์/CF/ACC ออก)
+function payBuildRangeTable(opt){
+  var src=document.getElementById(opt.body);
+  if(!src || !src.querySelector('table.pay-main')) return null;
+  var wrap=document.createElement('div'); wrap.innerHTML=src.innerHTML;
+  wrap.querySelectorAll('.pay-tools, .pay-side, svg').forEach(function(n){ n.remove(); });
+  wrap.querySelectorAll('input[type=checkbox]').forEach(function(i){ var td=i.closest('td'); if(td) td.textContent=i.checked?'✔':''; });
+  wrap.querySelectorAll('input,select,textarea').forEach(function(el){ var td=el.closest('td'); if(td){ td.textContent=(el.value||'').trim(); } });
+  wrap.querySelectorAll('[onclick]').forEach(function(n){ n.removeAttribute('onclick'); });
+  wrap.querySelectorAll('[onchange]').forEach(function(n){ n.removeAttribute('onchange'); });
+  wrap.querySelectorAll('table.pay-main').forEach(function(tb){
+    var rows=[].slice.call(tb.rows); var Lcount=0;
+    rows.forEach(function(tr){
+      var rst=tr.getAttribute('style')||'';
+      var cells=[].slice.call(tr.cells);
+      if(rst.indexOf('height:2px')>=0){ // แถวเส้นคั่นสัปดาห์: ย่อ colspan ให้พอดีฝั่งซ้าย + ตัดเซลล์ที่เหลือ
+        if(cells[0]){ if(Lcount) cells[0].setAttribute('colspan',Lcount); for(var j=cells.length-1;j>=1;j--) cells[j].remove(); }
+        return;
+      }
+      var cut=-1;
+      for(var i=0;i<cells.length;i++){ var st=cells[i].getAttribute('style')||''; if(st.indexOf('width:8px')>=0 && st.indexOf('border:none')>=0){ cut=i; break; } }
+      if(cut>=0){ for(var k=cells.length-1;k>=cut;k--) cells[k].remove(); }
+      var kept=0; [].slice.call(tr.cells).forEach(function(c){ kept+=(+c.getAttribute('colspan')||1); });
+      if(kept>Lcount) Lcount=kept;
+    });
+    tb.style.width='auto'; tb.style.borderCollapse='collapse';
+  });
+  return wrap;
+}
+function payExportRange(sfx, mode){
+  var opt=(String(sfx||'')==='2')?PAY_OPT2:PAY_OPT1;
+  var wrap=payBuildRangeTable(opt);
+  if(!wrap){ pkToast('ไม่พบตาราง Payment ที่จะ export','bad'); return; }
+  var ySel=(document.getElementById(opt.ySel)||{}).value||'', mSel=(document.getElementById(opt.mSel)||{}).value||'';
+  var yTxt=(ySel==='__all__')?'ทุกปี':(ySel||String(APP_TODAY.getFullYear()+543));
+  var mTxt=(mSel==='__all__')?'ทุกเดือน':(PAY_MONTHS_TH[(+mSel||(APP_TODAY.getMonth()+1))-1]||'');
+  var safe=function(v){ return String(v).replace(/[^\w฀-๿.\-]+/g,''); };
+  var baseName='Payment'+(opt.sfx||'')+'_'+safe(mTxt)+'_'+safe(yTxt);
+  var titleHtml='<div style="font-family:Tahoma;font-size:15px;font-weight:800;margin:0 0 6px;">Payment'+(opt.sfx||'')+' — '+mTxt+' '+yTxt+' <span style="font-weight:400;font-size:12px;">· Exchange Rate '+payFx(opt.fxEl)+' บาท/หยวน · ออกเมื่อ '+pkNowStr()+'</span></div>';
+  if(mode==='xls'){
+    var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Payment</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><style>body,table{font-family:Tahoma,sans-serif;}table{border-collapse:collapse;}</style></head><body>'+titleHtml+wrap.innerHTML+'</body></html>';
+    pkWriteFile(baseName+'.xls', new Blob(['﻿'+html],{type:'application/vnd.ms-excel;charset=utf-8'}));
+    pkToast('Export Excel (WEEK–BAHT) แล้ว — '+mTxt+' '+yTxt,'good');
+    return;
+  }
+  var orient=(mode==='pdf-l')?'landscape':'portrait';
+  pkToast('กำลังสร้าง PDF A4 ('+(orient==='landscape'?'แนวนอน':'แนวตั้ง')+')...','info');
+  var host=document.createElement('div'); host.style.cssText='position:fixed;left:-99999px;top:0;background:#ffffff;padding:16px;z-index:-1;display:inline-block;';
+  host.innerHTML=titleHtml+wrap.innerHTML; document.body.appendChild(host);
+  var H2C='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  var JSP='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  (window.html2canvas?Promise.resolve():_payLoadScript(H2C))
+    .then(function(){ return (window.jspdf&&window.jspdf.jsPDF)?Promise.resolve():_payLoadScript(JSP); })
+    .then(function(){ return window.html2canvas(host,{scale:2,backgroundColor:'#ffffff',windowWidth:host.scrollWidth+60}); })
+    .then(function(canvas){
+      var jsPDF=window.jspdf.jsPDF; var pdf=new jsPDF({orientation:orient,unit:'pt',format:'a4'});
+      var pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
+      var margin=18, availW=pw-margin*2, availH=ph-margin*2;
+      var ratio=canvas.width/availW;                 // px ต่อ pt
+      var pageSrcH=availH*ratio;                      // ความสูง source px ต่อ 1 หน้า
+      var y=0, page=0;
+      while(y<canvas.height){
+        var sliceH=Math.min(pageSrcH, canvas.height-y);
+        var cc=document.createElement('canvas'); cc.width=canvas.width; cc.height=sliceH;
+        cc.getContext('2d').drawImage(canvas,0,y,canvas.width,sliceH,0,0,canvas.width,sliceH);
+        if(page>0) pdf.addPage();
+        pdf.addImage(cc.toDataURL('image/png'),'PNG',margin,margin,availW,sliceH/ratio);
+        y+=sliceH; page++;
+      }
+      try{ document.body.removeChild(host); }catch(e){}
+      pkWriteFile(baseName+'_A4_'+(orient==='landscape'?'landscape':'portrait')+'.pdf', pdf.output('blob'));
+      pkToast('Export PDF A4 ('+(orient==='landscape'?'แนวนอน':'แนวตั้ง')+') แล้ว','good');
+    })
+    .catch(function(e){ try{ document.body.removeChild(host); }catch(_){} pkToast('สร้าง PDF ไม่สำเร็จ: '+((e&&e.message)||e),'bad'); });
+}
 const PAY_OPT1={sfx:'', body:'pay-body', mSel:'pay-month', ySel:'pay-year', vSel:'pay-vendor', ctSel:'pay-ct', fxEl:'pay-fx', usdEl:'pay-usd', splitLot:false, docs:false, noExport:true};   // หน้า Payment ปกติ — ตัดปุ่มปริ้นท์/Export ออก
 const PAY_OPT2={sfx:'2', body:'pay2-body', mSel:'pay2-month', ySel:'pay2-year', vSel:'pay2-vendor', ctSel:'pay2-ct', fxEl:'pay2-fx', usdEl:'pay2-usd', poSel:'pay2-po', lotSel:'pay2-lot', splitLot:true, splitPo:true, docs:false, poa:true, hideCF:true, multiMY:true, piCol:true, splitXferCol:true, acc3:true};   // หน้า Payment for ACC — แยกบรรทัดต่อ POA (แสดงเงินต่อ POA) + คอลัมน์ POA/Lot No. · ตัด บัญชี CF/SUPPLIER CF/BANK SLIP
 function renderPayment2(){ renderPayment(PAY_OPT2); }
@@ -12258,9 +12335,13 @@ function renderPayment(opt){
   let combos=[..._cset].sort().map(k=>({y:+k.slice(0,4), m:+k.slice(5,7)}));
   if(!combos.length){ const dY=yrSet.size?((+[...yrSet][0])-543):APP_TODAY.getFullYear(); const dM=monSet.size?(+[...monSet][0]):(APP_TODAY.getMonth()+1); combos=[{y:dY, m:dM}]; }
   const multi=combos.length>1;
-  const tools = opt.noExport ? '' : (`<div class="pay-tools" style="display:flex;justify-content:flex-end;margin:0 0 4px;">`
-    +`<button onclick="payExportExcel('${opt.sfx||''}')" title="Export ตารางนี้เป็น Excel (ตามปี/เดือน/Vendor/ตู้ ที่เลือกอยู่) — มีคอลัมน์ POA และ Lot No. เพิ่มให้"`
-    +` style="border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:7px;padding:2px 8px;font-size:14px;line-height:1.3;cursor:pointer;">🖨️</button></div>`);   // ปุ่มปริ้นท์/Export — ซ่อนได้ด้วย opt.noExport (หน้า Payment ปกติตัดออกแล้ว)
+  const _pbtn='border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:7px;padding:3px 9px;font-size:12.5px;line-height:1.3;cursor:pointer;';
+  const tools = `<div class="pay-tools" style="display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin:0 0 4px;">`
+    +`<button onclick="payExportRange('${opt.sfx||''}','xls')" title="Export เฉพาะคอลัมน์ WEEK → TOTAL AMOUNT (SUPPLIER-BAHT) เป็น Excel (ตาม Filter ปัจจุบัน)" style="${_pbtn}">📄 Excel</button>`
+    +`<button onclick="payExportRange('${opt.sfx||''}','pdf-p')" title="Export เป็น PDF A4 แนวตั้ง (เฉพาะ WEEK–BAHT ตาม Filter)" style="${_pbtn}">📑 PDF ↕ แนวตั้ง</button>`
+    +`<button onclick="payExportRange('${opt.sfx||''}','pdf-l')" title="Export เป็น PDF A4 แนวนอน (เฉพาะ WEEK–BAHT ตาม Filter)" style="${_pbtn}">📑 PDF ↔ แนวนอน</button>`
+    +(opt.noExport?'':`<button onclick="payExportExcel('${opt.sfx||''}')" title="Export ทั้งตาราง + คอลัมน์ POA/Lot (เดิม)" style="${_pbtn}">🖨️ ทั้งตาราง</button>`)
+    +`</div>`;
   el.innerHTML=tools+combos.map(c=>payMonthBlock(c.y, c.m, data, fx, !multi, opt)).join('<div style="height:26px;border-top:2px dashed #d8c893;margin-top:14px;"></div>');
   try{ paySyncTopScrollers(); }catch(e){} setTimeout(function(){ try{ paySyncTopScrollers(); }catch(e){} },60);
 }
