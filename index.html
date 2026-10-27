@@ -12337,9 +12337,10 @@ function renderPayment(opt){
   const multi=combos.length>1;
   const _pbtn='border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:7px;padding:3px 9px;font-size:12.5px;line-height:1.3;cursor:pointer;';
   const tools = `<div class="pay-tools" style="display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin:0 0 4px;">`
-    +`<button onclick="payExportRange('${opt.sfx||''}','xls')" title="Export เฉพาะคอลัมน์ WEEK → TOTAL AMOUNT (SUPPLIER-BAHT) เป็น Excel (ตาม Filter ปัจจุบัน)" style="${_pbtn}">📄 Excel (WEEK–฿)</button>`
-    +(opt.noExport?'':`<button onclick="payExportExcel('${opt.sfx||''}')" title="Export ทุกคอลัมน์ของตารางนี้เป็น Excel (+POA/Lot · ตาม Filter)" style="${_pbtn}">📊 Excel (ทุกคอลัมน์)</button>`)
-    +`<button onclick="payExportRange('${opt.sfx||''}','pdf-p')" title="Export เป็น PDF A4 แนวตั้ง (เฉพาะ WEEK–BAHT ตาม Filter)" style="${_pbtn}">📑 PDF A4</button>`
+    +(opt.acc3
+      ? `<button onclick="payExportExcel('${opt.sfx||''}')" title="Export ทุกคอลัมน์ของตารางนี้เป็น Excel (+POA/Lot · ตาม Filter)" style="${_pbtn}">📊 Excel (ทุกคอลัมน์)</button>`
+      : `<button onclick="payExportRange('${opt.sfx||''}','xls')" title="Export เฉพาะคอลัมน์ WEEK → TOTAL AMOUNT (SUPPLIER-BAHT) เป็น Excel (ตาม Filter ปัจจุบัน)" style="${_pbtn}">📄 Excel (WEEK–฿)</button>`
+        +`<button onclick="payExportRange('${opt.sfx||''}','pdf-p')" title="Export เป็น PDF A4 แนวตั้ง (เฉพาะ WEEK–BAHT ตาม Filter)" style="${_pbtn}">📑 PDF A4</button>`)
     +`</div>`;
   el.innerHTML=tools+combos.map(c=>payMonthBlock(c.y, c.m, data, fx, !multi, opt)).join('<div style="height:26px;border-top:2px dashed #d8c893;margin-top:14px;"></div>');
   try{ paySyncTopScrollers(); }catch(e){} setTimeout(function(){ try{ paySyncTopScrollers(); }catch(e){} },60);
