@@ -12241,7 +12241,7 @@ function payExportRange(sfx, mode){
   var titleHtml='<div style="font-family:Tahoma;font-size:15px;font-weight:800;margin:0 0 6px;">Payment'+(opt.sfx||'')+' — '+mTxt+' '+yTxt+' <span style="font-weight:400;font-size:12px;">· Exchange Rate '+payFx(opt.fxEl)+' บาท/หยวน · ออกเมื่อ '+pkNowStr()+'</span></div>';
   if(mode==='xls'){
     var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Payment</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><style>body,table{font-family:Tahoma,sans-serif;}table{border-collapse:collapse;}</style></head><body>'+titleHtml+wrap.innerHTML+'</body></html>';
-    pkWriteFile(baseName+'.xls', new Blob(['﻿'+html],{type:'application/vnd.ms-excel;charset=utf-8'}));
+    pkDownloadLocal(baseName+'.xls', new Blob(['﻿'+html],{type:'application/vnd.ms-excel;charset=utf-8'}));
     pkToast('Export Excel (WEEK–BAHT) แล้ว — '+mTxt+' '+yTxt,'good');
     return;
   }
@@ -12270,7 +12270,7 @@ function payExportRange(sfx, mode){
         y+=sliceH; page++;
       }
       try{ document.body.removeChild(host); }catch(e){}
-      pkWriteFile(baseName+'_A4_'+(orient==='landscape'?'landscape':'portrait')+'.pdf', pdf.output('blob'));
+      pkDownloadLocal(baseName+'_A4_'+(orient==='landscape'?'landscape':'portrait')+'.pdf', pdf.output('blob'));
       pkToast('Export PDF A4 ('+(orient==='landscape'?'แนวนอน':'แนวตั้ง')+') แล้ว','good');
     })
     .catch(function(e){ try{ document.body.removeChild(host); }catch(_){} pkToast('สร้าง PDF ไม่สำเร็จ: '+((e&&e.message)||e),'bad'); });
