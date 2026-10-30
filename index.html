@@ -398,8 +398,8 @@
         <span>สัปดาห์</span>
         <span style="position:relative;display:inline-block;"><button type="button" id="pay-wkf-btn" onclick="payFilterPop('pay-wkf-pop')" style="font-size:14px;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;min-width:110px;">ทุกสัปดาห์ ▾</button><div id="pay-wkf-pop" class="pay-filter-pop" style="display:none;position:absolute;top:calc(100% + 3px);left:0;z-index:60;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;min-width:150px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.3);"></div></span>
         <span style="width:1px;height:22px;background:var(--line);margin:0 4px;"></span>
-        <label style="font-size:13px;font-weight:700;">Exchange Rate: <input type="number" id="pay-fx" value="5" min="0" step="0.01" onchange="renderPayment()" oninput="renderPayment()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/หยวน</label>
-        <label style="font-size:13px;font-weight:700;">USD: <input type="number" id="pay-usd" value="34" min="0" step="0.01" onchange="renderPayment()" oninput="renderPayment()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/ดอลลาร์</label>
+        <label style="font-size:13px;font-weight:700;">Exchange Rate: <input type="number" id="pay-fx" value="5" min="0" step="0.0001" inputmode="decimal" onchange="payFxSave('pay-fx');renderPayment()" oninput="renderPayment()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/หยวน</label>
+        <label style="font-size:13px;font-weight:700;">USD: <input type="number" id="pay-usd" value="34" min="0" step="0.0001" inputmode="decimal" onchange="payFxSave('pay-usd');renderPayment()" oninput="renderPayment()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/ดอลลาร์</label>
         <span style="width:1px;height:22px;background:var(--line);margin:0 4px;"></span>
         <button onclick="payAddExtra()" title="เพิ่มบรรทัดค่าใช้จ่ายที่ไม่ใช่สินค้า (กรอกวันที่โอน · SUPPLIER · CT No. · จำนวนเงินเอง)" style="font-size:13px;font-weight:800;padding:6px 13px;border-radius:8px;border:0;background:#7f1d1d;color:#fff;cursor:pointer;">🧾 เพิ่มค่าใช้จ่ายอื่น (ไม่ใช่สินค้า)</button>
       </div>
@@ -428,8 +428,8 @@
         <input type="text" id="pay2-lot" placeholder="🔍 เลข Lot" oninput="renderPayment2()" autocomplete="off" style="width:150px;font-size:14px;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);">
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
-        <label style="font-size:13px;font-weight:700;">Exchange Rate: <input type="number" id="pay2-fx" value="5" min="0" step="0.01" onchange="renderPayment2()" oninput="renderPayment2()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/หยวน</label>
-        <label style="font-size:13px;font-weight:700;">USD: <input type="number" id="pay2-usd" value="34" min="0" step="0.01" onchange="renderPayment2()" oninput="renderPayment2()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/ดอลลาร์</label>
+        <label style="font-size:13px;font-weight:700;">Exchange Rate: <input type="number" id="pay2-fx" value="5" min="0" step="0.0001" inputmode="decimal" onchange="payFxSave('pay2-fx');renderPayment2()" oninput="renderPayment2()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/หยวน</label>
+        <label style="font-size:13px;font-weight:700;">USD: <input type="number" id="pay2-usd" value="34" min="0" step="0.0001" inputmode="decimal" onchange="payFxSave('pay2-usd');renderPayment2()" oninput="renderPayment2()" style="width:78px;text-align:right;font-size:14px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);"> บาท/ดอลลาร์</label>
         <span style="width:1px;height:22px;background:var(--line);margin:0 4px;"></span>
         <button onclick="payAddExtra()" title="เพิ่มบรรทัดค่าใช้จ่ายที่ไม่ใช่สินค้า (กรอกวันที่โอน · SUPPLIER · CT No. · จำนวนเงินเอง)" style="font-size:13px;font-weight:800;padding:6px 13px;border-radius:8px;border:0;background:#7f1d1d;color:#fff;cursor:pointer;">🧾 เพิ่มค่าใช้จ่ายอื่น (ไม่ใช่สินค้า)</button>
       </div>
@@ -11610,6 +11610,10 @@ function payCalendarHtml(y,m,xferSet,sfx){
   </div>`;
 }
 function payFx(id){ const e=document.getElementById(id||'pay-fx'); const v=e?+e.value:5; return (v>0)?v:5; }
+function payFxKey(id){ return 'payFxV1:'+id; }
+function payFxSave(id){ try{ const e=document.getElementById(id); if(e && +e.value>0) localStorage.setItem(payFxKey(id), String(e.value)); }catch(_){} }   // จำเรทที่ผู้ใช้ปรับ → เป็นค่า default รอบหน้า (ต่อ input · กรอกได้ 4 ตำแหน่ง)
+var _payFxRestored=false;
+function payFxRestoreOnce(){ if(_payFxRestored) return; _payFxRestored=true; ['pay-fx','pay-usd','pay2-fx','pay2-usd'].forEach(function(id){ try{ const e=document.getElementById(id); const v=localStorage.getItem(payFxKey(id)); if(e && v!=null && +v>0) e.value=v; }catch(_){} }); }
 function payUsd(id){ const e=document.getElementById(id||'pay-usd'); const v=e?+e.value:34; return (v>0)?v:34; }
 function payEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function payThaiDate(s){ const m=String(s||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!m) return payEsc(s||'-'); return `${+m[3]}/${+m[2]}/${(+m[1])+543}`; }
@@ -12315,7 +12319,7 @@ function payRefresh(){   // รีเฟรชหน้า Payment ที่ก�
   else { renderPayment(); }
 }
 function renderPayment(opt){
-  opt=opt||PAY_OPT1;
+  opt=opt||PAY_OPT1; payFxRestoreOnce();
   const el=document.getElementById(opt.body); if(!el) return;
   payFillSelectors(opt.mSel, opt.ySel);
   const fx=payFx(opt.fxEl);
