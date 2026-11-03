@@ -11829,13 +11829,19 @@ const PAY_EXTRA_KINDS=[
   {v:'Factory Inspection Fee', th:'ค่าตรวจโรงงาน'},
   {v:'Freight Invoice', th:'ใบแจ้งหนี้ค่าระวาง'},
   {v:'Loading & Unloading Fee', th:'ค่าโหลดสินค้าขึ้น-ลง'},
-  {v:'Document', th:'ค่าเอกสาร'}
+  {v:'Document', th:'ค่าเอกสาร'},
+  {v:'Other / Rounding', th:'ค่าใช้จ่ายประเภทอื่นๆ'}
 ];
 const PAY_EXTRA_VENDORS=['VINCENT'];   // Vendor เพิ่มเองสำหรับค่าใช้จ่ายอื่น (ไม่มีใน Lead Time) · VINCENT = ไม่มี Factory กำกับ
 const PAY_NO_FACTORY_VENDORS={'VINCENT':1};   // Vendor ที่ไม่ต้องระบุ Factory
 function payExtraKindLabel(v){ const k=PAY_EXTRA_KINDS.find(x=>x.v===v); return k?(k.th+' ('+k.v+')'):(v||''); }
 // รายชื่อ Factory ทั้งหมด (จาก Lead Time opts) ให้เลือกในฟอร์มค่าใช้จ่าย
-function payAllFactoriesList(){ if(window._payAllFac) return window._payAllFac; const set=new Set(), LT=window.BC_LEADTIME||{}; Object.keys(LT).forEach(k=>(((LT[k]||{}).opts)||[]).forEach(o=>{ if(o&&o.f) set.add(o.f); })); window._payAllFac=[...set].sort((a,b)=>String(a).localeCompare(String(b))); return window._payAllFac; }
+function payAllFactoriesList(){   // [3 พ.ย.2026] รวม Factory ทุกแหล่ง (Lead Time + Credit Term + Packing log) ให้ครบโรงงานใหม่ · ไม่ cache กันตกรุ่น
+  const set=new Set(); const add=f=>{ f=String(f==null?'':f).trim(); if(f && f!=='-') set.add(f); };
+  const LT=window.BC_LEADTIME||{}; Object.keys(LT).forEach(k=>(((LT[k]||{}).opts)||[]).forEach(o=>{ if(o) add(o.f); }));   // Lead Time opts
+  const CT=window.BC_CREDITTERM||{}; Object.keys(CT).forEach(it=>{ const m=CT[it]||{}; Object.keys(m).forEach(vf=>{ const p=String(vf).split('|'); if(p.length>=2) add(p[1]); }); });   // Credit Term key "Vendor|Factory"
+  (window.pkLog||[]).forEach(s=>((s&&s.rows)||[]).forEach(r=>add(r&&r.factory)));   // Packing log (โรงงานที่ใช้จริงในตู้)
+  return [...set].sort((a,b)=>String(a).localeCompare(String(b))); }
 function payVendorChoices(){ const set=new Set(); payShortVendorList().forEach(v=>set.add(payNormVendor(v))); PAY_EXTRA_VENDORS.forEach(v=>set.add(payNormVendor(v))); return [...set].sort((a,b)=>String(a).localeCompare(String(b))); }   // รวม QILI/QILI(TUBO)→QILI, KTL/KTL(Dingding)→KTL
 function payAddExtra(){ payExtraModal(null); }
 function payEditExtra(id){ payExtraModal(id); }
