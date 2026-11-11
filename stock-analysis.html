@@ -11446,7 +11446,7 @@ function renderFlowchart(){
     TH.splice(ex,0,'Sales In Mr.DIY (3/6ด.)','Cover Stock Sales In Mr.DIY (3/6ด.)');
     ex=KEYS.indexOf('exdiyavg');               // กลุ่มเขียว = OTHERS avg + Sales Out DIY + Cover (ต่อจาก OTHERS avg)
     KEYS.splice(ex+1,0,'storeavg','covdiyout');
-    TH.splice(ex+1,0,'Sales Out Mr.DIY (3/6ด.)','Cover Stock + Suggestion Sales Out DIY + Sales In OTHERS (3/6ด.)');
+    TH.splice(ex+1,0,'Sales Out Mr.DIY (3/6ด.)','Cover Stock รวม Suggestion + ยอดขายหน้าร้าน DIY + ยอดของลูกค้าไม่ใช่ DIY (3/6ด.)');
     TH.push('แนวโน้ม Mr.DIY ถอดสินค้า'); KEYS.push('diyrisk'); }
   if(window.flowHidePrice){ ['price','costdiy','npstore'].forEach(k=>{ const idx=KEYS.indexOf(k); if(idx>=0){ KEYS.splice(idx,1); TH.splice(idx,1); } }); }   // ซ่อนคอลัมน์ราคาทั้งหมด
   if(window.flowHideVF){ ['vendor','factory'].forEach(k=>{ const idx=KEYS.indexOf(k); if(idx>=0){ KEYS.splice(idx,1); TH.splice(idx,1); } }); }   // ซ่อนคอลัมน์ Vendor/Factory
