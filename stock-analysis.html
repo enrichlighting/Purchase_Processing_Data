@@ -11169,7 +11169,7 @@ function flowSetMoqUnit(u){ window.flowMoqUnit=u; try{ localStorage.setItem('flo
 function flowSugExCarton(it, rc){
   const sugAll=flowSugAll(it, rc);                                  // ควรสั่งเพิ่ม รวมทุกลูกค้า (ค่าเดิมที่เคยแสดง)
   let sugDiy=0;
-  if(it.mrdiySell){ const s3=flowStoreAvg(it,3), stk=flowMrdiyStockNow(it); const tD=s3*flowTargetMonths(it); sugDiy=Math.max(0,Math.round(tD-stk)); }
+  // [11 พ.ย.2026] เลิกตัดส่วน DIY ในค่าแนะนำ (ผู้ใช้เลือก) → เล็งเป้าเต็ม T เดือนจากยอดขายรวม (sugDiy=0) → Cover ขึ้นถึงเป้าพอดี
   let sugEx=Math.max(0, sugAll - sugDiy);                          // ตัดส่วน Mr.DIY ออกก่อน
   const ov=(window.flowSug && window.flowSug[it.no]!=null && window.flowSug[it.no]!=='') ? Math.max(0,+window.flowSug[it.no]||0) : null;   // ค่าที่ผู้ใช้แก้เอง
   const edited=(ov!=null);
