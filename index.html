@@ -10901,7 +10901,7 @@ function flowSalesCellsHtml(it, salesCols){
   (salesCols||[]).forEach(c=>{
     let v; if(c.t==='y'){ v=0; (it.monthly||[]).forEach(m=>{ if(m[0].slice(0,4)===c.k) v+=m[1]; }); } else v=smap[c.k]||0;
     const yr=c.t==='y';
-    h+=`<td style="padding:6px 9px;text-align:right;white-space:nowrap;font-size:${yr?'13.5px':'13px'};background:#fff9f3;border-left:1px solid #fde6cf;${v?(yr?'color:#c2410c;font-weight:800;':'color:#ea580c;'):'color:#e2e8f0;'}">${v?fmtNum(v):'·'}</td>`;
+    h+=`<td onclick="flowToggleItem('${it.no}')" title="คลิกเพื่อกาง/ปิดกราฟยอดขายของสินค้านี้" style="cursor:pointer;padding:6px 9px;text-align:right;white-space:nowrap;font-size:${yr?'13.5px':'13px'};background:#fff9f3;border-left:1px solid #fde6cf;${v?(yr?'color:#c2410c;font-weight:800;':'color:#ea580c;'):'color:#e2e8f0;'}">${v?fmtNum(v):'·'}</td>`;
   });
   return h;
 }
@@ -10979,7 +10979,7 @@ function flowExDiyAvgCell(it){
   return flowTwoCol(a3,a6,'#111','ยอดขายลูกค้าทั้งหมด ไม่รวม Mr.DIY เฉลี่ย/เดือน 3 เดือน','ยอดขาย ไม่รวม Mr.DIY เฉลี่ย/เดือน 6 เดือน',flowGrpBorder('exdiyavg'));
 }
 // ควรสั่งเพิ่ม 2 บรรทัด: บน=รวมทุกลูกค้า(อัตราขายเฉลี่ย 3ด.) · ล่าง=พาร์ท Mr.DIY(ยอดขายหน้าร้านเฉลี่ย 3ด. − สต๊อกหน้าร้าน)
-function flowSugAll(it, rc){ const a3=flowAvg3(it); const t=a3*flowTargetMonths(it); return Math.max(0,Math.round(t-(rc.c3||0))); }   // เป้า 3 เดือน (DIY) / 4 (ไม่ DIY) / 5 (ตรุษจีน)
+function flowSugAll(it, rc){ const a=(flowCovPlusMode()==='diyout' && flowIsDiyItem(it))?flowStoreAvg(it,3):flowAvg3(it); const t=a*flowTargetMonths(it); return Math.max(0,Math.round(t-(rc.c3||0))); }   // เป้า T เดือน · ฐานยอด = หน้าร้าน DIY (โหมด Sales Out DIY) หรือ ยอดรวม (Sales In All)
 // สีของ Cover Stock อิง Lead Time (เดือน) · เกณฑ์: ≤LT แดง · LT–LT+0.5 ส้ม · LT+0.5–LT+1 เหลือง · >LT+1 เขียว · ≥9 ชมพู · ≥12 ม่วง
 function coverHiByLead(m, leadDays){
   if(!(+leadDays>0)) return flowOhcColor(m);   // [22 ต.ค. 2026] ไม่มี LT (lt=0/ไม่ระบุ) → ยึดสีแบบหมวด② ON HAND COVER (flowOhcColor) แทนเกณฑ์อิง Lead Time
@@ -11190,13 +11190,14 @@ function flowSuggestResult(g){
 function flowSuggestCell(it, rc){
   const g=flowSugExCarton(it, rc);
   const T=flowTargetMonths(it), cny=flowCnyActive();
+  const sugBasis=(flowCovPlusMode()==='diyout' && flowIsDiyItem(it))?'หน้าร้าน DIY':'ยอดรวม';
   const inputVal=g.edited?(+window.flowSug[it.no]||0):Math.round(g.sugEx);
   const badge = g.edited
     ? '<span style="display:inline-flex;align-items:center;gap:3px;background:#3a2e05;color:#facc15;font-size:9px;font-weight:800;padding:1px 7px;border-radius:999px;">✎ คีย์เอง</span>'
     : (cny
       ? '<span style="display:inline-flex;align-items:center;gap:3px;background:#3a0d0d;color:#fca5a5;font-size:9px;font-weight:800;padding:1px 7px;border-radius:999px;">🧧 แนะนำ · ตรุษจีน</span>'
       : '<span style="display:inline-flex;align-items:center;gap:3px;background:#0b2a3a;color:#7dd3fc;font-size:9px;font-weight:800;padding:1px 7px;border-radius:999px;">💡 แนะนำ (คำนวณ)</span>');
-  const sub = g.edited ? '' : ('<div style="font-size:8.5px;color:#9ca3af;margin-top:1px;">พอขาย '+T+' เดือน'+(cny?' · ตรุษจีน':'')+'</div>');
+  const sub = g.edited ? '' : ('<div style="font-size:8.5px;color:#9ca3af;margin-top:1px;">พอขาย '+T+' เดือน ('+sugBasis+')'+(cny?' · ตรุษจีน':'')+'</div>');
   const tip=`ควรสั่งเพิ่ม รวม ${fmtNum(g.sugAll)}${g.sugDiy>0?' − Mr.DIY '+fmtNum(g.sugDiy):''} = ${fmtNum(g.sugEx)} ชิ้น (เป้า ${T} เดือน${cny?' · ตรุษจีน':''}) → ปัดขึ้นเต็มลัง${g.hasPk?' ('+fmtNum(g.pcs)+' ชิ้น/ลัง)':''}${g.edited?' · (แก้ไขเอง)':''} · แก้ตัวเลขได้ ระบบปัดเต็มลังให้`;
   return `<td style="padding:6px 8px;text-align:right;white-space:nowrap;vertical-align:top;background:#111;${flowGrpBorder('suggest')}" title="${tip}">
     <div style="margin-bottom:3px;">${badge}</div>
@@ -11340,7 +11341,7 @@ function flowItemRow(it, basis, grp, salesCols){
   const factoryHtml = lo ? `<span style="font-size:11px;">${lo.factory||'-'}</span>` : '<span class="muted" style="font-size:10px;">—</span>';
   const _leadDays = (lo&&lo.lead) ? lo.lead : (FLOW_LEAD_OVERRIDE[it.no]||0);   // R-BKP: ใช้ Lead Time override 30 วัน
   const leadMoq = [ _leadDays?`LT ${_leadDays} วัน`:'', (it.moq)?`MOQ ${fmtNum(it.moq)}`:'' ].filter(Boolean).join(' · ');
-  const tr=`<tr onclick="flowToggleItem('${it.no}')" style="cursor:pointer;border-top:1px solid var(--line);${iOpen?'background:var(--bg);':''}">
+  const tr=`<tr style="border-top:1px solid var(--line);${iOpen?'background:var(--bg);':''}">
     ${window.flowHideVF?'':`<td style="padding:6px 6px;vertical-align:top;position:sticky;left:${(window._flowSL||{}).vendor||0}px;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${vendorHtml}</td>
     <td style="padding:6px 6px;vertical-align:top;position:sticky;left:${(window._flowSL||{}).factory||78}px;z-index:3;background:${stickyBg};width:78px;min-width:78px;max-width:78px;">${factoryHtml}</td>`}
     ${window.flowShowCode?`<td style="padding:6px 8px;vertical-align:top;position:sticky;left:${(window._flowSL||{}).code||0}px;z-index:3;background:${stickyBg};width:110px;min-width:110px;max-width:110px;"><span style="font-size:11px;font-weight:700;color:var(--muted);">${it.no}</span></td>`:''}
