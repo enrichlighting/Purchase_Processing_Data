@@ -9493,11 +9493,8 @@ function pkOutstandingFor(po,item){ const rel=(window.BC_POREL&&window.BC_POREL[
 // ตู้ "ถึงคลังแล้ว" = PO ที่เชื่อมกับตู้มีการรับเข้า (ค้างรับปัจจุบัน < ตอนจัดตู้) หรือทุกตู้ผ่าน ETA ถึงคลังแล้ว
 function pkRoundArrived(s){
   if(!s || s.pending || s.mode!=='released') return false;
-  let base=0, cur=0, any=false;
-  (s.rows||[]).forEach(r=>{ if(!r.item||!r.po) return; const lm=(r.lotMax!=null&&r.lotMax!=='')?(+r.lotMax):null; if(lm==null) return; const c=pkOutstandingFor(r.po,r.item); if(c==null) return; base+=lm; cur+=c; any=true; });
-  if(any && cur < base-0.5) return true;                                   // มีการรับเข้า (ค้างรับลดลง)
-  const conts=s.containers||[]; if(conts.length && conts.every(ct=>{ const w=ct.dates&&ct.dates.arrWh; return w && poToday()>=w; })) return true;   // ทุกตู้ถึงคลังแล้ว (ETA)
-  return false;
+  const conts=s.containers||[];
+  return !!(conts.length && conts.every(ct=>{ const w=ct.dates&&ct.dates.arrWh; return w && poToday()>=w; }));   // ถึงคลัง = ทุกตู้ถึงวัน ETA (arrWh) แล้วเท่านั้น · ไม่อิงค้างรับลดอีกแล้ว
 }
 // วันที่อ้างอิงของรอบ (สำหรับจัดกลุ่มเดือน/ปี ในแท็บถึงคลัง) = วันถึงคลังล่าสุด · ไม่มีก็ใช้เวลาบันทึก
 function pkRoundDate(s){ let d=''; (s.containers||[]).forEach(ct=>{ const w=ct.dates&&ct.dates.arrWh; if(w && w>d) d=w; }); if(!d) d=(typeof pkTsParts==='function'?pkTsParts(s).orig:s.ts||'').slice(0,10); return d; }
